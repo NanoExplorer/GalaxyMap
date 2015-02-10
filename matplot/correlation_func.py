@@ -49,28 +49,55 @@ def d_p_est(r,dr,actual_kd,random_kd):
     print('.',end="",flush=True)
     return ((DD[1]-DD[0])/(DR[1]-DR[0]))-1
 """
-def hamest(r,dr,actual_list,random_list):
+def hamest(min_value,max_value,step,actual_list,random_list):
+    """
+    Notes: step = 2*dx
+    min_value - dx >> 0 (or else we find a distance that is slightly greater than zero
+    and we end up with a zero galaxy count and a divide by zero error)
+    
+    if min value is 1 and max value is 6 and step is one, we should generate a range
+    [1,2,3,4,5,6(!!!!)]
+    then subtract step/2 for
+    [.5,1.5,2.5,3.5,4.5,5.5]
+    so that the range generated ends up being in the middle of each pair (list[0],list[1]) or (list[1],list[2]) etc
+    of values in the resultant list.
+    """
     actual_kd = space.cKDTree(actual_list,3)
     random_kd = space.cKDTree(random_list,3)
-    lower = r-(dr/2)
+    num_elements = int((max_value-min_value)/step)+1+1 #one because range is not inclusive,
+                                                       #one because int rounds down (and we want an EXTRA element)
+    intervals = [((x*step)+min_value)-(step/2) for x in range(num_elements)]
+    #This one needs the extra value at the end for producing intervals from first-dx to last+dx
+    
+    xs = [(x*step)+min_value for x in range(num_elements-1)]
+    #Here we DON'T want that extra element, so we       ^ subtract one from num_elements
+    #this will be the desired list of x values
+    
+    check_list = np.array(intervals)
+    print(intervals)
+    lower = min(check_list)
     assert(lower >= 0)
-    upper = r+(dr/2)
-    DD = actual_kd.count_neighbors(actual_kd,np.array([lower,upper]))
-    DR = actual_kd.count_neighbors(random_kd,np.array([lower,upper]))
-    RR = random_kd.count_neighbors(random_kd,np.array([lower,upper]))
-    print('.',end="",flush=True)
-    DDr = DD[1]-DD[0]
-    DRr = DR[1]-DR[0]
-    RRr = RR[1]-RR[0]
-    return (DDr*RRr)/(DRr**2)-1
+    DDs = actual_kd.count_neighbors(actual_kd,check_list)
+    DRs = actual_kd.count_neighbors(random_kd,check_list)
+    RRs = random_kd.count_neighbors(random_kd,check_list)
+    dxs = itertools.repeat(step/2) #error in each x value
+    correlations = calculate_correlations(DDs,DRs,RRs)
+    
+    #return value looks like this: a list of tuples, (x value, x uncertainty, y value)
+    return zip(xs,dxs,correlations)
 
-def hamestunzip(args):
-    print(args)
-    return hamest(args[0],args[1],args[2],args[3])
+def calculate_correlations(DDs,DRs,RRs):
+    results = []
+    for index in range(len(DDs)-1):
+        DDr = DDs[index+1]-DDs[index]
+        DRr = DRs[index+1]-DRs[index]
+        RRr = RRs[index+1]-RRs[index]
+        results.append((DDr*RRr)/(DRr**2)-1)
+    return results
 
     
 def makeplot(xs,ys,title,xl,yl):
-    fig = plt.figure(figsize=(4,3),dpi=200)
+    fig = plt.figure(figsize=(4,3),dpi=100)
     ax = fig.add_subplot(111)
     ax.loglog(xs,ys,'o')
     ax.set_title(title)
@@ -78,6 +105,14 @@ def makeplot(xs,ys,title,xl,yl):
     plt.ylabel(yl)
     plt.show()
 
+def unwrap(zvals):
+    xs = []
+    ys = []
+    for tup in zvals:
+        xs.append(tup[0])
+        ys.append(tup[2])
+    return (xs,ys)
+        
 def main():
     master_bins = []
     master_corrs = []
@@ -87,38 +122,19 @@ def main():
     num_galax = len(xs)
     assert(len(xs) == len(ys) == len(zs))
     actual_galaxies = np.array(list(zip(xs,ys,zs)))
-#    print("Planting trees, watering them, and letting them grow...")
-#    actual_kd = space.cKDTree(actual_galaxies,3)
-    print("Filling pool...")
-    pool=Pool(processes=NUM_PROCESSORS)
-    start=time.time()
-    for x in range(5):
-        print("Run {}:".format(x+1))
-        print("    Generating random data set and corresponding tree...")
-        random_galaxies = np.random.uniform(cubic_min,cubic_max,(num_galax,3))
-#        random_kd = space.cKDTree(random_galaxies,3)
-        bins = [(x*.1) + 1 for x in range(100)]
-        random.shuffle(bins)
-        print("    Computing correlation function...")
-        print("    ",end="",flush=True)
-        dr = 0.05
-        
-        correlation_func_of_r = list(pool.starmap(hamest,list(zip(bins,
-                                                                   itertools.repeat(dr),
-                                                                   itertools.repeat(actual_galaxies),
-                                                                   itertools.repeat(random_galaxies)))))
-        
-        print("Complete.")
-        master_bins.append(bins)
-        master_corrs.append(correlation_func_of_r)
+    print("    Generating random data set and corresponding tree...")
+    random_galaxies = np.random.uniform(cubic_min,cubic_max,(num_galax,3))
+    print("    Computing correlation function...")
+    start = time.time()
+    correlation_func_of_r = hamest(1,20,.1,actual_galaxies,random_galaxies)
+    print("That took {:.2f} seconds".format(time.time()-start))
     print("Complete.")
-    print("Operation took approximately {:.2f} seconds.".format(time.time()-start))
-    writecsv(master_bins,master_corrs)
-    #makeplot(bins,correlation_func_of_r,"Correlation function of distance r","Distance(Mpc/h)","correlation")
+    xs,ys = unwrap(correlation_func_of_r)
+    makeplot(xs,ys,"Correlation function of distance r","Distance(Mpc/h)","correlation")
 
 def writecsv(xslist,yslist):
     assert(len(xslist)==len(yslist))
-    with open("./out.csv",'w') as csv:
+    with open("./out2.csv",'w') as csv:
         for row in range(len(xslist[0])):
             line = ""
             for cell in range(len(xslist)):
