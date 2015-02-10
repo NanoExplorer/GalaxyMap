@@ -1,0 +1,108 @@
+import matplotlib
+
+matplotlib.use("TkAgg")
+import time
+import matplotlib.backends.backend_pdf as pdfback
+import numpy as np
+import scipy.spatial as space
+import math
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
+from multiprocessing import Pool
+NUM_PROCESSORS = 8
+
+#from mayavi import mlab
+print("Loading Coordinates...")
+
+xs = []#list of x coordinates of galaxies. The coordinates of galaxy zero are (xs[0],ys[0],zs[0])
+ys = []
+zs = []
+
+with open("./BoxOfGalaxies.csv", "r") as boxfile:
+    for line in boxfile:
+        if line[0]!="#":
+            try:
+                row = line.split(',')
+                xs.append(float(row[14]))
+                ys.append(float(row[15]))
+                zs.append(float(row[16]))
+            except ValueError:
+                pass
+
+cubic_min = min(min(xs),min(ys),min(zs))
+cubic_max = max(max(xs),max(ys),max(zs))
+num_galax = len(xs)
+assert(len(xs) == len(ys) == len(zs))
+
+random_galaxies = np.random.uniform(cubic_min,cubic_max,(num_galax,3))
+actual_galaxies = np.array(list(zip(xs,ys,zs)))
+
+random_kd = space.cKDTree(random_galaxies,3)
+actual_kd = space.cKDTree(actual_galaxies,3)
+
+dr = 1
+def d_p_estimator(r):
+    #from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
+    #Nrd = N so the factor Nrd/N = 1 and will be left out.
+    #DD(r) = average number of pairs
+    #DR(r) = average num pairs between random and actual
+    lower = r-(dr/2)
+    assert(lower >= 0)
+    upper = r+(dr/2)
+
+    DD = actual_kd.count_neighbors(actual_kd,np.array([lower,upper]))
+    DR = actual_kd.count_neighbors(random_kd,np.array([lower,upper]))
+    return ((DD[1]-DD[0])/(DR[1]-DR[0]))-1
+
+bins = [x + 1.5 for x in range(30)]
+pool=Pool(processes=NUM_PROCESSORS)
+start=time.time()
+correlation_func_of_r = list(pool.map(d_p_estimator,bins))
+fig = plt.figure(figsize=(11,8),dpi=400)
+ax = fig.add_subplot(111)
+ax.semilogy(bins,correlation_func_of_r,marker='o')
+ax.set_title("Correlation function of distance r")
+plt.xlabel("Distance (Mpc/h)")
+plt.ylabel("correlation")
+plt.show()
+"""
+print("Generating plots...")
+fig=plt.figure(figsize=(16,9), dpi=400)
+ax = fig.add_subplot(111, projection='hammer')
+ax.scatter(thetas, phis, s=mag, color = 'r', marker = '.', linewidth = "1")
+ax.set_title('Angular Distribution of Galaxies')
+plt.xlabel('azimuth')
+plt.ylabel('elevation')
+#ax2 = fig.add_subplot(212)
+#numbins = 50
+#ax2.hist(rho,numbins,color='g',alpha=0.8)
+
+fig2=plt.figure(figsize=(15,5), dpi=400)
+hs = fig2.add_subplot(131)
+hs2= fig2.add_subplot(132)
+hs3= fig2.add_subplot(133)
+numbins = 50
+hs.hist (xs,numbins,color='g',alpha=0.8)
+hs2.hist(ys,numbins,color='g',alpha=0.8)
+hs3.hist(zs,numbins,color='g',alpha=0.8)
+hs.set_title ('Distribution of Galaxies by X position')
+hs2.set_title('Distribution of Galaxies by Y position')
+hs3.set_title('Distribution of Galaxies by Z position')
+    
+#ax = fig.add_subplot(131, projection='hammer')
+#ax.scatter(thetas, phis, c='r', marker = 'o')
+
+#ax2 = fig.add_subplot(132, projection='3d')
+#ax2.scatter(xs, ys, zs, c='r', marker = 'o')
+
+#ax3 = fig.add_subplot(133)
+#ax3.scatter(phis, thetas, c = 'r', marker = 'o')
+
+#plt.show()
+print("Saving plots...")
+with pdfback.PdfPages('out.pdf') as pdf:    
+    pdf.savefig(fig)
+    pdf.savefig(fig2)
+
+print("Done!")
+"""
