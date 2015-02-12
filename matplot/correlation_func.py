@@ -1,38 +1,16 @@
 print("Loading...")
-import matplotlib
-
-matplotlib.use("TkAgg")
+import common
 import time
-import matplotlib.backends.backend_pdf as pdfback
 import numpy as np
 import scipy.spatial as space
 import math
-from mpl_toolkits.mplot3d import Axes3D
-import matplotlib.pyplot as plt
-from multiprocessing import Pool
-import random
+#from multiprocessing import Pool
+#import random
+import argparse
 import itertools
 NUM_PROCESSORS = 8
 
 #from mayavi import mlab
-def load(filename):
-    print("Loading Coordinates...")
-
-    xs = []#list of x coordinates of galaxies. The coordinates of galaxy zero are (xs[0],ys[0],zs[0])
-    ys = []
-    zs = []
-
-    with open(filename, "r") as boxfile:
-        for line in boxfile:
-            if line[0]!="#":
-                try:
-                    row = line.split(',')
-                    xs.append(float(row[14]))
-                    ys.append(float(row[15]))
-                    zs.append(float(row[16]))
-                except ValueError:
-                    pass
-    return (xs,ys,zs)
 
 """
 def d_p_est(r,dr,actual_kd,random_kd):
@@ -62,6 +40,9 @@ def hamest(min_value,max_value,step,actual_list,random_list):
     so that the range generated ends up being in the middle of each pair (list[0],list[1]) or (list[1],list[2]) etc
     of values in the resultant list.
     """
+    #We have to make the KD tree here because if we want to run an instance of this function on each processor
+    #we need to make sure that we aren't passing any cKD trees into it. (Pickle drives the multiprocessing
+    #argument passing, and a cpython object cannot be handled by pickle)
     actual_kd = space.cKDTree(actual_list,3)
     random_kd = space.cKDTree(random_list,3)
     num_elements = int((max_value-min_value)/step)+1+1 #one because range is not inclusive,
@@ -74,7 +55,6 @@ def hamest(min_value,max_value,step,actual_list,random_list):
     #this will be the desired list of x values
     
     check_list = np.array(intervals)
-    print(intervals)
     lower = min(check_list)
     assert(lower >= 0)
     DDs = actual_kd.count_neighbors(actual_kd,check_list)
@@ -90,20 +70,15 @@ def calculate_correlations(DDs,DRs,RRs):
     results = []
     for index in range(len(DDs)-1):
         DDr = DDs[index+1]-DDs[index]
+        #DDr, DRr, and RRr are all "number of objects in a shell" not "number of
+        #objects closer than". This function converts from "closer than" to "in a shell"
         DRr = DRs[index+1]-DRs[index]
         RRr = RRs[index+1]-RRs[index]
         results.append((DDr*RRr)/(DRr**2)-1)
+        #This is the formula for a hamilton estimator from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
     return results
 
     
-def makeplot(xs,ys,title,xl,yl):
-    fig = plt.figure(figsize=(4,3),dpi=100)
-    ax = fig.add_subplot(111)
-    ax.loglog(xs,ys,'o')
-    ax.set_title(title)
-    plt.xlabel(xl)
-    plt.ylabel(yl)
-    plt.show()
 
 def unwrap(zvals):
     xs = []
@@ -114,73 +89,48 @@ def unwrap(zvals):
     return (xs,ys)
         
 def main():
+    #Handle command line arguments
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers()
+    parser_gensettings = subparsers.add_parser('sample_settings', help="generates a sample settings file")
+    parser_gensettings.set_defaults(func=common.gensettings)
+    parser_run = subparsers.add_parser('run', help="runs the correlation function")
+    parser_run.add_argument("settings",help="Read in settings from this file.", type=str)
+    parser_run.set_defaults(func=mainrun)
+    
+    args = parser.parse_args()
+
+    function = None
+    try:
+        function =args.func
+    except AttributeError:
+        parser.print_help()
+        exit()
+    function(args)
+
+def mainrun(args):
     master_bins = []
     master_corrs = []
-    xs, ys, zs = load("./BoxOfGalaxies.csv")
+    settings = common.getsettings(args.settings)
+    filename = settings["filename"]
+    min_x =    settings["min_x"]
+    max_x =    settings["max_x"]
+    step_size =settings["step_size"]
+    xs, ys, zs = common.loadCSVData(filename)
     cubic_min = min(min(xs),min(ys),min(zs))
     cubic_max = max(max(xs),max(ys),max(zs))
     num_galax = len(xs)
     assert(len(xs) == len(ys) == len(zs))
     actual_galaxies = np.array(list(zip(xs,ys,zs)))
-    print("    Generating random data set and corresponding tree...")
+    print("    Generating random data set...")
     random_galaxies = np.random.uniform(cubic_min,cubic_max,(num_galax,3))
     print("    Computing correlation function...")
     start = time.time()
-    correlation_func_of_r = hamest(1,20,.1,actual_galaxies,random_galaxies)
+    correlation_func_of_r = hamest(min_x,max_x,step_size,actual_galaxies,random_galaxies)
     print("That took {:.2f} seconds".format(time.time()-start))
     print("Complete.")
     xs,ys = unwrap(correlation_func_of_r)
-    makeplot(xs,ys,"Correlation function of distance r","Distance(Mpc/h)","correlation")
-
-def writecsv(xslist,yslist):
-    assert(len(xslist)==len(yslist))
-    with open("./out2.csv",'w') as csv:
-        for row in range(len(xslist[0])):
-            line = ""
-            for cell in range(len(xslist)):
-                line = line + str(xslist[cell][row]) + ',' + str(yslist[cell][row])+ ','
-            line = line + '\n'
-            csv.write(line)
+    common.makeplot(xs,ys,"Correlation function of distance r","Distance(Mpc/h)","correlation")
+                     
 if __name__ == "__main__":
     main()
-"""
-print("Generating plots...")
-fig=plt.figure(figsize=(16,9), dpi=400)
-ax = fig.add_subplot(111, projection='hammer')
-ax.scatter(thetas, phis, s=mag, color = 'r', marker = '.', linewidth = "1")
-ax.set_title('Angular Distribution of Galaxies')
-plt.xlabel('azimuth')
-plt.ylabel('elevation')
-#ax2 = fig.add_subplot(212)
-#numbins = 50
-#ax2.hist(rho,numbins,color='g',alpha=0.8)
-
-fig2=plt.figure(figsize=(15,5), dpi=400)
-hs = fig2.add_subplot(131)
-hs2= fig2.add_subplot(132)
-hs3= fig2.add_subplot(133)
-numbins = 50
-hs.hist (xs,numbins,color='g',alpha=0.8)
-hs2.hist(ys,numbins,color='g',alpha=0.8)
-hs3.hist(zs,numbins,color='g',alpha=0.8)
-hs.set_title ('Distribution of Galaxies by X position')
-hs2.set_title('Distribution of Galaxies by Y position')
-hs3.set_title('Distribution of Galaxies by Z position')
-    
-#ax = fig.add_subplot(131, projection='hammer')
-#ax.scatter(thetas, phis, c='r', marker = 'o')
-
-#ax2 = fig.add_subplot(132, projection='3d')
-#ax2.scatter(xs, ys, zs, c='r', marker = 'o')
-
-#ax3 = fig.add_subplot(133)
-#ax3.scatter(phis, thetas, c = 'r', marker = 'o')
-
-#plt.show()
-print("Saving plots...")
-with pdfback.PdfPages('out.pdf') as pdf:    
-    pdf.savefig(fig)
-    pdf.savefig(fig2)
-
-print("Done!")
-"""
