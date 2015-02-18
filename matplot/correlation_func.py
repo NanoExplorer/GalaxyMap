@@ -156,10 +156,9 @@ def mainrun(args):
             ys_for_this_x.append(correlation_func_of_r[y][x_value][2])
         final_data.append((correlation_func_of_r[0][x_value][0],
                            correlation_func_of_r[0][x_value][1],
-                           np.average(ys_for_this_x),
+                           2*np.average(ys_for_this_x),
                            np.std(ys_for_this_x)))
     
-
     print("Complete.")
     common.makeplotWithErrors(final_data,"Correlation function of distance r","Distance(Mpc/h)","correlation")
                      
