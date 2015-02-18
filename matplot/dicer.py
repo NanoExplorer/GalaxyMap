@@ -55,9 +55,9 @@ def dice(args):
                             #store the coordinate in the max part of the file
                             minmax[dimension][MAX] = coord[dimension]
                         #same ish for the minimums
-                        else if coord[dimension]<minmax[dimension][MIN]:
+                        elif coord[dimension]<minmax[dimension][MIN]:
                             minmax[dimension][MIN] = coord[dimension]
-"""    
+    """    
 #    We now know the size of the box and will be able to use that to decide the chopping points for
 #    the galaxies. Who knows if we will ever need any more information out of the box (it's entirely possible)
 #    so we are going to copy entire lines.

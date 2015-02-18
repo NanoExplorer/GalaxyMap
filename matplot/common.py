@@ -50,10 +50,23 @@ def getdict(filename):
     return jsondict
 
 
+
 def makeplot(xs,ys,title,xl,yl):
     fig = plt.figure(figsize=(4,3),dpi=100)
     ax = fig.add_subplot(111)
     ax.loglog(xs,ys,'o')
+    ax.set_title(title)
+    plt.xlabel(xl)
+    plt.ylabel(yl)
+    plt.show()
+
+def makeplotWithErrors(data,title,xl,yl):
+    fig = plt.figure(figsize=(4,3),dpi=100)
+    ax = fig.add_subplot(111)
+    ax.set_xscale("log", nonposx='clip')
+    ax.set_yscale("log", nonposx='clip')
+
+    plt.errorbar([x[0] for x in data],[x[2] for x in data],xerr=[x[1] for x in data],yerr=[x[3] for x in data]) 
     ax.set_title(title)
     plt.xlabel(xl)
     plt.ylabel(yl)

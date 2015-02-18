@@ -20,7 +20,7 @@ def main():
 
     parser_breakbox = subparsers.add_parser('divide', help='runs the "dicer" function to divide a huge box into smaller boxes')
     parser_breakbox.add_argument("settings",help="Read in settings from this file.",type=str)
-    parser_correlation.set_defaults(func=dicer.dice)
+    parser_breakbox.set_defaults(func=dicer.dice)
     
     args = parser.parse_args()
 
