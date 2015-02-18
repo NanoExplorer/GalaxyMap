@@ -1,6 +1,7 @@
 #Takes in a file,
 #chops it up into many files based on x y and z positions (boxes)
 import common
+import math
 
 def dice(args):
     #algorithm: go through the box and find its bounds
@@ -23,6 +24,7 @@ def dice(args):
     sizes = (settings["x_box_size"], settings["y_box_size"], settings["z_box_size"])
     radius = settings["expected_radius"]
     outFileName = settings["boxname"]
+    """
     minmax = [[None,None],[None,None],[None,None]]
 #    Here we loop through the file, finding the global maximum and minimum of the data set.
 #    This is an expensive operation (for HDD time) but optimally it will only have to run once ever
@@ -39,25 +41,25 @@ def dice(args):
                     coord = (float(row[14]),float(row[15]),float(row[16]))
                 except ValueError:
                     pass
-                    
-                if first:
-                    minmax[X][MIN] = coord[X]
-                    minmax[X][MAX] = coord[X]
-                    minmax[Y][MIN] = coord[Y]
-                    minmax[Y][MAX] = coord[Y]
-                    minmax[Z][MIN] = coord[Z]
-                    minmax[Z][MAX] = coord[Z]
-                    first = False
-                else:
-                    for dimension in range(3):
-                        #if the current coordinate is bigger than the current max
-                        if coord[dimension]>minmax[dimension][MAX]:
-                            #store the coordinate in the max part of the file
-                            minmax[dimension][MAX] = coord[dimension]
-                        #same ish for the minimums
-                        elif coord[dimension]<minmax[dimension][MIN]:
-                            minmax[dimension][MIN] = coord[dimension]
-    """    
+                if coord is not None:    
+                    if first:
+                        minmax[X][MIN] = coord[X]
+                        minmax[X][MAX] = coord[X]
+                        minmax[Y][MIN] = coord[Y]
+                        minmax[Y][MAX] = coord[Y]
+                        minmax[Z][MIN] = coord[Z]
+                        minmax[Z][MAX] = coord[Z]
+                        first = False
+                    else:
+                        for dimension in range(3):
+                            #if the current coordinate is bigger than the current max
+                            if coord[dimension]>minmax[dimension][MAX]:
+                                #store the coordinate in the max part of the file
+                                minmax[dimension][MAX] = coord[dimension]
+                            #same ish for the minimums
+                            elif coord[dimension]<minmax[dimension][MIN]:
+                                minmax[dimension][MIN] = coord[dimension]
+   """ """    
 #    We now know the size of the box and will be able to use that to decide the chopping points for
 #    the galaxies. Who knows if we will ever need any more information out of the box (it's entirely possible)
 #    so we are going to copy entire lines.
@@ -85,8 +87,8 @@ def dice(args):
     #We will also build the extended boxes each centered around a normal box
     #These operations will run concurrently so as to minimize unnecessary disk i/o usage
     with open(inFileName,'r') as infile:
-        for line in infile:
-            line = line.strip()
+        for rawline in infile:
+            line = rawline.strip()
             if line[0] != "#":
                 row = line.split(',')
                 coord = None
@@ -94,8 +96,15 @@ def dice(args):
                     coord = (float(row[14]),float(row[15]),float(row[16]))
                 except ValueError:
                     pass
-                    
-                    
+                if coord is not None:
+                    boxIndex = (math.floor(coord[0]/sizes[0]),
+                                math.floor(coord[1]/sizes[1]),
+                                math.floor(coord[2]/sizes[2]))
+                    boxfilename = common.getBoxName(outFileName,*boxIndex)
+                    #NOTE: The asterisk passes each part of the tuple as one argument.
+                    #Which is REALLY HANDY and also REALLY OBSCURE. Be careful!
+                    with open(boxfilename, 'a') as boxfile:
+                        boxfile.write(rawline)
 
 
     

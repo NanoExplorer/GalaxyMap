@@ -72,6 +72,8 @@ def makeplotWithErrors(data,title,xl,yl):
     plt.ylabel(yl)
     plt.show()
 
+def getBoxName(name, xi, yi, zi):
+    return name + '_{}_{}_{}.box'.format(xi,yi,zi)
 
 def loadCSVData(filename):
     """
