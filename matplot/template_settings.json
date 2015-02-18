@@ -1,0 +1,20 @@
+{
+    "correlation": {
+        "filename": "BoxOfGalaxies.csv",
+        "max_x": 10.0,
+        "min_x": 1.0,
+        "num_runs": 8,
+        "step_size": 1
+    },
+    "divide": {
+        "filename": "BoxOfGalaxies.csv",
+        "x_box_size":10,
+        "y_box_size":10,
+        "z_box_size":10,
+	"expected_radius":1,
+        "boxname":"Test"
+    },
+    "test": {
+        "a thing": "another thing"
+    }
+}

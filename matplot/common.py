@@ -3,11 +3,11 @@ This file contains common functions used by my millenium programs. It contains m
 like loading files and outputting data.
 
 Function reference:
-    gensettings(args)
-        takes an args paramater from argparse (which is never used) and writes a sample settings json file
-        to settings.json in the current folder.
-    getsettings(filename)
+    getdict(filename)
         Gets json settings stored in the filename, parses them and returns them as a python dictionary
+    gensettings(args)
+        takes an args paramater from argparse (assumed to have a  and writes a sample settings json file
+        to settings.json in the current folder.
     loadCSVData(filename)
         Loads galaxy coordinates from a CSV file.
         Returns (xs, ys, zs) as a tuple
@@ -26,22 +26,28 @@ import matplotlib.backends.backend_pdf as pdfback
 import numpy as np
 import json
 import matplotlib.pyplot as plt
+import os.path
 
 def gensettings(args):
-    if(input("Are you sure you want to overwrite settings.json? (y/n)")=='y'):
-        with open("settings.json",'w') as settings:
-            settingsDict = {'filename':'BoxOfGalaxies.csv','min_x':1.0,'max_x':10.0,'step_size':0.05,'num_runs':8}
-            settings.write(json.dumps(settingsDict,
-                                   sort_keys=True,
-                                   indent=4, separators=(',', ': ')))
+    module = args.module
+    filename = "settings_{}.json".format(module)
+    template = getdict("template_settings.json")
+    if(not os.path.exists(filename) or input("Are you sure you want to overwrite {}? (y/n) ".format(filename))=='y'):
+        #if the file doesn't exist, it goes ahead with out asking.
+        #if the file does exist, then it asks.
+        #Woo for boolean operator overloading!
+        with open(filename,'w') as settings:
+            settings.write(json.dumps(template[module],
+                                      sort_keys=True,
+                                      indent=4, separators=(',', ': ')))
     exit()
 
-def getsettings(filename):
+def getdict(filename):
     jsondict = None
     with open(filename,'r') as settings:
         jsondict = json.loads(settings.read())
         #reads the entire settings file with .read(), then loads it as a json dictionary, and stores it into jsondict
-        return jsondict
+    return jsondict
 
 
 def makeplot(xs,ys,title,xl,yl):
@@ -57,7 +63,12 @@ def makeplot(xs,ys,title,xl,yl):
 def loadCSVData(filename):
     """
     Loads galaxy data from a CSV file. Assumes that the data is in the same format that my csv box was in,
-    that is that X, Y, and Z coordinates are in rows 14,15, and 16 respectively.
+    that is that X, Y, and Zelp='an integer for the accumulator')
+    parser.add_argument('--sum', dest='accumulate', action='store_const',
+                                           const=sum, default=max,
+                                           help='sum the integers (default: find the max)')
+
+    args = parser.parse_coordinates are in rows 14,15, and 16 respectively.
     """
     print("Loading Coordinates...")
 

@@ -1,4 +1,3 @@
-print("Loading...")
 import common
 import time
 import numpy as np
@@ -6,7 +5,6 @@ import scipy.spatial as space
 import math
 #from multiprocessing import Pool
 #import random
-import argparse
 import itertools
 NUM_PROCESSORS = 8
 
@@ -43,6 +41,7 @@ def hamest(min_value,max_value,step,actual_list,random_list):
     #We have to make the KD tree here because if we want to run an instance of this function on each processor
     #we need to make sure that we aren't passing any cKD trees into it. (Pickle drives the multiprocessing
     #argument passing, and a cpython object cannot be handled by pickle)
+    random_galaxies = np.random.uniform(cubic_min,cubic_max,(num_galax,3))        
     actual_kd = space.cKDTree(actual_list,3)
     random_kd = space.cKDTree(random_list,3)
     num_elements = int((max_value-min_value)/step)+1+1 #one because range is not inclusive,
@@ -64,6 +63,7 @@ def hamest(min_value,max_value,step,actual_list,random_list):
     correlations = calculate_correlations(DDs,DRs,RRs)
     
     #return value looks like this: a list of tuples, (x value, x uncertainty, y value)
+    print('.',end="",flush=True)
     return zip(xs,dxs,correlations)
 
 def calculate_correlations(DDs,DRs,RRs):
@@ -88,27 +88,9 @@ def unwrap(zvals):
         ys.append(tup[2])
     return (xs,ys)
         
-def main():
-    #Handle command line arguments
-    parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers()
-    parser_gensettings = subparsers.add_parser('sample_settings', help="generates a sample settings file")
-    parser_gensettings.set_defaults(func=common.gensettings)
-    parser_run = subparsers.add_parser('run', help="runs the correlation function")
-    parser_run.add_argument("settings",help="Read in settings from this file.", type=str)
-    parser_run.set_defaults(func=mainrun)
-    
-    args = parser.parse_args()
-
-    function = None
-    try:
-        function =args.func
-    except AttributeError:
-        parser.print_help()
-        exit()
-    function(args)
 
 def mainrun(args):
+    print("Setting things up...")
     master_bins = []
     master_corrs = []
     settings = common.getsettings(args.settings)
@@ -116,21 +98,31 @@ def mainrun(args):
     min_x =    settings["min_x"]
     max_x =    settings["max_x"]
     step_size =settings["step_size"]
+    runs = settings["num_runs"]
+    print("Extracting galaxies...")
     xs, ys, zs = common.loadCSVData(filename)
     cubic_min = min(min(xs),min(ys),min(zs))
     cubic_max = max(max(xs),max(ys),max(zs))
     num_galax = len(xs)
     assert(len(xs) == len(ys) == len(zs))
     actual_galaxies = np.array(list(zip(xs,ys,zs)))
-    print("    Generating random data set...")
-    random_galaxies = np.random.uniform(cubic_min,cubic_max,(num_galax,3))
-    print("    Computing correlation function...")
+    print("Computing correlation function...")
+    results = []
     start = time.time()
-    correlation_func_of_r = hamest(min_x,max_x,step_size,actual_galaxies,random_galaxies)
+    print("    ",end="",flush=True)
+    min_x_control = [min_x for x in range(runs)]
+    correlation_func_of_r = list(pool.starmap(hamest,list(zip(min_x_control,
+                                                              itertools.repeat(max_x),
+                                                              itertools.repeat(step_size),
+                                                              itertools.repeat(actual_galaxies)))))
+
+
     print("That took {:.2f} seconds".format(time.time()-start))
     print("Complete.")
-    xs,ys = unwrap(correlation_func_of_r)
+    
     common.makeplot(xs,ys,"Correlation function of distance r","Distance(Mpc/h)","correlation")
                      
 if __name__ == "__main__":
-    main()
+    print("This python file does not run as a script. Instead use:")
+    print("python galaxy.py correlation settings.json")
+    print("where settings.json is your settings file.")
