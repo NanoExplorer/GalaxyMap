@@ -25,59 +25,82 @@ def d_p_est(r,dr,actual_kd,random_kd):
     print('.',end="",flush=True)
     return ((DD[1]-DD[0])/(DR[1]-DR[0]))-1
 """
-def hamest(unique,min_value,max_value,step,actual_list,box_info):
-    """
-    Notes: step = 2*dx
-    min_value - dx >> 0 (or else we find a distance that is slightly greater than zero
-    and we end up with a zero galaxy count and a divide by zero error)
-
-    
-    if min value is 1 and max value is 6 and step is one, we should generate a range
-    [1,2,3,4,5,6(!!!!)]
-    then subtract step/2 for
-    [.5,1.5,2.5,3.5,4.5,5.5]
-    so that the range generated ends up being in the middle of each pair (list[0],list[1]) or (list[1],list[2]) etc
-    of values in the resultant list.
-
-    Also, that above paragraph is wrong, and we'll have to do something to fix it in the future. It will be good
-    to be able to have overlapping shells.
-    """
-    #We have to make the KD tree here because if we want to run an instance of this function on each processor
-    #we need to make sure that we aren't passing any cKD trees into it. (Pickle drives the multiprocessing
-    #argument passing, and a cpython object cannot be handled by pickle)
-    cubic_min, cubic_max, num_galax = box_info
+def correlate_box(boxfilename, intervals):
+    #load in the subbox
+    #ACTUALLY, the load csv data function probably has more overhead than we need.
+    #The box cutter has really simplified everything
+    xs, ys, zs = common.loadCSVData(boxfilename)
+    #compute its minimum and maximum bounds
+    cubic_min = min(min(xs),min(ys),min(zs))
+    cubic_max = max(max(xs),max(ys),max(zs))
+    #and its length
+    num_galax = len(xs)
+    #make sure we don't have a jagged array somehow
+    assert(num_galax == len(ys) == len(zs))
+    actual_galaxies = np.array(list(zip(xs,ys,zs)))
+    #Make a thread-safe random number generator
     rng = np.random.RandomState()
-    random_list = rng.uniform(cubic_min,cubic_max,(num_galax,3))        
-    #    with open(str(unique),'w') as dmp:
-    #        dmp.write(str(random_list))
-
+    #and use it to make a list of random galaxy positions
+    random_list = rng.uniform(cubic_min,cubic_max,(num_galax,3))
+    #make kd trees        
     actual_kd = space.cKDTree(actual_list,3)
     random_kd = space.cKDTree(random_list,3)
-    num_elements = int((max_value-min_value)/step)+1+1 #one because range is not inclusive,
-                                                       #one because int rounds down (and we want an EXTRA element)
-    intervals = [((x*step)+min_value)-(step/2) for x in range(num_elements)]
-    #This one needs the extra value at the end for producing intervals from first-dx to last+dx
+    DDs = actual_kd.count_neighbors(actual_kd,intervals)
+    DRs = actual_kd.count_neighbors(random_kd,intervals)
+    RRs = random_kd.count_neighbors(random_kd,intervals)
+
+    return((DDs,DRs,RRs))
     
-    xs = [(x*step)+min_value for x in range(num_elements-1)]
-    #Here we DON'T want that extra element, so we       ^ subtract one from num_elements
-    #this will be the desired list of x values
+
+def calculate_correlations(args):
+    """
+    args = (unique, boxname, numpoints, dr)
+    
+    min_value - dr >> 0 (or else we find a distance that is slightly greater than zero
+    and we end up with a zero galaxy count and a divide by zero error)
+    """
+
+    unique, boxname, numpoints, dr, step_size, min_r = args
+
+    xs = [(min_r+step_size*x) for x in range(numpoints)]
+    intervals = []
+    for x in xs:
+        intervals.append(x-(dr/2.0))
+        intervals.append(x+(dr/2.0))
+
     
     check_list = np.array(intervals)
     lower = min(check_list)
     assert(lower >= 0)
-    DDs = actual_kd.count_neighbors(actual_kd,check_list)
-    DRs = actual_kd.count_neighbors(random_kd,check_list)
-    RRs = random_kd.count_neighbors(random_kd,check_list)
-    dxs = itertools.repeat(step/2) #error in each x value
-    correlations = calculate_correlations(DDs,DRs,RRs)
-    
+    radial_error = itertools.repeat(dr/2) #error in each r value
+
+    DDs = [0 for x in range(len(check_list))]
+    DRs = [0 for x in range(len(check_list))]#These arrays should contain total numbers of pairs.
+    RRs = [0 for x in range(len(check_list))]
+
+    #make a list of boxes:
+    boxes = common.getdict(boxname)['list_of_files']
+    #THIS IS POTENTIALLY INEFFICIENT! Consider getting this dictionary from outside this function
+    #and passing paramaters in so that we only have to load the dictionary from file once.
+    #This is probably fine for small numbers of boxes.
+    for box in boxes:
+        miniDDs, miniDRs, miniRRs = correlate_box(box, check_list)
+        assert(len(DDs) == len(DRs) == len(RRs) == len(miniDDs) == len(miniDRs) == len(miniRRs))
+        #I think I'm just paranoid.
+        #Make DDs, DRs, and RRs contain the *total* number of pairs found.
+        for i in range(len(miniDDs)):
+            DDs[i] = DDs[i] + miniDDs[i]
+            DRs[i] = DRs[i] + miniDRs[i]
+            RRs[i] = RRs[i] + miniRRs[i]
+    correlations = hamest(DDs,DRs,RRs)
     #return value looks like this: a list of tuples, (x value, x uncertainty, y value)
     print('.',end="",flush=True)
-    return list(zip(xs,dxs,correlations))
+    return list(zip(xs,radial_error,correlations))
 
-def calculate_correlations(DDs,DRs,RRs):
+
+def hamest(DDs,DRs,RRs):
     results = []
-    for index in range(len(DDs)-1):
+    for index in range(0,len(DDs),2):
         DDr = DDs[index+1]-DDs[index]
         #DDr, DRr, and RRr are all "number of objects in a shell" not "number of
         #objects closer than". This function converts from "closer than" to "in a shell"
@@ -88,7 +111,7 @@ def calculate_correlations(DDs,DRs,RRs):
     return results
 
     
-
+"""
 def unwrap(zvals):
     xs = []
     ys = []
@@ -96,32 +119,23 @@ def unwrap(zvals):
         xs.append(tup[0])
         ys.append(tup[2])
     return (xs,ys)
-        
+   """     
 
 def mainrun(args):
     print("Setting things up...")
-    master_bins = []
-    master_corrs = []
     settings = common.getdict(args.settings)
-    filename = settings["filename"]
-    min_x =    settings["min_x"]
-    max_x =    settings["max_x"]
-    step_size =settings["step_size"]
-    runs = settings["num_runs"]
-    print("Extracting galaxies...")
-    xs, ys, zs = common.loadCSVData(filename)
-    cubic_min = min(min(xs),min(ys),min(zs))
-    cubic_max = max(max(xs),max(ys),max(zs))
-    num_galax = len(xs)
-    assert(len(xs) == len(ys) == len(zs))
-    actual_galaxies = np.array(list(zip(xs,ys,zs)))
+    boxname =   settings["boxname"]
+    numpoints = settings["numpoints"]
+    dr =        settings["dr"]
+    runs =      settings["num_runs"]
+    min_r =     settings["min_r"]
+    step_size = settings["step_size"]
+
     print("Computing correlation function...")
-    results = []
-    start = time.time()
-    print("    ",end="",flush=True)
-    unique = range(runs)
-    pool=Pool(processes=NUM_PROCESSORS)
-    correlation_func_of_r = list(pool.starmap(hamest,list(zip(unique,
+    argslist = [(x,boxname,numpoints,dr,step_size,min_r) for x in range(runs)]
+    correlation_func_of_r = map(calculate_correlations,argslist)
+    
+    """list(pool.starmap(hamest,list(zip(unique,
                                                               itertools.repeat(min_x),
                                                               itertools.repeat(max_x),
                                                               itertools.repeat(step_size),
@@ -131,7 +145,7 @@ def mainrun(args):
                                                               #exists to pass the information to build the random
                                                               #data set to the function.
                                                          
-    """
+    """ """
     the structure of correlation_func_of_r is confusing right now, so I'll write it out.
     [
       [ (x,dx,y), (x,dx,y), ... (x,dx,y) ], <- run 0
@@ -139,9 +153,7 @@ def mainrun(args):
       [ (x,dx,y), (x,dx,y), ... (x,dx,y) ]  <- run 2
     ]
     
-    """
-                                                              
-    print("That took {:.2f} seconds".format(time.time()-start))
+    """                                                              
     print("Computing statistics...")
     """
     OK, so Correlation Func of r is a list containing tuples of xs and ys (and dxs).
@@ -166,3 +178,4 @@ if __name__ == "__main__":
     print("This python file does not run as a script. Instead use:")
     print("python galaxy.py correlation settings.json")
     print("where settings.json is your settings file.")
+    

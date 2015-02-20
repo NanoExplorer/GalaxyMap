@@ -2,6 +2,7 @@
 #chops it up into many files based on x y and z positions (boxes)
 import common
 import math
+import json
 
 def dice(args):
     #algorithm: go through the box and find its bounds
@@ -19,6 +20,8 @@ def dice(args):
     MIN= 0
     MAX = 1
 
+    files = set()
+    
     settings=common.getdict(args.settings)
     inFileName = settings["filename"]
     sizes = (settings["x_box_size"], settings["y_box_size"], settings["z_box_size"])
@@ -101,12 +104,22 @@ def dice(args):
                                 math.floor(coord[1]/sizes[1]),
                                 math.floor(coord[2]/sizes[2]))
                     boxfilename = common.getBoxName(outFileName,*boxIndex)
+                    files.add(boxfilename)
                     #NOTE: The asterisk passes each part of the tuple as one argument.
                     #Which is REALLY HANDY and also REALLY OBSCURE. Be careful!
                     with open(boxfilename, 'a') as boxfile:
                         boxfile.write(rawline)
 
-
+    genericInfo = {"list_of_files": list(files),
+                   "box_x_size": sizes[0],
+                   "box_y_size": sizes[1],
+                   "box_z_size": sizes[2]
+                  }
+    with open(outFileName,'w') as infofile:
+        infofile.write(json.dumps(genericInfo,
+                                  sort_keys = True,
+                                  indent = 4,
+                                  separators = (',', ': ')))
     
 
 
