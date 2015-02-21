@@ -1,9 +1,9 @@
 {
     "correlation": {
         "boxname": "BoxOfGalaxies.csv",
-        "numpoints": 10.0,
+        "numpoints": 10,
         "dr": 1.0,
-        "min_r": 0.25,
+        "min_r": 0.75,
         "step_size": 0.5,
         "_COMMENT":"Step size is the distance between x values. It NEEDS to be smaller than dr",
         "num_runs": 8

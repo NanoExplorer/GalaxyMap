@@ -19,8 +19,7 @@ def dice(args):
     Z = 2
     MIN= 0
     MAX = 1
-
-    files = set()
+    filebounds = dict()
     
     settings=common.getdict(args.settings)
     inFileName = settings["filename"]
@@ -104,13 +103,15 @@ def dice(args):
                                 math.floor(coord[1]/sizes[1]),
                                 math.floor(coord[2]/sizes[2]))
                     boxfilename = common.getBoxName(outFileName,*boxIndex)
-                    files.add(boxfilename)
                     #NOTE: The asterisk passes each part of the tuple as one argument.
                     #Which is REALLY HANDY and also REALLY OBSCURE. Be careful!
+                    
+                    filebounds[boxfilename] = (list(map(lambda x, y: x*y,boxIndex,sizes)),list(map(lambda x, y: (x+1)*y,boxIndex,sizes)))
+                    #calculate the bounding box of this box and add it to a dictionary for later use.
                     with open(boxfilename, 'a') as boxfile:
                         boxfile.write(rawline)
 
-    genericInfo = {"list_of_files": list(files),
+    genericInfo = {"list_of_files": filebounds,
                    "box_x_size": sizes[0],
                    "box_y_size": sizes[1],
                    "box_z_size": sizes[2]
@@ -120,6 +121,17 @@ def dice(args):
                                   sort_keys = True,
                                   indent = 4,
                                   separators = (',', ': ')))
+    with open(outFileName + '_README','w') as readmefile:
+        readmefile.write("""User's guide to the {0} file.
+{0} is in JSON format, and contains information about the boxes in this folder.
+box_x_size, box_y_size, and box_z_size are all floats that describe the size of each box
+in the x, y and z dimensions. 
+List_of_files is a dictionary. Its keys are names of boxes. Iterate through all the keys
+to make sure you've processed each box. The file paths assume that you are running the
+python script from the 'millenium/matplot' folder. 
+The values are lists of two lists. The first list tells you the x, y, and z coordinates (in that order)
+of the smallest corner of the box. The second list tells you the x, y, and z coordinates in that order
+of the largest corner of the box. From there you can figure out everything about the bounding box.""".format(outFileName))
     
 
 

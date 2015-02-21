@@ -85,7 +85,7 @@ def loadCSVData(filename):
 
     args = parser.parse_coordinates are in rows 14,15, and 16 respectively.
     """
-    print("Loading Coordinates...")
+#    print("Loading Coordinates...")
 
     xs = []#list of x coordinates of galaxies. The coordinates of galaxy zero are (xs[0],ys[0],zs[0])
     ys = []

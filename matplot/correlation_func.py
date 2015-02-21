@@ -25,14 +25,14 @@ def d_p_est(r,dr,actual_kd,random_kd):
     print('.',end="",flush=True)
     return ((DD[1]-DD[0])/(DR[1]-DR[0]))-1
 """
-def correlate_box(boxfilename, intervals):
+def correlate_box(boxinfo, intervals):
     #load in the subbox
     #ACTUALLY, the load csv data function probably has more overhead than we need.
     #The box cutter has really simplified everything
-    xs, ys, zs = common.loadCSVData(boxfilename)
-    #compute its minimum and maximum bounds
-    cubic_min = min(min(xs),min(ys),min(zs))
-    cubic_max = max(max(xs),max(ys),max(zs))
+    xs, ys, zs = common.loadCSVData(boxinfo[0])
+    #grab its minimum and maximum values:
+    rect_min = boxinfo[1][0]
+    rect_max = boxinfo[1][1]
     #and its length
     num_galax = len(xs)
     #make sure we don't have a jagged array somehow
@@ -41,9 +41,11 @@ def correlate_box(boxfilename, intervals):
     #Make a thread-safe random number generator
     rng = np.random.RandomState()
     #and use it to make a list of random galaxy positions
-    random_list = rng.uniform(cubic_min,cubic_max,(num_galax,3))
+    random_list = np.array(list(zip(rng.uniform(rect_min[0],rect_max[0],num_galax),
+                                    rng.uniform(rect_min[1],rect_max[1],num_galax),
+                                    rng.uniform(rect_min[2],rect_max[2],num_galax))))
     #make kd trees        
-    actual_kd = space.cKDTree(actual_list,3)
+    actual_kd = space.cKDTree(actual_galaxies,3)
     random_kd = space.cKDTree(random_list,3)
     DDs = actual_kd.count_neighbors(actual_kd,intervals)
     DRs = actual_kd.count_neighbors(random_kd,intervals)
@@ -54,14 +56,13 @@ def correlate_box(boxfilename, intervals):
 
 def calculate_correlations(args):
     """
-    args = (unique, boxname, numpoints, dr)
+    args = (unique, boxinfo, numpoints, dr, step size, minimum radius)
     
     min_value - dr >> 0 (or else we find a distance that is slightly greater than zero
     and we end up with a zero galaxy count and a divide by zero error)
     """
 
-    unique, boxname, numpoints, dr, step_size, min_r = args
-
+    unique, boxinfo, numpoints, dr, step_size, min_r = args
     xs = [(min_r+step_size*x) for x in range(numpoints)]
     intervals = []
     for x in xs:
@@ -79,12 +80,16 @@ def calculate_correlations(args):
     RRs = [0 for x in range(len(check_list))]
 
     #make a list of boxes:
-    boxes = common.getdict(boxname)['list_of_files']
-    #THIS IS POTENTIALLY INEFFICIENT! Consider getting this dictionary from outside this function
-    #and passing paramaters in so that we only have to load the dictionary from file once.
-    #This is probably fine for small numbers of boxes.
-    for box in boxes:
-        miniDDs, miniDRs, miniRRs = correlate_box(box, check_list)
+    boxes = boxinfo['list_of_files'].items()
+    pool = Pool(processes = NUM_PROCESSORS)
+    list_of_DDsDRsRRs = pool.starmap(correlate_box,zip(boxes, itertools.repeat(check_list)))
+        #The box that we're passing them isn't actually *just* a box. Instead it's a tuple
+        #(filename, [[minx,miny,minz],[maxx,maxy,maxz]])
+        #the tuple contains the filename of the box, the coordinates of the box's minimum corner
+        #and the coordinates of the box's maximum corner.
+    
+    for item in list_of_DDsDRsRRs:
+        miniDDs, miniDRs, miniRRs = item
         assert(len(DDs) == len(DRs) == len(RRs) == len(miniDDs) == len(miniDRs) == len(miniRRs))
         #I think I'm just paranoid.
         #Make DDs, DRs, and RRs contain the *total* number of pairs found.
@@ -124,16 +129,17 @@ def unwrap(zvals):
 def mainrun(args):
     print("Setting things up...")
     settings = common.getdict(args.settings)
+
     boxname =   settings["boxname"]
     numpoints = settings["numpoints"]
     dr =        settings["dr"]
     runs =      settings["num_runs"]
     min_r =     settings["min_r"]
     step_size = settings["step_size"]
-
+    boxinfo = common.getdict(boxname)
     print("Computing correlation function...")
-    argslist = [(x,boxname,numpoints,dr,step_size,min_r) for x in range(runs)]
-    correlation_func_of_r = map(calculate_correlations,argslist)
+    argslist = [(x,boxinfo,numpoints,dr,step_size,min_r) for x in range(runs)]
+    correlation_func_of_r = list(map(calculate_correlations,argslist))
     
     """list(pool.starmap(hamest,list(zip(unique,
                                                               itertools.repeat(min_x),
