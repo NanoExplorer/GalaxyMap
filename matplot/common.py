@@ -103,6 +103,30 @@ def loadCSVData(filename):
                     pass#sometimes the CSV file doesn't contain a number. In that case, just skip that row.
     return (xs,ys,zs)
 
+def loadCSVData(filename):
+    """
+    Loads galaxy data from a CSV file. Assumes that the data is in the same format that my csv box was in,
+    that is that X, Y, and Zelp='an integer for the accumulator')
+    parser.add_argument('--sum', dest='accumulate', action='store_const',
+                                           const=sum, default=max,
+                                           help='sum the integers (default: find the max)')
+
+    args = parser.parse_coordinates are in rows 14,15, and 16 respectively.
+    """
+#    print("Loading Coordinates...")
+
+    xs = []#list of x coordinates of galaxies. The coordinates of galaxy zero are (xs[0],ys[0],zs[0])
+    ys = []
+    zs = []
+
+    with open(filename, "r") as boxfile:
+        for line in boxfile:
+            row = line.split(',')
+            xs.append(float(row[0]))
+            ys.append(float(row[1]))
+            zs.append(float(row[2]))
+    return (xs,ys,zs)
+
 def writecsv(xslist,yslist):
     assert(len(xslist)==len(yslist))
     with open("./out2.csv",'w') as csv:
