@@ -92,10 +92,10 @@ def dice(args):
         for rawline in infile:
             line = rawline.strip()
             if line[0] != "#":
-                row = line.split(',')
+                row = line.split()
                 coord = None
                 try:
-                    coord = (float(row[14]),float(row[15]),float(row[16]))
+                    coord = (float(row[0]),float(row[1]),float(row[2]))
                 except ValueError:
                     pass
                 if coord is not None:

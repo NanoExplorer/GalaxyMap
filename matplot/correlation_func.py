@@ -29,7 +29,7 @@ def correlate_box(boxinfo, intervals):
     #load in the subbox
     #ACTUALLY, the load csv data function probably has more overhead than we need.
     #The box cutter has really simplified everything
-    xs, ys, zs = common.loadCSVData(boxinfo[0])
+    xs, ys, zs = common.loadDATData(boxinfo[0])
     #grab its minimum and maximum values:
     rect_min = boxinfo[1][0]
     rect_max = boxinfo[1][1]
@@ -139,8 +139,9 @@ def mainrun(args):
     boxinfo = common.getdict(boxname)
     print("Computing correlation function...")
     argslist = [(x,boxinfo,numpoints,dr,step_size,min_r) for x in range(runs)]
+    start = time.time()
     correlation_func_of_r = list(map(calculate_correlations,argslist))
-    
+    print("That took {} seconds.".format(time.time()-start))
     """list(pool.starmap(hamest,list(zip(unique,
                                                               itertools.repeat(min_x),
                                                               itertools.repeat(max_x),
