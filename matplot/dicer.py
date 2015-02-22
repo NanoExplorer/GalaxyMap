@@ -88,14 +88,30 @@ def dice(args):
     #We'll build "normal" boxes starting at minimum + expectedRadius
     #We will also build the extended boxes each centered around a normal box
     #These operations will run concurrently so as to minimize unnecessary disk i/o usage
+
+    fileType = inFileName.split('.')[-1].lower()
+    fileParms = {'dat':{'x':0,
+                        'y':1,
+                        'z':2,
+                        'split':None
+                        }
+                 'csv':{'x':14,
+                        'y':15,
+                        'z':16,
+                        'split':','
+                        }
+                 }
+    
     with open(inFileName,'r') as infile:
         for rawline in infile:
             line = rawline.strip()
             if line[0] != "#":
-                row = line.split()
+                row = line.split(fileParms[fileType]['split'])
                 coord = None
                 try:
-                    coord = (float(row[0]),float(row[1]),float(row[2]))
+                    coord = (float(row[fileParms[fileType]['x']]),
+                             float(row[fileParms[fileType]['y']]),
+                             float(row[fileParms[fileType]['z']]))
                 except ValueError:
                     pass
                 if coord is not None:
@@ -106,10 +122,11 @@ def dice(args):
                     #NOTE: The asterisk passes each part of the tuple as one argument.
                     #Which is REALLY HANDY and also REALLY OBSCURE. Be careful!
                     
-                    filebounds[boxfilename] = (list(map(lambda x, y: x*y,boxIndex,sizes)),list(map(lambda x, y: (x+1)*y,boxIndex,sizes)))
+                    filebounds[boxfilename] = (list(map(lambda x, y: x*y,boxIndex,sizes)),
+                                               list(map(lambda x, y: (x+1)*y,boxIndex,sizes)))
                     #calculate the bounding box of this box and add it to a dictionary for later use.
                     with open(boxfilename, 'a') as boxfile:
-                        boxfile.write(rawline)
+                        boxfile.write(coord[0]+','+coord[1]+','+coord[2]+'\n')
 
     genericInfo = {"list_of_files": filebounds,
                    "box_x_size": sizes[0],

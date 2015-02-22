@@ -75,7 +75,34 @@ def makeplotWithErrors(data,title,xl,yl):
 def getBoxName(name, xi, yi, zi):
     return name + '_{}_{}_{}.box'.format(xi,yi,zi)
 
-def loadCSVData(filename):
+
+def loadData(filename):
+    ext = filename.split('.')[-1].lower()
+    if ext == 'dat':
+        return _loadDATData(filename)
+    elif ext == 'csv':
+        return _loadCSVData(filename)
+    elif ext == 'box':
+        return _loadBOXData(filename)
+
+def _loadBOXData(filename):
+    """
+    Loads galaxy data from a BOX file created by dicer.py
+    """
+#    print("Loading Coordinates...")
+
+    xs = []#list of x coordinates of galaxies. The coordinates of galaxy zero are (xs[0],ys[0],zs[0])
+    ys = []
+    zs = []
+
+    with open(filename, "r") as boxfile:
+        for line in boxfile:
+            row = line.split(',')
+            xs.append(float(row[14]))
+            ys.append(float(row[15]))
+            zs.append(float(row[16]))
+        return (xs,ys,zs)
+def _loadCSVData(filename):
     """
     Loads galaxy data from a CSV file. Assumes that the data is in the same format that my csv box was in,
     that is that X, Y, and Zelp='an integer for the accumulator')
@@ -103,7 +130,7 @@ def loadCSVData(filename):
                     pass#sometimes the CSV file doesn't contain a number. In that case, just skip that row.
     return (xs,ys,zs)
 
-def loadDATData(filename):
+def _loadDATData(filename):
     """
         Loads galaxy data from a DAT file. Assumes that the data is in the same format that my dat box was in,
         that is that X, Y, and Z are in columns 0, 1, and 2 respectively.
