@@ -42,6 +42,14 @@ def gensettings(args):
                                       indent=4, separators=(',', ': ')))
     exit()
 
+def writedict(filename, dictionary):
+    with open(filename,'w') as jsonfile:
+        jsonfile.write(json.dumps(dictionary,
+                                  sort_keys=True,
+                                  indent=4, separators=(',', ': ')))
+        
+
+
 def getdict(filename):
     jsondict = None
     with open(filename,'r') as settings:
