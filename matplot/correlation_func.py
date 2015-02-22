@@ -175,10 +175,13 @@ def mainrun(args):
             ys_for_this_x.append(correlation_func_of_r[y][x_value][2])
         final_data.append((correlation_func_of_r[0][x_value][0],
                            correlation_func_of_r[0][x_value][1],
-                           2*np.average(ys_for_this_x),
-                           np.std(ys_for_this_x)))
+                           np.average(ys_for_this_x),
+                           2*np.std(ys_for_this_x)))
     
     print("Complete.")
+    common.writedict(boxname + '_rawdata.json', {'raw_runs':correlation_func_of_r,
+                                                 'averaged':final_data,
+                                                 'dy_method':'simple_stdev'})
     common.makeplotWithErrors(final_data,"Correlation function of distance r","Distance(Mpc/h)","correlation")
                      
 if __name__ == "__main__":
