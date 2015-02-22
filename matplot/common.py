@@ -98,19 +98,14 @@ def _loadBOXData(filename):
     with open(filename, "r") as boxfile:
         for line in boxfile:
             row = line.split(',')
-            xs.append(float(row[14]))
-            ys.append(float(row[15]))
-            zs.append(float(row[16]))
+            xs.append(float(row[0]))
+            ys.append(float(row[1]))
+            zs.append(float(row[2]))
         return (xs,ys,zs)
 def _loadCSVData(filename):
     """
     Loads galaxy data from a CSV file. Assumes that the data is in the same format that my csv box was in,
-    that is that X, Y, and Zelp='an integer for the accumulator')
-    parser.add_argument('--sum', dest='accumulate', action='store_const',
-                                           const=sum, default=max,
-                                           help='sum the integers (default: find the max)')
-
-    args = parser.parse_coordinates are in rows 14,15, and 16 respectively.
+    that is that X, Y, and Z are in rows 14,15, and 16 respectively.
     """
 #    print("Loading Coordinates...")
 

@@ -94,7 +94,7 @@ def dice(args):
                         'y':1,
                         'z':2,
                         'split':None
-                        }
+                        },
                  'csv':{'x':14,
                         'y':15,
                         'z':16,
@@ -126,7 +126,7 @@ def dice(args):
                                                list(map(lambda x, y: (x+1)*y,boxIndex,sizes)))
                     #calculate the bounding box of this box and add it to a dictionary for later use.
                     with open(boxfilename, 'a') as boxfile:
-                        boxfile.write(coord[0]+','+coord[1]+','+coord[2]+'\n')
+                        boxfile.write(str(coord[0])+','+str(coord[1])+','+str(coord[2])+'\n')
 
     genericInfo = {"list_of_files": filebounds,
                    "box_x_size": sizes[0],
