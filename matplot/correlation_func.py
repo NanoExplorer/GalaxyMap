@@ -50,7 +50,7 @@ def correlate_box(boxinfo, intervals):
     DDs = actual_kd.count_neighbors(actual_kd,intervals)
     DRs = actual_kd.count_neighbors(random_kd,intervals)
     RRs = random_kd.count_neighbors(random_kd,intervals)
-
+    
     return((DDs,DRs,RRs))
     
 
@@ -87,20 +87,30 @@ def calculate_correlations(args):
         #(filename, [[minx,miny,minz],[maxx,maxy,maxz]])
         #the tuple contains the filename of the box, the coordinates of the box's minimum corner
         #and the coordinates of the box's maximum corner.
-    
-    for item in list_of_DDsDRsRRs:
+    dataPerBox = {}
+    for x in range(len(list_of_DDsDRsRRs)):
+        item = list_of_DDsDRsRRs[x]
+        boxfile = boxes[x][0]
+        
+        
         miniDDs, miniDRs, miniRRs = item
         assert(len(DDs) == len(DRs) == len(RRs) == len(miniDDs) == len(miniDRs) == len(miniRRs))
         #I think I'm just paranoid.
         #Make DDs, DRs, and RRs contain the *total* number of pairs found.
+        dataPerBox[boxfile] = {"Hamilton":hamest(miniDDs,miniDRs,miniRRs),
+                               "Davis_Peebles":dpest(miniDDs,miniDRs,miniRRs),
+                               "Landy_Szalay":lsest(miniDDs,miniDRs,miniRRs)}
         for i in range(len(miniDDs)):
             DDs[i] = DDs[i] + miniDDs[i]
             DRs[i] = DRs[i] + miniDRs[i]
             RRs[i] = RRs[i] + miniRRs[i]
-    correlations = hamest(DDs,DRs,RRs)
+    correlations = {"Hamilton":hamest(DDs,DRs,RRs),
+                    "Davis_Peebles":dpest(DDs,DRs,RRs),
+                    "Landy_Szalay":lsest(DDs,DRs,RRs)}
+    dataPerBox['ALL_BOXES'] = correlations
     #return value looks like this: a list of tuples, (x value, x uncertainty, y value)
     print('.',end="",flush=True)
-    return list(zip(xs,radial_error,correlations))
+    return list(zip(xs,radial_error,dataPerBox))
 
 
 def hamest(DDs,DRs,RRs):
@@ -114,6 +124,36 @@ def hamest(DDs,DRs,RRs):
         results.append((DDr*RRr)/(DRr**2)-1)
         #This is the formula for a hamilton estimator from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
     return results
+
+    
+def dpest(DDs,DRs,RRs):
+    results = []
+    for index in range(0,len(DDs),2):
+        DDr = DDs[index+1]-DDs[index]
+        #DDr, DRr, and RRr are all "number of objects in a shell" not "number of
+        #objects closer than". This function converts from "closer than" to "in a shell"
+        DRr = DRs[index+1]-DRs[index]
+        RRr = RRs[index+1]-RRs[index]
+        results.append((DDr/DRr)-1)
+        #This is the formula for a Davis and Peebles estimator from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
+        #Nrd = N
+    return results
+
+
+def lsest(DDs,DRs,RRs):
+    results = []
+    for index in range(0,len(DDs),2):
+        DDr = DDs[index+1]-DDs[index]
+        #DDr, DRr, and RRr are all "number of objects in a shell" not "number of
+        #objects closer than". This function converts from "closer than" to "in a shell"
+        DRr = DRs[index+1]-DRs[index]
+        RRr = RRs[index+1]-RRs[index]
+        results.append(1+(DDr/RRr)-2*(DRr/RRr))
+        #This is the formula for a Landy and Szalay estimator from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
+        #Nrd = N
+        #number of randomly uniform points = number of 'actual' points
+    return results
+
 
     
 """
@@ -138,7 +178,12 @@ def mainrun(args):
     step_size = settings["step_size"]
     boxinfo = common.getdict(boxname)
     print("Computing correlation function...")
-    argslist = [(x,boxinfo,numpoints,dr,step_size,min_r) for x in range(runs)]
+    argslist = [(x,
+                 boxinfo,
+                 numpoints,
+                 dr,
+                 step_size,
+                 min_r) for x in range(runs)]
     start = time.time()
     correlation_func_of_r = list(map(calculate_correlations,argslist))
     print("That took {} seconds.".format(time.time()-start))
@@ -151,15 +196,17 @@ def mainrun(args):
       [ (x1,dx1,y1), (x2,dx2,y2), ... (xn,dxn,yn) ]  <- run 2
     ]
     
-    """                                                              
+                                                                  
     print("Computing statistics...")
-    """
+
     Correlation Func of r is a list containing tuples of xs and ys (and dxs).
     To compute the error bars, we'll want to take the y values out of all the tuples, grouped by x value,
     find the standard deviation, and multiply by two to calculate the error bars for each number.
     Then find the average of the y values to place the center point of the error bars.
     Finally, save that information to file and then use it to build a graph!
-    """
+
+    We're actually going to move the "computing statistics" thingies to a different file.
+    
     final_data = []
     for x_value in range(len(correlation_func_of_r[0])): 
         ys_for_this_x = [] #a list of the y values of a specific x value
@@ -169,7 +216,7 @@ def mainrun(args):
                            correlation_func_of_r[0][x_value][1],
                            np.average(ys_for_this_x),
                            2*np.std(ys_for_this_x)))
-    
+    """
     print("Complete.")
     dataFileName = settings['output_data_folder'] + boxname.split('/')[-1] + '---'
     dataFileName = dataFileName + args.settings.split('/')[-1].split('.')[0] + '---rawdata.json'
@@ -177,10 +224,7 @@ def mainrun(args):
                             
                             
     common.writedict(dataFileName,
-                     {'raw_runs':correlation_func_of_r,
-                      'averaged':final_data,
-                      'dy_method':'simple_stdev'})
-    common.makeplotWithErrors(final_data,"Correlation function of distance r","Distance(Mpc/h)","correlation")
+                     {'raw_runs':correlation_func_of_r})
                      
 if __name__ == "__main__":
     print("This python file does not run as a script. Instead use:")
