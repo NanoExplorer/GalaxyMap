@@ -142,31 +142,23 @@ def mainrun(args):
     start = time.time()
     correlation_func_of_r = list(map(calculate_correlations,argslist))
     print("That took {} seconds.".format(time.time()-start))
-    """list(pool.starmap(hamest,list(zip(unique,
-                                                              itertools.repeat(min_x),
-                                                              itertools.repeat(max_x),
-                                                              itertools.repeat(step_size),
-                                                              itertools.repeat(actual_galaxies),
-                                                              itertools.repeat((cubic_min,cubic_max,num_galax))))))
-                                                              #This tuple here  ^         ^         ^
-                                                              #exists to pass the information to build the random
-                                                              #data set to the function.
-                                                         
-    """ """
-    the structure of correlation_func_of_r is confusing right now, so I'll write it out.
+
+    """
+    the structure of correlation_func_of_r:
     [
-      [ (x,dx,y), (x,dx,y), ... (x,dx,y) ], <- run 0
-      [ (x,dx,y), (x,dx,y), ... (x,dx,y) ], <- run 1
-      [ (x,dx,y), (x,dx,y), ... (x,dx,y) ]  <- run 2
+      [ (x1,dx1,y1), (x2,dx2,y2), ... (xn,dxn,yn) ], <- run 0
+      [ (x1,dx1,y1), (x2,dx2,y2), ... (xn,dxn,yn) ], <- run 1
+      [ (x1,dx1,y1), (x2,dx2,y2), ... (xn,dxn,yn) ]  <- run 2
     ]
     
     """                                                              
     print("Computing statistics...")
     """
-    OK, so Correlation Func of r is a list containing tuples of xs and ys (and dxs).
-    To compute the error bars, we'll want to take the first y values out of all the tuples, find the standard
-    deviation, multiply by two to calculate the error bars for each number, then find the standard deviation.
-    Use that informaton to build a graph!
+    Correlation Func of r is a list containing tuples of xs and ys (and dxs).
+    To compute the error bars, we'll want to take the y values out of all the tuples, grouped by x value,
+    find the standard deviation, and multiply by two to calculate the error bars for each number.
+    Then find the average of the y values to place the center point of the error bars.
+    Finally, save that information to file and then use it to build a graph!
     """
     final_data = []
     for x_value in range(len(correlation_func_of_r[0])): 
@@ -179,9 +171,15 @@ def mainrun(args):
                            2*np.std(ys_for_this_x)))
     
     print("Complete.")
-    common.writedict(boxname + '_rawdata.json', {'raw_runs':correlation_func_of_r,
-                                                 'averaged':final_data,
-                                                 'dy_method':'simple_stdev'})
+    dataFileName = settings['output_data_folder'] + boxname.split('/')[-1] + '---'
+    dataFileName = dataFileName + args.settings.split('/')[-1].split('.')[0] + '---rawdata.json'
+                            
+                            
+                            
+    common.writedict(dataFileName,
+                     {'raw_runs':correlation_func_of_r,
+                      'averaged':final_data,
+                      'dy_method':'simple_stdev'})
     common.makeplotWithErrors(final_data,"Correlation function of distance r","Distance(Mpc/h)","correlation")
                      
 if __name__ == "__main__":
