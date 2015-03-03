@@ -21,11 +21,12 @@ def dice(args):
     MAX = 1
     filebounds = dict()
     
-    settings=common.getdict(args.settings)
+    all_settings=common.getdict(args.settings)
+    settings = all_settings["Divide"]
     inFileName = settings["filename"]
     sizes = (settings["x_box_size"], settings["y_box_size"], settings["z_box_size"])
     radius = settings["expected_radius"]
-    outFileName = settings["boxname"]
+    outFileName = all_settings["boxname"]
     """
     minmax = [[None,None],[None,None],[None,None]]
 #    Here we loop through the file, finding the global maximum and minimum of the data set.

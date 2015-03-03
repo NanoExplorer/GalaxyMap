@@ -2,6 +2,7 @@ import argparse
 import common
 import correlation_func
 import dicer
+import stats
 
 def main():
     #Handle command line arguments
@@ -22,6 +23,10 @@ def main():
     parser_breakbox.add_argument("settings",help="Read in settings from this file.",type=str)
     parser_breakbox.set_defaults(func=dicer.dice)
     
+    parser_stats = subparsers.add_parser('stats',help='Takes in a data file, computes statistics and makes plots.')
+    parser_stats.add_argument("datafile",help='JSON file to read data from.',type=str)
+    parser_stats.set_defaults(func=stats.statistics)
+
     args = parser.parse_args()
 
     function = None

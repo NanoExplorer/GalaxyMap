@@ -7,7 +7,7 @@ from multiprocessing import Pool
 #import random
 import itertools
 NUM_PROCESSORS = 8
-
+np.seterr(divide='ignore',invalid='ignore')
 #from mayavi import mlab
 
 """
@@ -36,7 +36,7 @@ def correlate_box(boxinfo, intervals):
     #and its length
     num_galax = len(xs)
     #make sure we don't have a jagged array somehow
-    assert(num_galax == len(ys) == len(zs))
+    #assert(num_galax == len(ys) == len(zs))
     actual_galaxies = np.array(list(zip(xs,ys,zs)))
     #Make a thread-safe random number generator
     rng = np.random.RandomState()
@@ -50,7 +50,10 @@ def correlate_box(boxinfo, intervals):
     DDs = actual_kd.count_neighbors(actual_kd,intervals)
     DRs = actual_kd.count_neighbors(random_kd,intervals)
     RRs = random_kd.count_neighbors(random_kd,intervals)
-    
+    #RDs = random_kd.count_neighbors(actual_kd,intervals)
+    #Turns out that RDs == RRs always
+    #Just think about it.
+    print('.',end='',flush=True)
     return((DDs,DRs,RRs))
     
 
@@ -72,15 +75,15 @@ def calculate_correlations(args):
     
     check_list = np.array(intervals)
     lower = min(check_list)
-    assert(lower >= 0)
-    radial_error = itertools.repeat(dr/2) #error in each r value
+    #assert(lower >= 0)
 
     DDs = [0 for x in range(len(check_list))]
     DRs = [0 for x in range(len(check_list))]#These arrays should contain total numbers of pairs.
     RRs = [0 for x in range(len(check_list))]
+    
 
     #make a list of boxes:
-    boxes = boxinfo['list_of_files'].items()
+    boxes = list(boxinfo['list_of_files'].items())
     pool = Pool(processes = NUM_PROCESSORS)
     list_of_DDsDRsRRs = pool.starmap(correlate_box,zip(boxes, itertools.repeat(check_list)))
         #The box that we're passing them isn't actually *just* a box. Instead it's a tuple
@@ -97,20 +100,34 @@ def calculate_correlations(args):
         assert(len(DDs) == len(DRs) == len(RRs) == len(miniDDs) == len(miniDRs) == len(miniRRs))
         #I think I'm just paranoid.
         #Make DDs, DRs, and RRs contain the *total* number of pairs found.
-        dataPerBox[boxfile] = {"Hamilton":hamest(miniDDs,miniDRs,miniRRs),
+        dataPerBox[boxfile] = {"rs":xs,
+                               "dr":dr,
+                               "Hamilton":hamest(miniDDs,miniDRs,miniRRs),
                                "Davis_Peebles":dpest(miniDDs,miniDRs,miniRRs),
-                               "Landy_Szalay":lsest(miniDDs,miniDRs,miniRRs)}
+                               "Landy_Szalay":lsest(miniDDs,miniDRs,miniRRs),
+                               "Random_Correlation":randomPointCorrelation(miniDDs,miniDRs,miniRRs),
+                               "DDs":[int(num) for num in DDs],
+                               "DRs":[int(num) for num in DRs],
+                               "RRs":[int(num) for num in RRs]}
         for i in range(len(miniDDs)):
             DDs[i] = DDs[i] + miniDDs[i]
             DRs[i] = DRs[i] + miniDRs[i]
             RRs[i] = RRs[i] + miniRRs[i]
-    correlations = {"Hamilton":hamest(DDs,DRs,RRs),
+            
+            
+    correlations = {"rs":xs,
+                    "dr":dr,
+                    "Hamilton":hamest(DDs,DRs,RRs),
                     "Davis_Peebles":dpest(DDs,DRs,RRs),
-                    "Landy_Szalay":lsest(DDs,DRs,RRs)}
+                    "Landy_Szalay":lsest(DDs,DRs,RRs),
+                    "Random_Correlation":randomPointCorrelation(miniDDs,miniDRs,miniRRs),
+                    "DDs":[int(num) for num in DDs],
+                    "DRs":[int(num) for num in DRs],
+                    "RRs":[int(num) for num in RRs]}
     dataPerBox['ALL_BOXES'] = correlations
     #return value looks like this: a list of tuples, (x value, x uncertainty, y value)
-    print('.',end="",flush=True)
-    return list(zip(xs,radial_error,dataPerBox))
+    print('Run {} complete.'.format(unique))
+    return dataPerBox
 
 
 def hamest(DDs,DRs,RRs):
@@ -124,7 +141,6 @@ def hamest(DDs,DRs,RRs):
         results.append((DDr*RRr)/(DRr**2)-1)
         #This is the formula for a hamilton estimator from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
     return results
-
     
 def dpest(DDs,DRs,RRs):
     results = []
@@ -154,6 +170,21 @@ def lsest(DDs,DRs,RRs):
         #number of randomly uniform points = number of 'actual' points
     return results
 
+def randomPointCorrelation(DDs,DRs,RRs):
+    results = []
+    for index in range(0,len(DDs),2):
+        DDr = DDs[index+1]-DDs[index]
+        #DDr, DRr, and RRr are all "number of objects in a shell" not "number of
+        #objects closer than". This function converts from "closer than" to "in a shell"
+        DRr = DRs[index+1]-DRs[index]
+        RRr = RRs[index+1]-RRs[index]
+        results.append((DRr/RRr)-1)
+        #This takes the number of galaxies in a shell around a random point
+        #and compares it to the number of random points in a shell around the random point.
+        #Nrd = N
+        #number of randomly uniform points = number of 'actual' points
+    return results
+
 
     
 """
@@ -168,9 +199,10 @@ def unwrap(zvals):
 
 def mainrun(args):
     print("Setting things up...")
-    settings = common.getdict(args.settings)
+    all_settings = common.getdict(args.settings)
 
-    boxname =   settings["boxname"]
+    boxname =   all_settings["boxname"]
+    settings = all_settings["Correlation"]
     numpoints = settings["numpoints"]
     dr =        settings["dr"]
     runs =      settings["num_runs"]
@@ -186,7 +218,8 @@ def mainrun(args):
                  min_r) for x in range(runs)]
     start = time.time()
     correlation_func_of_r = list(map(calculate_correlations,argslist))
-    print("That took {} seconds.".format(time.time()-start))
+    finish = time.time()-start
+    print("That took {} seconds.".format(finish))
 
     """
     the structure of correlation_func_of_r:
@@ -224,7 +257,9 @@ def mainrun(args):
                             
                             
     common.writedict(dataFileName,
-                     {'raw_runs':correlation_func_of_r})
+                     {'raw_runs':correlation_func_of_r,
+                      'settings':all_settings,
+                      'time':finish})
                      
 if __name__ == "__main__":
     print("This python file does not run as a script. Instead use:")
