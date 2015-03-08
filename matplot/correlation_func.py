@@ -106,9 +106,9 @@ def calculate_correlations(args):
                                "Davis_Peebles":dpest(miniDDs,miniDRs,miniRRs),
                                "Landy_Szalay":lsest(miniDDs,miniDRs,miniRRs),
                                "Random_Correlation":randomPointCorrelation(miniDDs,miniDRs,miniRRs),
-                               "DDs":[int(num) for num in DDs],
-                               "DRs":[int(num) for num in DRs],
-                               "RRs":[int(num) for num in RRs]}
+                               "DDs":[int(num) for num in miniDDs],
+                               "DRs":[int(num) for num in miniDRs],
+                               "RRs":[int(num) for num in miniRRs]}
         for i in range(len(miniDDs)):
             DDs[i] = DDs[i] + miniDDs[i]
             DRs[i] = DRs[i] + miniDRs[i]

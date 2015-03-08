@@ -1,21 +1,22 @@
 {
     "correlation": {
-        "boxname": "BoxOfGalaxies.csv",
-        "numpoints": 10,
-        "dr": 1.0,
-        "min_r": 0.75,
-        "step_size": 0.5,
-        "_COMMENT":"Step size is the distance between x values. It NEEDS to be smaller than dr",
-        "num_runs": 8,
-	    "output_data_folder":"output/"
-    },
-    "divide": {
-        "filename": "BoxOfGalaxies.csv",
-        "x_box_size":10,
-        "y_box_size":10,
-        "z_box_size":10,
-	"expected_radius":1,
-        "boxname":"Test"
+        "_COMMENT": "Step size is the distance between x values. It NEEDS to be smaller than dr",
+        "boxname": "boxes/TEST_BOX/testbox",
+        "Correlation":{
+            "dr": 1,
+            "min_r": 1,
+            "num_runs": 1,
+            "numpoints": 10,
+            "output_data_folder":"output/",
+            "step_size": 1
+        },
+        "Divide":{
+            "expected_radius": 1,
+            "filename": "lasdamas-2001.dat",
+            "x_box_size": 100,
+            "y_box_size": 100,
+            "z_box_size": 100
+        }
     },
     "test": {
         "a thing": "another thing"

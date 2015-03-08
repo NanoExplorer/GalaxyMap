@@ -3,7 +3,7 @@
 import common
 import math
 import json
-
+import os
 def dice(args):
     #algorithm: go through the box and find its bounds
     #Divide that volume into sub-boxes using the x_divs, y_divs and z_divs from the settings file
@@ -27,6 +27,9 @@ def dice(args):
     sizes = (settings["x_box_size"], settings["y_box_size"], settings["z_box_size"])
     radius = settings["expected_radius"]
     outFileName = all_settings["boxname"]
+    directory = os.path.dirname(outFileName)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
     """
     minmax = [[None,None],[None,None],[None,None]]
 #    Here we loop through the file, finding the global maximum and minimum of the data set.
