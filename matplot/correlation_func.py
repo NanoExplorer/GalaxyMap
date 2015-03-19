@@ -27,16 +27,17 @@ def d_p_est(r,dr,actual_kd,random_kd):
 """
 def correlate_box(boxinfo, intervals):
     #load in the subbox
-    #ACTUALLY, the load csv data function probably has more overhead than we need.
-    #The box cutter has really simplified everything
     xs, ys, zs = common.loadData(boxinfo[0])
-    #grab its minimum and maximum values:
+    #grab its THEORETICAL minimum and maximum values:
+    #Need to add detection of actual minimum and maximum values.
+    #I might already have the logic in the box cutter function...
     rect_min = boxinfo[1][0]
     rect_max = boxinfo[1][1]
     #and its length
     num_galax = len(xs)
     #make sure we don't have a jagged array somehow
     #assert(num_galax == len(ys) == len(zs))
+    #Never had a problem with that
     actual_galaxies = np.array(list(zip(xs,ys,zs)))
     #Make a thread-safe random number generator
     rng = np.random.RandomState()
@@ -51,7 +52,7 @@ def correlate_box(boxinfo, intervals):
     DRs = actual_kd.count_neighbors(random_kd,intervals)
     RRs = random_kd.count_neighbors(random_kd,intervals)
     #RDs = random_kd.count_neighbors(actual_kd,intervals)
-    #Turns out that RDs == RRs always
+    #Turns out that RDs == DRs always
     #Just think about it.
     print('.',end='',flush=True)
     return((DDs,DRs,RRs))
@@ -59,20 +60,30 @@ def correlate_box(boxinfo, intervals):
 
 def calculate_correlations(args):
     """
-    args = (unique, boxinfo, numpoints, dr, step size, minimum radius)
+    args = (unique, boxinfo, numpoints, dr, step size, minimum radius, type of step to use for xs)
     
     min_value - dr >> 0 (or else we find a distance that is slightly greater than zero
     and we end up with a zero galaxy count and a divide by zero error)
+
+    Actually, I've gotten to the point where divide by zero errors are handled by stats.py
+    so don't worry about it.
     """
 
-    unique, boxinfo, numpoints, dr, step_size, min_r = args
-    xs = [(min_r+step_size*x) for x in range(numpoints)]
+    unique, boxinfo, numpoints, dr, step_size, min_r, step_type = args
+    xs = []
     intervals = []
-    for x in xs:
-        intervals.append(x-(dr/2.0))
-        intervals.append(x+(dr/2.0))
+    if step_type = "lin":
+        xs = [(min_r+step_size*x) for x in range(numpoints)]
+        for x in xs:
+            intervals.append(x-(dr/2.0))
+            intervals.append(x+(dr/2.0))
 
-    
+    elif step_type = "log":
+        xs = [(min_r + 10**(step_size*x) - 1) for x in range(numpoints)]
+        for x in xs:
+            intervals.append(x-(dr*((10**(step_size*x))*(1-10**(-step_size)))))
+            intervals.append(x+(dr*((10**(step_size*x))*(10**(step_size)-1))))
+
     check_list = np.array(intervals)
     lower = min(check_list)
     #assert(lower >= 0)
@@ -208,6 +219,11 @@ def mainrun(args):
     runs =      settings["num_runs"]
     min_r =     settings["min_r"]
     step_size = settings["step_size"]
+    step_type = "lin"
+    try:
+        step_type = settings["step_type"]
+    except KeyError:
+        print("We've added a new argument \"step_type\" to the settings file.\nPlease update {} to include this argument.\nDefault value is \"lin\" for linear steps on the x axis.\nOther values are \"log\" for logarithmic point spacing. More types to come.")
     boxinfo = common.getdict(boxname)
     print("Computing correlation function...")
     argslist = [(x,
@@ -215,7 +231,8 @@ def mainrun(args):
                  numpoints,
                  dr,
                  step_size,
-                 min_r) for x in range(runs)]
+                 min_r,
+                 step_type) for x in range(runs)]
     start = time.time()
     correlation_func_of_r = list(map(calculate_correlations,argslist))
     finish = time.time()-start
