@@ -7,6 +7,9 @@ from multiprocessing import Pool
 #import random
 import itertools
 NUM_PROCESSORS = 8
+MAXIMUM_ERROR = .1
+MINIMUM_SAMPLE = 1/(MAXIMUM_ERROR**2)
+
 np.seterr(divide='ignore',invalid='ignore')
 #from mayavi import mlab
 
@@ -57,7 +60,56 @@ def correlate_box(boxinfo, intervals):
     print('.',end='',flush=True)
     return((DDs,DRs,RRs))
     
+def lin_intervals(min_r,step_size,numpoints,dr):
+    xs = [(min_r+step_size*x) for x in range(numpoints)]
+    intervals = []
+    for x in xs:
+        intervals.append(x-(dr/2.0))
+        intervals.append(x+(dr/2.0))    
+    return (xs, intervals)
+def log_intervals(min_r,step_size,numpoints,dr):
+    xs = [(min_r + 10**(step_size*x) - 1) for x in range(numpoints)]
+    intervals = []
+    for i in range(numpoints):
+        x = xs[i]
+        intervals.append(x-(dr*((10**(step_size*i))*(1-10**(-step_size)))))
+        intervals.append(x+(dr*((10**(step_size*i))*(10**(step_size)-1))))
+    return (xs, intervals)
 
+def makeSubDataPerBox(DDs, DRs, RRs, xs, ldrs, rdrs):
+    localxs = list(xs)
+    localLdrs = list(ldrs)
+    localRdrs = list(rdrs)
+    hamilton = hamest(DDs,DRs,RRs)
+    davis_peebles = dpest(DDs,DRs,RRs)
+    landy_szalay = lsest(DDs,DRs,RRs)
+    random_point = randomPointCorrelation(DDs,DRs,RRs)
+    #checkForBadNums(hamilton, davis_peebles, landy_szalay, localxs, localLdrs,localRdrs,random_point)
+    return {"rs":localxs,
+            "dr_left":localLdrs,
+            "dr_right":localRdrs,
+            "Hamilton":hamilton,
+            "Davis_Peebles":davis_peebles,
+            "Landy_Szalay":landy_szalay,
+            "Random_Correlation":random_point,
+            "DDs":[int(num) for num in DDs],
+            "DRs":[int(num) for num in DRs],
+            "RRs":[int(num) for num in RRs]
+    }
+#deprecated in favor of checkSampleSize()
+# def checkForBadNums(*args):
+#     #The lists always need to have the same length!
+#     for i in range(len(args[0])-1,-1,-1):
+#         #go through the lists from the back to the front.
+#         bad = False
+#         for arg in args:
+#             if not math.isfinite(arg[i]):
+#                 bad = True
+#                 break
+#         if bad:
+#             for arg in args:
+#                 del arg[i]
+            
 def calculate_correlations(args):
     """
     args = (unique, boxinfo, numpoints, dr, step size, minimum radius, type of step to use for xs)
@@ -70,20 +122,16 @@ def calculate_correlations(args):
     """
 
     unique, boxinfo, numpoints, dr, step_size, min_r, step_type = args
-    xs = []
-    intervals = []
-    if step_type = "lin":
-        xs = [(min_r+step_size*x) for x in range(numpoints)]
-        for x in xs:
-            intervals.append(x-(dr/2.0))
-            intervals.append(x+(dr/2.0))
-
-    elif step_type = "log":
-        xs = [(min_r + 10**(step_size*x) - 1) for x in range(numpoints)]
-        for x in xs:
-            intervals.append(x-(dr*((10**(step_size*x))*(1-10**(-step_size)))))
-            intervals.append(x+(dr*((10**(step_size*x))*(10**(step_size)-1))))
-
+    
+    if step_type == "lin":
+        inter_fun = lin_intervals
+    elif step_type == "log":
+        inter_fun = log_intervals
+    else:
+        raise ValueError("step_type {} undefined".format(step_type))
+    xs,intervals = inter_fun(min_r, step_size, numpoints, dr)
+    left_drs = getLeftdrs(xs,intervals)
+    right_drs = getRightdrs(xs,intervals)
     check_list = np.array(intervals)
     lower = min(check_list)
     #assert(lower >= 0)
@@ -105,41 +153,55 @@ def calculate_correlations(args):
     for x in range(len(list_of_DDsDRsRRs)):
         item = list_of_DDsDRsRRs[x]
         boxfile = boxes[x][0]
-        
-        
+
+
+        #Make a local copy of these things for use in culling.
+
         miniDDs, miniDRs, miniRRs = item
+
         assert(len(DDs) == len(DRs) == len(RRs) == len(miniDDs) == len(miniDRs) == len(miniRRs))
         #I think I'm just paranoid.
+        
         #Make DDs, DRs, and RRs contain the *total* number of pairs found.
-        dataPerBox[boxfile] = {"rs":xs,
-                               "dr":dr,
-                               "Hamilton":hamest(miniDDs,miniDRs,miniRRs),
-                               "Davis_Peebles":dpest(miniDDs,miniDRs,miniRRs),
-                               "Landy_Szalay":lsest(miniDDs,miniDRs,miniRRs),
-                               "Random_Correlation":randomPointCorrelation(miniDDs,miniDRs,miniRRs),
-                               "DDs":[int(num) for num in miniDDs],
-                               "DRs":[int(num) for num in miniDRs],
-                               "RRs":[int(num) for num in miniRRs]}
         for i in range(len(miniDDs)):
             DDs[i] = DDs[i] + miniDDs[i]
             DRs[i] = DRs[i] + miniDRs[i]
             RRs[i] = RRs[i] + miniRRs[i]
             
+        
             
-    correlations = {"rs":xs,
-                    "dr":dr,
-                    "Hamilton":hamest(DDs,DRs,RRs),
-                    "Davis_Peebles":dpest(DDs,DRs,RRs),
-                    "Landy_Szalay":lsest(DDs,DRs,RRs),
-                    "Random_Correlation":randomPointCorrelation(miniDDs,miniDRs,miniRRs),
-                    "DDs":[int(num) for num in DDs],
-                    "DRs":[int(num) for num in DRs],
-                    "RRs":[int(num) for num in RRs]}
+        dataPerBox[boxfile] = makeSubDataPerBox(miniDDs, miniDRs, miniRRs, xs, left_drs, right_drs)
+        if dataPerBox[boxfile] is None:
+            del dataPerBox[boxfile]
+
+    correlations = makeSubDataPerBox(DDs, DRs, RRs, xs, left_drs, right_drs)
     dataPerBox['ALL_BOXES'] = correlations
     #return value looks like this: a list of tuples, (x value, x uncertainty, y value)
     print('Run {} complete.'.format(unique))
     return dataPerBox
 
+def getLeftdrs(xs,intervals):
+    return [xs[i] - intervals[i*2] for i in range(len(xs))]
+
+def getRightdrs(xs,intervals):
+    return [intervals[i*2+1] - xs[i] for i in range(len(xs))]
+
+def checkSampleSize(Dd,Dr,Rr,name):
+    if Dd < MINIMUM_SAMPLE:
+        print("Warning: Small sample size encountered in {} correlation calculation, {} value = {}.".format(name,
+                                                                                                            "DD",
+                                                                                                            Dd))
+        print("Consider increasing bin size.")
+    if Dr < MINIMUM_SAMPLE:
+        print("Warning: Small sample size encountered in {} correlation calculation, {} value = {}.".format(name,
+                                                                                                            "DR",
+                                                                                                            Dr))
+        print("Consider increasing bin size.")
+    if Rr < MINIMUM_SAMPLE:
+        print("Warning: Small sample size encountered in {} correlation calculation, {} value = {}.".format(name,
+                                                                                                            "RR",
+                                                                                                            Rr))
+        print("Consider increasing bin size.")
 
 def hamest(DDs,DRs,RRs):
     results = []
@@ -149,6 +211,7 @@ def hamest(DDs,DRs,RRs):
         #objects closer than". This function converts from "closer than" to "in a shell"
         DRr = DRs[index+1]-DRs[index]
         RRr = RRs[index+1]-RRs[index]
+        checkSampleSize(DDr,DRr,RRr,"Hamilton")
         results.append((DDr*RRr)/(DRr**2)-1)
         #This is the formula for a hamilton estimator from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
     return results
@@ -161,6 +224,7 @@ def dpest(DDs,DRs,RRs):
         #objects closer than". This function converts from "closer than" to "in a shell"
         DRr = DRs[index+1]-DRs[index]
         RRr = RRs[index+1]-RRs[index]
+        checkSampleSize(DDr,DRr,RRr,"Davis Peebles")
         results.append((DDr/DRr)-1)
         #This is the formula for a Davis and Peebles estimator from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
         #Nrd = N
@@ -175,6 +239,7 @@ def lsest(DDs,DRs,RRs):
         #objects closer than". This function converts from "closer than" to "in a shell"
         DRr = DRs[index+1]-DRs[index]
         RRr = RRs[index+1]-RRs[index]
+        checkSampleSize(DDr,DRr,RRr,"Landy Szalay")
         results.append(1+(DDr/RRr)-2*(DRr/RRr))
         #This is the formula for a Landy and Szalay estimator from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
         #Nrd = N
@@ -189,6 +254,7 @@ def randomPointCorrelation(DDs,DRs,RRs):
         #objects closer than". This function converts from "closer than" to "in a shell"
         DRr = DRs[index+1]-DRs[index]
         RRr = RRs[index+1]-RRs[index]
+        checkSampleSize(DDr,DRr,RRr,"random")
         results.append((DRr/RRr)-1)
         #This takes the number of galaxies in a shell around a random point
         #and compares it to the number of random points in a shell around the random point.
