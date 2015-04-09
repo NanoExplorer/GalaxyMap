@@ -1,22 +1,27 @@
 {
     "correlation": {
-        "_COMMENT": "Step size is the distance between x values. It NEEDS to be smaller than dr",
-        "boxname": "boxes/TEST_BOX/testbox",
-        "Correlation":{
+        "Correlation": {
+            "_COMMENT": "Step size is the distance between x values. It NEEDS to be smaller than dr",
             "dr": 1,
             "min_r": 1,
             "num_runs": 1,
             "numpoints": 10,
-            "output_data_folder":"output/",
+            "output_data_folder": "output/",
             "step_size": 1
         },
-        "Divide":{
+        "Divide": {
             "expected_radius": 1,
             "filename": "lasdamas-2001.dat",
             "x_box_size": 100,
             "y_box_size": 100,
             "z_box_size": 100
-        }
+        },
+        "boxname": "boxes/TEST_BOX/testbox"
+    },
+    "survey": {
+        "num_bins": "30",
+        "output_filename": "SAMPLE_OUTPUT.json",
+        "survey_filename": "SAMPLE.txt"
     },
     "test": {
         "a thing": "another thing"

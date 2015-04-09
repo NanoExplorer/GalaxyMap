@@ -3,6 +3,7 @@ import common
 import correlation_func
 import dicer
 import stats
+import survey
 
 def main():
     #Handle command line arguments
@@ -26,6 +27,10 @@ def main():
     parser_stats = subparsers.add_parser('stats',help='Takes in a data file, computes statistics and makes plots.')
     parser_stats.add_argument("datafile",help='JSON file to read data from.',type=str)
     parser_stats.set_defaults(func=stats.statistics)
+
+    parser_survey = subparsers.add_parser('survey',help='Takes in a survey file, bins it into a histogram and fits the survey function to it.')
+    parser_survey.add_argument("settings",help='JSON file to read settings from.',type=str)
+    parser_survey.set_defaults(func=survey.mainrun)
 
     args = parser.parse_args()
 

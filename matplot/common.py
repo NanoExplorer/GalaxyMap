@@ -84,14 +84,54 @@ def getBoxName(name, xi, yi, zi):
     return name + '_{}_{}_{}.box'.format(xi,yi,zi)
 
 
-def loadData(filename):
-    ext = filename.split('.')[-1].lower()
-    if ext == 'dat':
+def loadData(filename, dataType = "guess"):
+    """
+    Tries to guess what kind of data you're loading using the extension on the filename. Override this using
+    the DataType flag.
+
+    dataTypes:
+        'dat': boxfiles that are like lasdamas box files
+        'csv': boxfiles from millennium that have x, y, and z values in columns 14, 15, and 16
+        'box': boxfiles created by dicer.py
+        'miscFloat': csv files that contain only floats
+        'survey': read data from a real survey
+    
+    """
+    if dataType == "guess":
+        dataType = filename.split('.')[-1].lower()
+    if dataType == 'dat':
         return _loadDATData(filename)
-    elif ext == 'csv':
+    elif dataType == 'csv':
         return _loadCSVData(filename)
-    elif ext == 'box':
+    elif dataType == 'box':
         return _loadBOXData(filename)
+    elif dataType == 'miscFloat':
+        return _loadCSVFloatData(filename)
+    elif dataType == 'CF2':
+        return _loadCF2Data(filename)
+
+def _loadCSVFloatData(filename): 
+    """
+    Loads miscellaneous data from a csv file.
+    Note: Assumes all data in the file are floats.
+    """
+    csvData = []
+    with open(filename, "r") as boxfile:
+        for line in boxfile:
+            if line[0]!="#":#comment lines need to be ignored
+                row = line.split(',')
+                csvRow = []
+                valid = True
+                for cell in row:
+                    try:
+                        csvRow.append(float(cell))
+                    except ValueError:
+                        valid = False#sometimes the CSV file doesn't contain a number.
+                                     #In that case, just skip that row.
+                if valid:
+                    csvData.append(csvRow)
+    return csvData
+
 
 def _loadBOXData(filename):
     """
@@ -152,6 +192,27 @@ def _loadDATData(filename):
             zs.append(float(row[2]))
     return (xs,ys,zs)
 
+def _loadCF2Data(filename):
+    """
+    Loads galaxy data from a TXT file. Assumes that the data is in the same format
+    as the CF2 and COMPOSITE surveys:
+    two-space-delimited, with columns
+            cz (km/s)
+            distance (Mpc/h)
+            radial velocity(km/s)
+            error in radial velocity(km/s)
+            Galactic Longitude (degrees)
+            Galactic Latitude (degrees)
+    """
+
+    galaxies = [] 
+    with open(filename, "r") as boxfile:
+        for line in boxfile:
+            row = line.split()
+            floats = [float(x) for x in row]
+            galaxies.append(CF2(floats))
+    return galaxies
+
 def writecsv(xslist,yslist):
     assert(len(xslist)==len(yslist))
     with open("./out2.csv",'w') as csv:
@@ -161,3 +222,24 @@ def writecsv(xslist,yslist):
                 line = line + str(xslist[cell][row]) + ',' + str(yslist[cell][row])+ ','
             line = line + '\n'
             csv.write(line)
+class CF2:
+    def __init__(self, data):
+        self.cz = data[0]
+        self.d = data[1]
+        self.v = data[2]
+        self.dv = data[3]
+        self.lon = data[4]
+        self.lat = data[5]
+        self.doc = {"cz": "Unknown. Has units km/sec.",
+                    "d": "Distance. Has units Mpc/h.",
+                    "v": "Peculiar (radial) velocity in km/sec.",
+                    "dv": "Error in peculiar velocity. Units: km/sec.",
+                    "lon":"Galactic longitude in degrees.",
+                    "lat":"Galactic latitude in degrees."}
+        self.units = {"cz": "km/sec",
+                    "d": "Mpc/h",
+                    "v": "km/sec",
+                    "dv": "km/sec",
+                    "lon":"degrees",
+                    "lat":"degrees"}
+       

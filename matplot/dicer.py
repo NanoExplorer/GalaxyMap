@@ -129,6 +129,8 @@ def dice(args):
                     filebounds[boxfilename] = (list(map(lambda x, y: x*y,boxIndex,sizes)),
                                                list(map(lambda x, y: (x+1)*y,boxIndex,sizes)))
                     #calculate the bounding box of this box and add it to a dictionary for later use.
+                    #WARNING: Not accurate unless the boxes fit evenly into the big box! e.g. does not
+                    #work for arbitrary box sizes!
                     with open(boxfilename, 'a') as boxfile:
                         boxfile.write(str(coord[0])+','+str(coord[1])+','+str(coord[2])+'\n')
 
