@@ -82,8 +82,8 @@ def statistics(args):
     ax3.set_yscale("log", nonposx='clip')
     ax4.set_yscale("log", nonposx='clip')
     ys = []
-    maxY = 5*10**2
-    minY = 10**-2
+    maxY =10**2
+    minY = 3*10**-1
     maxRandom = 5*10**1
     minRandom = 10**-1
     numboxes = 0
@@ -118,7 +118,7 @@ def statistics(args):
     #deviation easily. Format [(10,9.8,10.25),(7.776,7.90,7.745) etc] except with possibly more values per tuple
     #and definitely way more tuples.
     
-    yerrs = [np.std(y) for y in allys]
+    
     #Calculate the 95% confidence interval, two times the standard deviation of all the ys for a certain x.
 
     #yerrs = jackknife(allys)
@@ -127,15 +127,18 @@ def statistics(args):
     xs = data['raw_runs'][0]["ALL_BOXES"]["rs"]
     xerrs = [data['raw_runs'][0]["ALL_BOXES"]["dr_left"],data['raw_runs'][0]["ALL_BOXES"]["dr_right"]]
     #Take the raw xs and ys from the dataset that was averaged over all of the boxes.
-    print(xerrs)
     if numboxes == 1:
         popt, pcov = scipy.optimize.curve_fit(power,xs,ys,p0=(10,1.5))#,sigma=yerrs,absolute_sigma=True)
         #When we only have one box, we need to tell the curve fit that all of the errors are "The Same"
+        yerrs = [300*ys[i]*math.sqrt(data['raw_runs'][0]["ALL_BOXES"]["DDs"][i])/data['raw_runs'][0]["ALL_BOXES"]["DDs"][i]for i in range(len(ys))]
     else:
+        yerrs = [np.std(y) for y in allys]
         popt, pcov = scipy.optimize.curve_fit(power,xs,ys,p0=(10,1.5),sigma=yerrs,absolute_sigma=True)
         #More than one box means that the standard deviation errors are correct.
-    print(pcov)
-    print(popt)
+        
+    print(yerrs)
+    # print(pcov)
+    # print(popt)
     plt.figure(5)
     dot = plt.errorbar(xs,ys,yerr=yerrs,xerr=xerrs,fmt='.',label="Averaged Correlation Data")
     model = [power(x,*popt) for x in xs]
