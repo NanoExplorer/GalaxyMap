@@ -14,6 +14,24 @@ print("Loading Coordinates...")
 xs = []#list of x coordinates of galaxies. The coordinates of galaxy zero are (xs[0],ys[0],zs[0])
 ys = []
 zs = []
+vxs = []
+vys = []
+vzs = []
+
+def radialVelocity(x,y,z,vx,vy,vz):
+    r = sqrt(x**2+y**2+z**2)
+    ux = x/r
+    uy = y/r
+    uz = z/r
+    vr = ux*vx + uy*vy + uz*vz
+
+def colorFunc(vr,maxVr):
+    #if vr equals positive maxVr then all blue
+    #if vr equals negative maxVr then all red
+    if vr>0:
+        return (vr/maxVr,0,0)
+    else:
+        return (0,0,-vr/maxVr)
 
 with open("./BoxOfGalaxies.csv", "r") as boxfile:
     for line in boxfile:
@@ -23,6 +41,9 @@ with open("./BoxOfGalaxies.csv", "r") as boxfile:
                 xs.append(float(row[14]))
                 ys.append(float(row[15]))
                 zs.append(float(row[16]))
+                vxs.append(float(row[21]))
+                vxs.append(float(row[22]))
+                vxs.append(float(row[23]))
             except ValueError:
                 pass
 
@@ -40,6 +61,9 @@ thetas = [math.atan2(y,x) for x,y in zip(xs,ys)]
 #phis and thetas are the phi and theta spherical coordinates accd. to my calculus book (except for elevations)
 rho = [math.sqrt(x**2+y**2+z**2) for x,y,z in zip(xs,ys,zs)]
 mag = 1#[500/(x**2+y**2+z**2) for x,y,z in zip(xs,ys,zs)]
+
+vrs = [radialVelocity(x,y,z,vx,vy,vz) for x,y,z,vx,vy,vz in zip(xs,ys,zs,vxs,vys,vzs)]
+
 
 
 print("Generating plots...")

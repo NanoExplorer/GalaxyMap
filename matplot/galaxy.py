@@ -4,6 +4,7 @@ import correlation_func
 import dicer
 import stats
 import survey
+import jackknife
 
 def main():
     #Handle command line arguments
@@ -31,6 +32,10 @@ def main():
     parser_survey = subparsers.add_parser('survey',help='Takes in a survey file, bins it into a histogram and fits the survey function to it.')
     parser_survey.add_argument("settings",help='JSON file to read settings from.',type=str)
     parser_survey.set_defaults(func=survey.mainrun)
+
+    parser_jackknife = subparsers.add_parser('jackknife', help="Takes in a box, divides it into subboxes containing randomly assigned points.")
+    parser_jackknife.add_argument("settings",help="json file to read settings from.",type=str)
+    parser_jackknife.set_defaults(func=jackknife.dice)
 
     args = parser.parse_args()
 
