@@ -7,7 +7,7 @@ import matplotlib.backends.backend_pdf as pdfback
 import math
 import matplotlib.pyplot as plt
 
-
+matplotlib.rc('font', size= 30)
 def updateMinMax(curmin, curmax, values):
     for x in values:
         if x > curmax:
@@ -51,22 +51,22 @@ def statistics(args):
     fig4 = plt.figure(4,figsize=(8,6),dpi=400)
     ax4 = fig4.add_subplot(111)
     plt.ylabel("Correlation+1")
-    plt.xlabel("Correlation distance, Mpc/h")
-    ax4.set_title("Correlation Function from random points, modified Davis and Peebles Estimator")
+    plt.xlabel("Distance, Mpc/h")
+    ax4.set_title("Correlation Function of Random Points")
 
-    fig5 = plt.figure(5,figsize=(8,6),dpi=400)
+    fig5 = plt.figure(5,figsize=(10,7.5),dpi=400)
     ax5 = fig5.add_subplot(111)
     plt.ylabel("Correlation")
-    plt.xlabel("Correlation distance, Mpc/h")
-    ax5.set_title("Correlation Function, average. Landy and Szalay estimator.")
+    plt.xlabel("Distance, Mpc/h",labelpad=-20)
+    ax5.set_title("Millennium Simulation Correlation", y=1.04)
     ax5.set_xscale('log', nonposx = 'clip')
     ax5.set_yscale('log', nonposx = 'clip')
 
-    fig6 = plt.figure(6,figsize=(8,6),dpi=400)
+    fig6 = plt.figure(6,figsize=(10,6),dpi=400)
     ax6 = fig6.add_subplot(111)
-    plt.ylabel("Correlation Residuals")
-    plt.xlabel("Correlation distance, Mpc/h")
-    ax6.set_title("Correlation Function residuals")
+    plt.ylabel("Residuals $\\left(\\frac{measured}{model}\\right)$")
+    plt.xlabel("Distance, Mpc/h",labelpad=-20)
+    ax6.set_title("Millennium Simulation Residuals",y=1.04)
     ax6.set_xscale('log', nonposx = 'clip')
     #ax6.set_yscale('log', nonposx = 'clip')
 
@@ -82,8 +82,8 @@ def statistics(args):
     ax3.set_yscale("log", nonposx='clip')
     ax4.set_yscale("log", nonposx='clip')
     ys = []
-    maxY =10**2
-    minY = 3*10**-1
+    maxY =3*10**1
+    minY = 1*10**-1
     maxRandom = 5*10**1
     minRandom = 10**-1
     numboxes = 0
@@ -136,29 +136,64 @@ def statistics(args):
         popt, pcov = scipy.optimize.curve_fit(power,xs,ys,p0=(10,1.5),sigma=yerrs,absolute_sigma=True)
         #More than one box means that the standard deviation errors are correct.
         
-    print(yerrs)
+    
     # print(pcov)
     # print(popt)
     plt.figure(5)
-    dot = plt.errorbar(xs,ys,yerr=yerrs,xerr=xerrs,fmt='.',label="Averaged Correlation Data")
+    dot = plt.errorbar(xs,ys,xerr=xerrs,fmt='.',ms=13,label="Measured Correlation",
+                       yerr=yerrs,
+                       elinewidth=2,
+                       capsize=3,
+                       capthick=2
+    )
     model = [power(x,*popt) for x in xs]
     line = plt.plot(xs,
                     model,
                     label="Model fit: $(r/r_0)^{{-\gamma}}$\n$r_0 = {:.3f}$\n$\gamma = {:.3f}$".format(popt[0],
-                                                                                                       popt[1]))
+                                                                                                       popt[1]),
+                    lw=2
+    )
     #We need {{ and }} to escape the .format thingy and pass { and } to LaTeX
 
-    plt.legend()
+    plt.legend(prop={'size':20})
     plt.figure(6)
     residuals = [y/mod for y,mod in zip(ys,model)]
-
+    print(list(zip(xs,residuals)))
     #Since a residual data point is y / model, the relative error in residual will be equal to
     #sqrt( relative error in model ^2 + relative error in point ^2)
     residuals_errors = [res*(dy / y) for y,dy,res in zip(ys,yerrs,residuals)]
-    plt.errorbar(xs,residuals,yerr=residuals_errors,fmt='.',label="Residuals")
-    plt.plot(xs,[1 for x in xs],label="Model")
-    plt.legend()
-    ax6.axis([0,max(xs)+1,0,2])#min(residuals)*.9,max(residuals)*1.1])
+    plt.errorbar(xs,residuals,yerr=residuals_errors,fmt='.',ms=13,label="Residuals",elinewidth=2,capsize=3,capthick=2)
+    plt.plot(xs,[1 for x in xs],label="Model",lw=2)
+    plt.legend(prop={'size':20})
+    ax6.axis([min(xs)-0.15,max(xs)+3,0.5,1.5])#min(residuals)*.9,max(residuals)*1.1])
+    ax6.annotate('Pairs within a cluster', xy = (xs[1]*1.05,residuals[1]*1.05), xytext = (1.0,1.3),
+                 arrowprops = dict(arrowstyle="-|>",
+                                   connectionstyle="arc3,rad=0.2",
+                                   relpos=(0.,0.),
+                                   fc="w"                                   
+                               ),
+                 size = 20,
+                 bbox = dict(boxstyle="round", fc="w", ec="0.5", alpha=0.9)
+    )
+    ax6.annotate('Pairs in neighboring clusters', xy = (xs[15]*0.95,residuals[15]*0.95), xytext = (3.0,0.77),
+                 arrowprops = dict(arrowstyle="-|>",
+                                   connectionstyle="arc3,rad=0.2",
+                                   relpos=(0.5,1.),
+                                   fc="w"                                   
+                               ),
+                 size = 20,
+                 bbox = dict(boxstyle="round", fc="w", ec="0.5", alpha=0.9)
+    )
+    ax6.annotate('Fewer galaxies between clusters', xy = (xs[8]*0.95,residuals[8]*0.95), xytext = (0.8,0.6),
+                 arrowprops = dict(arrowstyle="-|>",
+                                   connectionstyle="arc3,rad=0.2",
+                                   relpos=(0.5,1.),
+                                   fc="w"                                   
+                               ),
+                 size = 20,
+                 bbox = dict(boxstyle="round", fc="w", ec="0.5", alpha=0.9)
+    )
+
     plt.figure(5)
     #Here, we set the scale of each axis. We need a better method of dynamically deciding what the bounds should be
     ax5.axis([min(xs)-0.15,max(xs)+3,minY,maxY])
@@ -184,12 +219,15 @@ def statistics(args):
                           data["settings"]["Divide"]["y_box_size"]*
                           data["settings"]["Divide"]["z_box_size"])
         outfile.write(line+'\n')              
-    with pdfback.PdfPages(basefilename+'graphs.pdf') as pdf:
-        pdf.savefig(fig)
-        pdf.savefig(fig2)
-        pdf.savefig(fig3)
-        pdf.savefig(fig4)
-        pdf.savefig(fig5)
+    with pdfback.PdfPages(basefilename+'graphResiduals.pdf') as pdf:
+        #pdf.savefig(fig)
+        #pdf.savefig(fig2)
+        #pdf.savefig(fig3)
+        
+        #pdf.savefig(fig4)
+        #fig5.subplots_adjust(bottom=0.13,left=0.15,top=0.88)
+        #pdf.savefig(fig5)
+        fig6.subplots_adjust(bottom=0.13, left=0.15,top=0.88)
         pdf.savefig(fig6)
 
 
