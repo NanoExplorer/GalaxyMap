@@ -83,6 +83,8 @@ def makeplotWithErrors(data,title,xl,yl):
 def getBoxName(name, xi, yi, zi):
     return name + '_{}_{}_{}.box'.format(xi,yi,zi)
 
+def getBoxNameJackknife(name, ranint):
+    return name + '_{}.box'.format(ranint)
 
 def loadData(filename, dataType = "guess"):
     """
@@ -95,10 +97,11 @@ def loadData(filename, dataType = "guess"):
         'box': boxfiles created by dicer.py
         'miscFloat': csv files that contain only floats
         'survey': read data from a real survey
-    
     """
     if dataType == "guess":
         dataType = filename.split('.')[-1].lower()
+        if dataType == "txt":
+            dataType = "CF2" #Note: This might not always be the case.
     if dataType == 'dat':
         return _loadDATData(filename)
     elif dataType == 'csv':

@@ -84,6 +84,9 @@ def makeSubDataPerBox(DDs, DRs, RRs, xs, ldrs, rdrs):
     davis_peebles = dpest(DDs,DRs,RRs)
     landy_szalay = lsest(DDs,DRs,RRs)
     random_point = randomPointCorrelation(DDs,DRs,RRs)
+    if hamilton is None or davis_peebles is None or landy_szalay is None:
+        #print("Zero correlation encountered!")
+        return None
     #checkForBadNums(hamilton, davis_peebles, landy_szalay, localxs, localLdrs,localRdrs,random_point)
     return {"rs":localxs,
             "dr_left":localLdrs,
@@ -150,6 +153,7 @@ def calculate_correlations(args):
         #the tuple contains the filename of the box, the coordinates of the box's minimum corner
         #and the coordinates of the box's maximum corner.
     dataPerBox = {}
+    num_bad_points = 0
     for x in range(len(list_of_DDsDRsRRs)):
         item = list_of_DDsDRsRRs[x]
         boxfile = boxes[x][0]
@@ -169,10 +173,12 @@ def calculate_correlations(args):
             RRs[i] = RRs[i] + miniRRs[i]
             
         
-            
-        dataPerBox[boxfile] = makeSubDataPerBox(miniDDs, miniDRs, miniRRs, xs, left_drs, right_drs)
-        if dataPerBox[boxfile] is None:
-            del dataPerBox[boxfile]
+        data = makeSubDataPerBox(miniDDs, miniDRs, miniRRs, xs, left_drs, right_drs)
+        if data is not None:
+            dataPerBox[boxfile] = data
+        else:
+            num_bad_points += 1
+    print("Number of bad runs: {}".format(num_bad_points))
 
     correlations = makeSubDataPerBox(DDs, DRs, RRs, xs, left_drs, right_drs)
     dataPerBox['ALL_BOXES'] = correlations
@@ -187,6 +193,7 @@ def getRightdrs(xs,intervals):
     return [intervals[i*2+1] - xs[i] for i in range(len(xs))]
 
 def checkSampleSize(Dd,Dr,Rr,name):
+    """
     if Dd < MINIMUM_SAMPLE:
         print("Warning: Small sample size encountered in {} correlation calculation, {} value = {}.".format(name,
                                                                                                             "DD",
@@ -201,7 +208,11 @@ def checkSampleSize(Dd,Dr,Rr,name):
         print("Warning: Small sample size encountered in {} correlation calculation, {} value = {}.".format(name,
                                                                                                             "RR",
                                                                                                             Rr))
-        print("Consider increasing bin size.")
+        print("Consider increasing bin size.")"""
+    if Dd == 0 or Dr == 0 or Rr == 0:
+        return True
+    else:
+        return False
 
 def hamest(DDs,DRs,RRs):
     results = []
@@ -211,7 +222,8 @@ def hamest(DDs,DRs,RRs):
         #objects closer than". This function converts from "closer than" to "in a shell"
         DRr = DRs[index+1]-DRs[index]
         RRr = RRs[index+1]-RRs[index]
-        checkSampleSize(DDr,DRr,RRr,"Hamilton")
+        if checkSampleSize(DDr,DRr,RRr,"hamilton"):
+            return None
         results.append((DDr*RRr)/(DRr**2)-1)
         #This is the formula for a hamilton estimator from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
     return results
@@ -224,7 +236,8 @@ def dpest(DDs,DRs,RRs):
         #objects closer than". This function converts from "closer than" to "in a shell"
         DRr = DRs[index+1]-DRs[index]
         RRr = RRs[index+1]-RRs[index]
-        checkSampleSize(DDr,DRr,RRr,"Davis Peebles")
+        if checkSampleSize(DDr,DRr,RRr,"Davis Peebles"):
+            return None
         results.append((DDr/DRr)-1)
         #This is the formula for a Davis and Peebles estimator from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
         #Nrd = N
@@ -239,7 +252,8 @@ def lsest(DDs,DRs,RRs):
         #objects closer than". This function converts from "closer than" to "in a shell"
         DRr = DRs[index+1]-DRs[index]
         RRr = RRs[index+1]-RRs[index]
-        checkSampleSize(DDr,DRr,RRr,"Landy Szalay")
+        if checkSampleSize(DDr,DRr,RRr,"Landy Szalay"):
+            return None
         results.append(1+(DDr/RRr)-2*(DRr/RRr))
         #This is the formula for a Landy and Szalay estimator from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
         #Nrd = N
@@ -254,8 +268,10 @@ def randomPointCorrelation(DDs,DRs,RRs):
         #objects closer than". This function converts from "closer than" to "in a shell"
         DRr = DRs[index+1]-DRs[index]
         RRr = RRs[index+1]-RRs[index]
-        checkSampleSize(DDr,DRr,RRr,"random")
-        results.append((DRr/RRr)-1)
+        if RRr == 0:
+            results.append(0)
+        else:
+            results.append((DRr/RRr)-1)
         #This takes the number of galaxies in a shell around a random point
         #and compares it to the number of random points in a shell around the random point.
         #Nrd = N

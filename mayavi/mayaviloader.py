@@ -14,7 +14,7 @@ xs = []
 ys = []
 zs = []
 
-with open("/home/christopher/code/Physics/millenium/BoxOfGalaxies.csv", "r") as boxfile:
+with open("/home/christopher/code/Physics/millennium/BoxOfGalaxies.csv", "r") as boxfile:
     for line in boxfile:
         if line[0]!="#":
             try:
