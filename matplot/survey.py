@@ -115,7 +115,35 @@ def selection_function(r, A, r_0, n_1, n_2):
 
 
 def selectrun(args):
-    pass
+    #I'll need from args:
+    #The input file name (5+gb csv file from millennium)
+    #Density of the input file name
+    #The survey function (could be the filename of the function parameter json)
+    #minimum distance between surveys
+    #number of surveys (?)
+    #Capitalized variables refer to variables that have not been implemented yet.
+    
+    #I'll need to go through each line in the file manually to avoid memory overflows.
+
+    #Now: make a list of the survey starting points. The data structure should be:
+    #list of origin tuples, (x,y,z). The index will be the ID of the survey. So we save each
+    #survey in a file named based on the list index.
+
+    #The survey starting points will all need to be more than MIN_DIST from each other, so I will
+    #either need a way of generating random points that are a certain minimum distance from each other or I'll
+    #need to manually make a list of a bunch of points to use, then recycle them. The first method would be
+    #better, under some circumstances probably.
+    with open(FILENAME, 'r') as theFile:
+        for i,rawline in enumerate(theFile):
+            if i != 0:
+                line = rawline.strip()
+                row = line.split(',')
+                surveyCheck(row, surveys)
+
+def surveyCheck(info, surveys):
+    #This function should go through all the surveys and determine the distance from the data point (info) to the
+    #center of the survey, then 
+    
 
 
 if __name__ == "__main__":
