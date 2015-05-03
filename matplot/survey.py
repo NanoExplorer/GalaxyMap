@@ -111,6 +111,12 @@ def selection_function(r, A, r_0, n_1, n_2):
         print("Uh-oh, the value was zero!")
         print(r,A,r_0,n_1,n_2)
     return value
-    
+
+
+
+def selectrun(args):
+    pass
+
+
 if __name__ == "__main__":
     print("This does not run standalone.")
