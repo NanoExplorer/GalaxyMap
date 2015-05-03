@@ -29,13 +29,17 @@ def main():
     parser_stats.add_argument("datafile",help='JSON file to read data from.',type=str)
     parser_stats.set_defaults(func=stats.statistics)
 
-    parser_survey = subparsers.add_parser('survey',help='Takes in a survey file, bins it into a histogram and fits the survey function to it.')
-    parser_survey.add_argument("settings",help='JSON file to read settings from.',type=str)
-    parser_survey.set_defaults(func=survey.mainrun)
-
     parser_jackknife = subparsers.add_parser('jackknife', help="Takes in a box, divides it into subboxes containing randomly assigned points.")
     parser_jackknife.add_argument("settings",help="json file to read settings from.",type=str)
     parser_jackknife.set_defaults(func=jackknife.dice)
+
+    parser_surveystats = subparsers.add_parser('surveystats',help='Takes in a survey file, bins it into a histogram and fits the survey function to it.')
+    parser_surveystats.add_argument("settings",help='JSON file to read settings from.',type=str)
+    parser_surveystats.set_defaults(func=survey.statsrun)
+
+    parser_selectsurvey = subparsers.add_parser('select',help='Uses a settings file to extract lots of virtual surveys (like the cf2 and composite ones) from the huge millennium data file.')
+    parser_selectsurvey.add_argument('settings',help='JSON file to read settings from.',type=str)
+    parser_selectsurvey.set_defaults(func=survey.selectrun)
 
     args = parser.parse_args()
 
