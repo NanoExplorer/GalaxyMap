@@ -70,10 +70,13 @@ def singlerun(filename,outputFile,binsize,chop):
         pdf.savefig(fig2)
     params = robot.result.x
     #Write paramaters to a file for later use.
-    common.writedict(outputFile+str(binsize)+'_params.json',{'A':params[0],
-                                                             'r_0':params[1],
-                                                             'n_1':params[2],
-                                                             'n_2':params[3]
+    common.writedict(outputFile+str(binsize)+'_params.json',{'constants':{'A':params[0],
+                                                                          'r_0':params[1],
+                                                                          'n_1':params[2],
+                                                                          'n_2':params[3]},
+                                                             'info':{'shell_thickness': binsize,
+                                                                     'max_radius': chop
+                                                                 }
                                                             })
 
 class chi_sq_solver:
@@ -147,34 +150,60 @@ def selectrun(args):
     density        = settings['dataset_density']
     surveyOverride = settings['survey_position_override']
     boxSize        = settings['box_size']
+    outFileName    = settings['survey_output_files']
     if surveyOverride is not None:
         surveys = surveyOverride
     else:
         surveySeparation = settings['survey_separation_distance']
         numSurveys       = settings['num_surveys']
         surveys = genSurveyPos(surveySeparation, boxSize, numSurveys)
-    
+    surveyContent = [[] for i in range(len(surveys))]
     selectionParams = common.getdict(settings['selection_function_json'])
-    with open(FILENAME, 'r') as theFile:
+    with open(hugeFile, 'r') as theFile:
         for i,rawline in enumerate(theFile):
-            if i != 0:
+            if i != 0: #making sure we don't take the header line
                 line = rawline.strip()
                 row = line.split(',')
-                surveyCheck(row, surveys, selectionParams)
+                floatRow = [float(r) for r in row]
+                toAdd = surveyCheck(floatRow, surveys, selectionParams, density)
+                for i,addBool in enumerate(toAdd):
+                    if addBool:
+                        surveyContent[i].append(rawline)
+    for i,surveyFinal in enumerate(surveyContent):
+        with open(outFileName + str(i) + '.json', 'w') as surveyFile:
+            for line in surveyFinal:
+                surveyFile.write(line)
 
-def surveyCheck(info, surveys, params):
+def surveyCheck(info, surveys, params, density):
     #This function should go through all the surveys and determine the distance from the data point (info) to the
     #center of the survey, then figure out the probability that you should pick the point in question.
-    selection = lambda x: selection_function(x,**params)
+    selection = lambda x: selection_function(x,**(params["constants"]))
     #selection is the specific version of the generalized selection function, a.k.a. the selection function
     #with all the constants set to their values.
     x = info[0]
     y = info[1]
     z = info[2]
-    distances = [sqrt( (x-r[0])**2 +
+    distances = [math.sqrt( (x-r[0])**2 +
                        (y-r[1])**2 +
                        (z-r[2])**2 ) for r in surveys]
-    
+    surveyAdd = []
+    for i,d in enumerate(distances):
+        rawSelection = selection(d)
+        shellVol = common.shellVolCenter(d,params['info']['shell_thickness'])
+        wantDensity = rawSelection / shellVol
+        probability = wantDensity/density
+        dieroll = np.random.random_sample()
+        addBool = dieroll < probability
+        surveyAdd.append(addBool)
+        
+        if addBool:
+            print("{: >10,.2e}{: >10,.2e}{: >10,.2e}{: >10,.2e}{: >10,.2e}{: >10}".format(d,
+                                                                                          rawSelection,
+                                                                                          wantDensity,
+                                                                                          probability,
+                                                                                          dieroll,
+                                                                                          i))
+    return surveyAdd
 
 def genSurveyPos(separation, boxsize, numSurveys):
     surveys = []

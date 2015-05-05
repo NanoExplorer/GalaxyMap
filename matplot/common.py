@@ -28,6 +28,37 @@ import json
 import matplotlib.pyplot as plt
 import os.path
 
+def columnPrint(*args,formatString = None,formatBase = "{: >10,.2f}",separator="",tail=""):
+    if formatString is None:
+        formatString = ""
+        for i in range(len(args) - 1):
+            formatString = formatString + formatBase + separator
+        formatString = formatString + formatBase + tail
+    length=max([len(arg) for arg in args])
+    for i in range(length):
+        row = []
+        for col in args:
+            try:
+                cell = col[i]
+            except IndexError:
+                cell = 0
+            finally:
+                row.append(cell)
+        print(formatString.format(*row))
+
+
+def sphereVol(radius):
+    return (4/3)*(np.pi)*(radius**3)
+
+def shellVolCenter(r, thickness):
+    dr = thickness/2
+    left = r-dr
+    right = r+dr
+    return shellVol(left,right)
+        
+def shellVol(r1,r2):
+    return abs(sphereVol(r1)-sphereVol(r2))
+
 def gensettings(args):
     module = args.module
     filename = "settings_{}.json".format(module)
