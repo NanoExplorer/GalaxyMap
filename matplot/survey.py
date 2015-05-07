@@ -5,7 +5,9 @@ import math
 import scipy.optimize as optimize
 import matplotlib.backends.backend_pdf as pdfback
 import itertools
-
+import os
+import multiprocessing
+NUM_PROCESSORS = 8
 np.seterr(all='raise')
 #When having problems with dividing by zero, we can debug more easily by having execution
 #stop completely when we encounter one, instead of continuing on with only a warning
@@ -157,11 +159,57 @@ def selectrun(args):
         surveySeparation = settings['survey_separation_distance']
         numSurveys       = settings['num_surveys']
         surveys = genSurveyPos(surveySeparation, boxSize, numSurveys)
-    surveyContent = [[] for i in range(len(surveys))]
+    
     selectionParams = common.getdict(settings['selection_function_json'])
+    
+    if os.path.isdir(hugeFile):
+        files = [hugeFile + x for x in os.listdir(hugeFile)]
+    else:
+        files = hugeFile
+
+    pool = multiprocessing.Pool(processes = NUM_PROCESSORS)
+    print(surveys,selectionParams,density)
+    listOfSurveyContents = pool.starmap(surveyOneFile,zip(files,
+                                                          itertools.repeat(surveys),
+                                                          itertools.repeat(selectionParams),
+                                                          itertools.repeat(density)))
+    #Format of listOfSurveyContents:
+    #List of 1000 elements.
+    #Each 'element' is a list of numSurveys elements, each element of which is a list of rows that belong to that
+    #survey.
+
+    #e.g. [
+    #       [
+    #         [rows from survey 1],
+    #         [rows from survey 2],
+    #         ...],
+    #       [],[],...,[]]
+    infoDict = {}
+    surveyContent = transposeMappedSurvey(listOfSurveyContents)
+    for i,surveyFinal in enumerate(surveyContent):
+        surveyFileName = outFileName + str(i) + '.json'
+        with open(surveyFileName, 'w') as surveyFile:
+            for line in surveyFinal:
+                surveyFile.write(line)
+        infoDict[surveyFileName] = surveys[i]
+    infoDict['general_info'] = {'selection_params': selectionParams,
+                                'settings': settings}
+    common.writedict(outFileName,infoDict)
+
+def transposeMappedSurvey(data):
+    surveyContent = [[] for i in range(len(data[0]))]
+    for mapResult in data:
+        for i,survey in enumerate(mapResult):
+            for line in survey:
+                surveyContent[i].append(line)
+    return surveyContent
+
+def surveyOneFile(hugeFile, surveys,selectionParams,density):
+    #Note: it's only called a hugeFile because I'm lazy and don't want to change its name.
+    surveyContent = [[] for i in range(len(surveys))]
     with open(hugeFile, 'r') as theFile:
-        for i,rawline in enumerate(theFile):
-            if i != 0: #making sure we don't take the header line
+        for rawline in theFile:
+            if rawline[0]!='#' and rawline[0] != 'x': #making sure we don't take the header line or any comments
                 line = rawline.strip()
                 row = line.split(',')
                 floatRow = [float(r) for r in row]
@@ -169,11 +217,8 @@ def selectrun(args):
                 for i,addBool in enumerate(toAdd):
                     if addBool:
                         surveyContent[i].append(rawline)
-    for i,surveyFinal in enumerate(surveyContent):
-        with open(outFileName + str(i) + '.json', 'w') as surveyFile:
-            for line in surveyFinal:
-                surveyFile.write(line)
-
+    return surveyContent
+                        
 def surveyCheck(info, surveys, params, density):
     #This function should go through all the surveys and determine the distance from the data point (info) to the
     #center of the survey, then figure out the probability that you should pick the point in question.
