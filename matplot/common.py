@@ -3,6 +3,12 @@ This file contains common functions used by my millenium programs. It contains m
 like loading files and outputting data.
 
 Function reference:
+    sphereVol(radius):
+        returns the volume of the sphere
+    shellVolCenter(r, thickness):
+        returns the volume of a shell centered on radius r with a certain thickness
+    shellVol(r1,r2)
+        returns the volume of a shell with defined inner and outer radii
     getdict(filename)
         Gets json settings stored in the filename, parses them and returns them as a python dictionary
     gensettings(args)
@@ -12,12 +18,15 @@ Function reference:
         Loads galaxy coordinates from a CSV file.
         Returns (xs, ys, zs) as a tuple
     makeplot(xs,ys,title,xl,yl)
+        Deprecated
         makes a matplotlib plot with the given X values, Y values, title, x label and y label.
+    makeplotWithErrors
+        Deprecated. 
     writecsv(xslist,yslist)
-        VERY ESOTERIC USE WITH EXTREME CAUTION.
-        Kept for legacy reasons.
+        Deprecated
         Writes a csv file with alternating X and Y columns, where x is a list of lists of x coordinates
         and yslist is a list of lists of y coordinates.
+    See docstrings for more information
 
 """
 import matplotlib
@@ -28,7 +37,7 @@ import json
 import matplotlib.pyplot as plt
 import os
 import math
-
+import scipy.spatial as space
 
 def sphereVol(radius):
     return (4/3)*(np.pi)*(radius**3)
@@ -95,22 +104,34 @@ def makeplotWithErrors(data,title,xl,yl):
     plt.show()
 
 def getBoxName(name, xi, yi, zi):
+    """
+    returns the name of the box given its stub name and the x, y, and z indices.
+    Works on dicer-split box files
+    """
     return name + '_{}_{}_{}.box'.format(xi,yi,zi)
 
 def getBoxNameJackknife(name, ranint):
+    """
+    returns the name of the box given its stub name and random iteration.
+    Works on jackknife-split box files.
+    """
     return name + '_{}.box'.format(ranint)
 
 def loadData(filename, dataType = "guess"):
     """
-    Tries to guess what kind of data you're loading using the extension on the filename. Override this using
-    the DataType flag.
+    Loads in galaxy data. Always returns a list of galaxies. Galaxies can be in multiple formats. Most of the
+    time the format is merely a list [x,y,z]. However, in the case of CF2 data, the result is a list of CF2 galaxies
+    with data type defined below. The miscFloat type returns a list of lists of floats.
+    
+    This method tries to guess what kind of data you're loading based on the extension on the filename.
+    Override this using the dataType named argument.
 
     dataTypes:
         'dat': boxfiles that are like lasdamas box files
         'csv': boxfiles from millennium that have x, y, and z values in columns 14, 15, and 16
         'box': boxfiles created by dicer.py
         'miscFloat': csv files that contain only floats
-        'survey': read data from a real survey
+        'CF2': read data from a CF2 or COMPOSITE survey
     """
     if dataType == "guess":
         dataType = filename.split('.')[-1].lower()
@@ -240,6 +261,10 @@ def writecsv(xslist,yslist):
             line = line + '\n'
             csv.write(line)
 class CF2:
+    """
+    Data structure for holding a cf2 galaxy. The constructor takes a list of attributes,
+    in the order given by the cf2 files. 
+    """
     def __init__(self, data):
         self.cz = data[0]
         self.d = data[1]
@@ -261,40 +286,78 @@ class CF2:
                     "lat":"degrees"}
 
 class MillenniumFiles:
+    """
+    Handles certain operations with regards to boxes of millennium files. 
+    """
     def __init__(self, boxLocation):
+        """
+        Takes in a directory, and initializes based on that directory and the files in it.
+        The directory must have a file next to it called 'nameofdirectory_info.json' that contains
+        box size information and box filename format information
+        """
         #Make sure we're looking at a directory.
-        boxIsDir = os.path.isDir()
+        boxIsDir = os.path.isdir(boxLocation)
         #self.files is always a list of files
-
+        self.boxLocation = boxLocation
         #This class is designed for handling millennium directories, so throw an exception if it isn't a directory
         if boxIsDir:
-            self.files = [boxLocation+fname for fname in os.listdir(boxLocation)]
+            self.files = [boxLocation+'/'+fname for fname in os.listdir(boxLocation)]
         else:
             raise TypeError("The MillenniumFiles class may only be used on directories containing many sub-boxes.")
 
         #grab the informational json file. If it doesn't exist, throw the corresponding exception.
-        boxInfoLoc = boxLocation + '_info.json')
-        if os.path.isfile(box):
-            self.boxInfo = getDict(boxLocation+'_info.json')
+        boxInfoLoc = boxLocation + '_info.json'
+        if os.path.isfile(boxInfoLoc):
+            self.boxInfo = getdict(boxLocation+'_info.json')
         else:
             raise RuntimeError("The box must have an associated informational JSON file located at {}!".format(boxInfoLoc))
+        
         #I wish I could think of a better way of storing info files. For now,
         #every box I use this program on will have to just have an associated
         #json file like this.
 
         #Self.boxinfo contains three important pieces of information:
-        #    the size of each box (a 3-element list/tuple)
-        #    the format string for finding a filename, using attributes xi, yi, and zi for indices
-        #    the directory the box is sitting in, relative to this file (not quite as useful.)
+        #    the size of each box (a 3-element list/tuple) "box_size"
+        #    the format string for finding a filename, using attributes xi, yi, and zi for indices "box_filename_format"
+        #    the directory the box is sitting in, relative to this file (not quite as useful.)"box_directory"
 
-    def getClosestGalaxy(self,r):
+    def getACloseGalaxy(self,r):
         """
-        Returns the galaxy closest to the (x,y,z) tuple 'r'
+        Returns a galaxy close to the (x,y,z) tuple 'r'
+        Note: The galaxy returned is not guaranteed to be the closest galaxy to r, especially if r
+        is close to a box edge. This method will be less computationally intensive than get "closest" galaxy
         """
+        csvData = loadData(self.getBox(r), 'miscFloat')
+        spatialInfo = []
+        for row in csvData:
+            galaxy = MillenniumGalaxy(row)
+            spatialInfo.append((galaxy.x,galaxy.y,galaxy.z))
+        kd_galaxies = space.cKDTree(spatialInfo)
+        distance, index = kd_galaxies.query(r)
+        return spatialInfo[index]
+        
+            
+    def getBox(self,r):
+        """
+        Returns the box (filename) that this point would be in
+        """
+        
+        size = self.boxInfo["box_size"]
+        xbox = int(r[0] / size[0])
+        ybox = int(r[1] / size[1])
+        zbox = int(r[2] / size[2])
+        filename = self.boxInfo["box_filename_format"].format(xi = xbox, yi = ybox, zi = zbox)
+        fullPath = self.boxLocation + '/' + filename
+        assert fullPath in self.files #If this assertion fails, you're most likely outside the box.
+        return fullPath
         
 class MillenniumGalaxy:
     def __init__(self,galaxy):
-
+        """
+        Data structure for holding galaxies from one type of millennium query.
+        the parameter 'galaxy' is either a string (one line) directly from the millennium box
+        or a list of attributes in the order presented by the millennium box
+        """
         #If we get the entire csv line as a string, we can just split it and make sure everything's a float.
         if type(galaxy) is str:
             self.galaxList = [float(x) for x in galaxy.split(',')]

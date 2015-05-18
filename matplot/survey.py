@@ -258,10 +258,14 @@ def surveyCheck(info, surveys, params, density):
     return surveyAdd
 
 def genSurveyPos(separation, boxsize, numSurveys,files):
-    surveys = []
-    numCatches = 0
+    surveys = [] #list of surveys. Each survey is a tuple (x,y,z) of starting position
+    numCatches = 0 #number of times we've tried to grab a position and failed
+    millennium = common.MillenniumFiles(files)
     assert numSurveys > 0
+    
     if not numSurveys*separation**3 < (boxsize[0] - separation)*(boxsize[1] - separation)*(boxsize[2] - separation):
+        #Estimate the volume of the box and the volume of the surveys to determine whether we can physically
+        #fit numSurveys into the box. This is a lower bound, so you might get the warning and still be fine.
         print("[WARN] there may be too many surveys for this box size and separation distance.")
     rng = np.random.RandomState()
     for i in range(numSurveys):
@@ -270,27 +274,22 @@ def genSurveyPos(separation, boxsize, numSurveys,files):
             #is concerned. If you try to cram too many surveys into a box it will fail. There's a built in
             #failsafe that detects infinite looping by failing after it tries too many times. (currently 500,000)
             edgeBound = separation/2
-            surveyCoord = (rng.uniform(edgeBound,boxsize[0]-edgeBound),
+            randomCoord = (rng.uniform(edgeBound,boxsize[0]-edgeBound),
                            rng.uniform(edgeBound,boxsize[1]-edgeBound),
                            rng.uniform(edgeBound,boxsize[2]-edgeBound))
+            galaxyCoord = millennium.getACloseGalaxy(randomCoord)
             distances = [math.sqrt((r1[0]-r2[0])**2+
                                    (r1[1]-r2[1])**2+
                                    (r1[2]-r2[2])**2)
-                             for r1,r2 in zip(itertools.repeat(surveyCoord),surveys)]
+                             for r1,r2 in zip(itertools.repeat(galaxyCoord),surveys)]
             if all(distance > separation for distance in distances):
                 #All is officially the 'coolest function ever.' All of an empty list is true!
-                surveys.append(surveyCoord)
+                surveys.append(galaxyCoord)
                 break
             else:
                 numCatches += 1
             if numCatches > 500000:
-                print("We tried SO HARD to make this survey for you, but it just didn't work.")
-                print("We're very sorry. We might still be able to make you a survey if you reduce")
-                print("the number of surveys that we have to put into this box and try again.")
-                print("")
-                print("Sincerely,")
-                print("The elves that sit in your laptop doing hundreds of math problems per second.")
-                exit()
+                raise RuntimeError("We're probably in an infinite loop. Try reducing the number of surveys generated.")
     print("Caught {}!".format(numCatches))
     return surveys
 
@@ -299,7 +298,7 @@ def genSurveyPos(separation, boxsize, numSurveys,files):
 def transpose(args):
     survey_info = common.getdict(args.survey_file)
     for survey in survey_info:
-        outCsvString = "" #change this to outcf2string when you're less depressed
+        outCF2String = "" 
         with open(survey['name'],'r') as csvFile:
             for line in csvFile:
                 row = line.strip().split(',')
@@ -311,9 +310,9 @@ def transpose(args):
                           0,#longitude degrees
                           0]#latitude degrees
                 #WARNING: The CF2 conversion algorithm is not complete yet!
-                outCsvString = outCsvString + '{}  {}  {}  {}  {}  {}\n'.format(*cf2row)
+                outCF2String = outCF2String + '{}  {}  {}  {}  {}  {}\n'.format(*cf2row)
         with open(survey['name'] + '_cf2.txt', 'w') as cf2outfile:
-            cf2outfile.write(outCsvString)
+            cf2outfile.write(outCF2String)
             
 if __name__ == "__main__":
     print("This does not run standalone.")
