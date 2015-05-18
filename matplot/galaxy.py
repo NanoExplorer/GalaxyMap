@@ -41,6 +41,10 @@ def main():
     parser_selectsurvey.add_argument('settings',help='JSON file to read settings from.',type=str)
     parser_selectsurvey.set_defaults(func=survey.selectrun)
 
+    parser_surveytranspose = subparsers.add_parser('transpose',help='Transforms cartesian surveys into CF2 format')
+    parser_surveytranspose.add_argument('survey_file',help='survey.json file that contains a list of surveys and all of their center points.')
+    parser_surveytranspose.set_defaults(func=survey.transpose)
+
     args = parser.parse_args()
 
     function = None

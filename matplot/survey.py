@@ -153,19 +153,23 @@ def selectrun(args):
     surveyOverride = settings['survey_position_override']
     boxSize        = settings['box_size']
     outFileName    = settings['survey_output_files']
+
+    if os.path.isdir(hugeFile):
+        files = [hugeFile + x for x in os.listdir(hugeFile)]
+    else:
+        files = hugeFile
+
+    
     if surveyOverride is not None:
         surveys = surveyOverride
     else:
         surveySeparation = settings['survey_separation_distance']
         numSurveys       = settings['num_surveys']
-        surveys = genSurveyPos(surveySeparation, boxSize, numSurveys)
+        surveys = genSurveyPos(surveySeparation, boxSize, numSurveys,files)
     
     selectionParams = common.getdict(settings['selection_function_json'])
     
-    if os.path.isdir(hugeFile):
-        files = [hugeFile + x for x in os.listdir(hugeFile)]
-    else:
-        files = hugeFile
+
 
     pool = multiprocessing.Pool(processes = NUM_PROCESSORS)
     print(surveys,selectionParams,density)
@@ -184,19 +188,22 @@ def selectrun(args):
     #         [rows from survey 2],
     #         ...],
     #       [],[],...,[]]
-    infoDict = {}
+    info = []
     surveyContent = transposeMappedSurvey(listOfSurveyContents)
     for i,surveyFinal in enumerate(surveyContent):
-        surveyFileName = outFileName + str(i) + '.json'
+        surveyFileName = outFileName + str(i) + '.mil'
         with open(surveyFileName, 'w') as surveyFile:
             for line in surveyFinal:
                 surveyFile.write(line)
-        infoDict[surveyFileName] = surveys[i]
-    infoDict['general_info'] = {'selection_params': selectionParams,
-                                'settings': settings}
-    common.writedict(outFileName,infoDict)
+        info.append({'name':surveyFileName,'center':surveys[i]})
+    common.writedict(outFileName + '.json', info)
+    common.writedict(outFileName + '_info.json',{'selection_params': selectionParams,
+                                            'settings': settings})
 
 def transposeMappedSurvey(data):
+    #What does this function do?
+    #Ah. It takes a list of lists of surveys, see above in section "Format of listOfSurveyContents"
+    #and flattens it into a single survey
     surveyContent = [[] for i in range(len(data[0]))]
     for mapResult in data:
         for i,survey in enumerate(mapResult):
@@ -250,7 +257,7 @@ def surveyCheck(info, surveys, params, density):
                                                                                           i))
     return surveyAdd
 
-def genSurveyPos(separation, boxsize, numSurveys):
+def genSurveyPos(separation, boxsize, numSurveys,files):
     surveys = []
     numCatches = 0
     assert numSurveys > 0
@@ -260,8 +267,8 @@ def genSurveyPos(separation, boxsize, numSurveys):
     for i in range(numSurveys):
         while True:
             #Note: this is basically the equivalent of bogosort as far as algorithm efficiency
-            #is concerned. If you try to cram too many surveys into a box it *WILL* keep on running forever.
-            #So don't do that. The assert statements should keep a reasonable amount of 
+            #is concerned. If you try to cram too many surveys into a box it will fail. There's a built in
+            #failsafe that detects infinite looping by failing after it tries too many times. (currently 500,000)
             edgeBound = separation/2
             surveyCoord = (rng.uniform(edgeBound,boxsize[0]-edgeBound),
                            rng.uniform(edgeBound,boxsize[1]-edgeBound),
@@ -286,6 +293,27 @@ def genSurveyPos(separation, boxsize, numSurveys):
                 exit()
     print("Caught {}!".format(numCatches))
     return surveys
-    
+
+
+
+def transpose(args):
+    survey_info = common.getdict(args.survey_file)
+    for survey in survey_info:
+        outCsvString = "" #change this to outcf2string when you're less depressed
+        with open(survey['name'],'r') as csvFile:
+            for line in csvFile:
+                row = line.strip().split(',')
+                center = survey['center']
+                cf2row = [0,#cz
+                          common.distance((row[0],row[1],row[2]),center),#distance (mpc/h)
+                          0,#peculiar velocity km/sec
+                          0,#dv
+                          0,#longitude degrees
+                          0]#latitude degrees
+                #WARNING: The CF2 conversion algorithm is not complete yet!
+                outCsvString = outCsvString + '{}  {}  {}  {}  {}  {}\n'.format(*cf2row)
+        with open(survey['name'] + '_cf2.txt', 'w') as cf2outfile:
+            cf2outfile.write(outCsvString)
+            
 if __name__ == "__main__":
     print("This does not run standalone.")

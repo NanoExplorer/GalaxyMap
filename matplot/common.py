@@ -26,7 +26,9 @@ import matplotlib.backends.backend_pdf as pdfback
 import numpy as np
 import json
 import matplotlib.pyplot as plt
-import os.path
+import os
+import math
+
 
 def sphereVol(radius):
     return (4/3)*(np.pi)*(radius**3)
@@ -257,4 +259,85 @@ class CF2:
                     "dv": "km/sec",
                     "lon":"degrees",
                     "lat":"degrees"}
-       
+
+class MillenniumFiles:
+    def __init__(self, boxLocation):
+        #Make sure we're looking at a directory.
+        boxIsDir = os.path.isDir()
+        #self.files is always a list of files
+
+        #This class is designed for handling millennium directories, so throw an exception if it isn't a directory
+        if boxIsDir:
+            self.files = [boxLocation+fname for fname in os.listdir(boxLocation)]
+        else:
+            raise TypeError("The MillenniumFiles class may only be used on directories containing many sub-boxes.")
+
+        #grab the informational json file. If it doesn't exist, throw the corresponding exception.
+        boxInfoLoc = boxLocation + '_info.json')
+        if os.path.isfile(box):
+            self.boxInfo = getDict(boxLocation+'_info.json')
+        else:
+            raise RuntimeError("The box must have an associated informational JSON file located at {}!".format(boxInfoLoc))
+        #I wish I could think of a better way of storing info files. For now,
+        #every box I use this program on will have to just have an associated
+        #json file like this.
+
+        #Self.boxinfo contains three important pieces of information:
+        #    the size of each box (a 3-element list/tuple)
+        #    the format string for finding a filename, using attributes xi, yi, and zi for indices
+        #    the directory the box is sitting in, relative to this file (not quite as useful.)
+
+    def getClosestGalaxy(self,r):
+        """
+        Returns the galaxy closest to the (x,y,z) tuple 'r'
+        """
+        
+class MillenniumGalaxy:
+    def __init__(self,galaxy):
+
+        #If we get the entire csv line as a string, we can just split it and make sure everything's a float.
+        if type(galaxy) is str:
+            self.galaxList = [float(x) for x in galaxy.split(',')]
+        elif type(galaxy) is list:
+            #If we get a list, we assume it is already full of floats.
+            self.galaxList = list(galaxy)
+            #The list() function is used to make sure we have a copy of the galaxy list and not the original.
+        else:
+            raise TypeError("Millennium Galaxies can only be constructed with lists or csv strings.")
+
+        assert(len(self.galaxList) == 22)
+
+        #This next part is really ugly. I apologize.
+        #If you think of a better way to do this, email me at christopher@rooneyworks.com
+        #I'm thinking I could use a dictionary or something like that...
+        #Maybe dynamically pull the field names from the comments at the beginning of the csv file.
+        #The problem with that is it requires dynamic execution of arbitrary code, and I'm not quite
+        #comfortable with that. I'm sure this will work just fine for now.
+        self.x = self.galaxList[0]
+        self.y = self.galaxList[1]
+        self.z = self.galaxList[2]
+        self.velX = self.galaxList[3]
+        self.velY = self.galaxList[4]
+        self.velZ = self.galaxList[5]
+        self.mvir = self.galaxList[6]
+        self.rvir = self.galaxList[7]
+        self.vvir = self.galaxList[8]
+        self.vmax = self.galaxList[9]
+        self.bulgeMass = self.galaxList[10]
+        self.stellarMass = self.galaxList[11]
+        self.mag_b = self.galaxList[12]
+        self.mag_v = self.galaxList[13]
+        self.mag_r = self.galaxList[14]
+        self.mag_i = self.galaxList[15]
+        self.mag_k = self.galaxList[16]
+        self.mag_bBulge = self.galaxList[17]
+        self.mag_vBulge = self.galaxList[18]
+        self.mag_rBulge = self.galaxList[19]
+        self.mag_iBulge = self.galaxList[20]
+        self.mag_kBulge = self.galaxList[21]
+
+        
+def distance(r1,r2):
+    r1 = [float(r) for r in r1]
+    r2 = [float(r) for r in r2]
+    return math.sqrt((r1[0]-r2[0])**2+(r1[1]-r2[1])**2+(r1[2]-r2[2])**2)
