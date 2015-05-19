@@ -1,13 +1,15 @@
 import common
 import numpy as np
-import pylab
 import math
 import scipy.optimize as optimize
-import matplotlib.backends.backend_pdf as pdfback
+import scipy.spatial as space
 import itertools
 import os
 import multiprocessing
-NUM_PROCESSORS = 8
+import time
+import pylab
+import matplotlib.backends.backend_pdf as pdfback
+NUM_PROCESSORS = 4
 np.seterr(all='raise')
 #When having problems with dividing by zero, we can debug more easily by having execution
 #stop completely when we encounter one, instead of continuing on with only a warning
@@ -18,15 +20,18 @@ def statsrun(args):
     outputFile = all_settings["output_filename"]
     filename = all_settings["survey_filename"]
     chop = float(all_settings["chop"])
-
-    singlerun(filename,outputFile,binsize,chop)
+    if all_settings["model_override"] is not None:
+        override = common.getdict(all_settings["model_override"])
+    else:
+        override = None
+    singlerun(filename,outputFile,binsize,chop,override)
         
 def genBins(binsize,chop):
     return [x*binsize for x in range(int(chop/binsize)+2)]
     #generates bins for a certain bin size. Stops with the bin that slightly overshoots the chop value
     #Always starts at zero
     
-def singlerun(filename,outputFile,binsize,chop):
+def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
     fig = pylab.figure()
     galaxies = common.loadData(filename, dataType = "CF2")
     distances = [galaxy.d for galaxy in galaxies]
@@ -46,14 +51,25 @@ def singlerun(filename,outputFile,binsize,chop):
 
     #Change visual properties of the histogram
     pylab.setp(patches, 'facecolor','g','alpha',0.75)
-
-    #Solve the chi squared optimization for the histogram and selection function
     robot = chi_sq_solver(bins,n,selection_function)
-
-    #Plot the best fit
-    domain = np.arange(0,chop,1)
-    model = [selection_function(r,*(robot.result.x)) for r in domain]
-    pylab.plot(domain,model, 'k--',linewidth=1.5,label="Model fit: $A = {:.3f}$\n$r_0 = {:.3f}$\n$n_1 = {:.3f}$\n$n_2={:.3f}$\n$\chi^2={chisq:.3f}$".format(*(robot.result.x),chisq = robot.result.fun))
+    if modelOverride is None:
+        #Solve the chi squared optimization for the histogram and selection function
+        params = robot.result.x
+        #Plot the best fit
+        domain = np.arange(0,chop,1)
+        model = [selection_function(r,*(robot.result.x)) for r in domain]
+        pylab.plot(domain,model, 'k--',linewidth=1.5,label="Model fit: $A = {:.3f}$\n$r_0 = {:.3f}$\n$n_1 = {:.3f}$\n$n_2={:.3f}$\n$\chi^2={chisq:.3f}$".format(*(robot.result.x),chisq = robot.result.fun))
+        chisq = robot.result.fun
+    else:
+        mo = modelOverride["constants"]
+        params = [mo['A'], mo['r_0'], mo['n_1'], mo['n_2']]
+        chisq = robot.chi_sq(params)
+        domain = np.arange(0,chop,1)
+        model = [selection_function(r,*params) for r in domain]
+        pylab.plot(domain,model, 'k--',linewidth=1.5,label="Model fit: $A = {:.3f}$\n$r_0 = {:.3f}$\n$n_1 = {:.3f}$\n$n_2={:.3f}$\n$\chi^2={chisq:.3f}$".format(*params,chisq = chisq))
+        
+   
+    
 
     #Add axis labels
     pylab.ylabel("Galaxy count")
@@ -70,14 +86,15 @@ def singlerun(filename,outputFile,binsize,chop):
     with pdfback.PdfPages(outputFile+str(binsize)) as pdf:
         pdf.savefig(fig)
         pdf.savefig(fig2)
-    params = robot.result.x
+    
     #Write paramaters to a file for later use.
     common.writedict(outputFile+str(binsize)+'_params.json',{'constants':{'A':params[0],
                                                                           'r_0':params[1],
                                                                           'n_1':params[2],
                                                                           'n_2':params[3]},
                                                              'info':{'shell_thickness': binsize,
-                                                                     'max_radius': chop
+                                                                     'max_radius': chop,
+                                                                     'chisq': chisq
                                                                  }
                                                             })
 
@@ -120,12 +137,10 @@ def selection_function(r, A, r_0, n_1, n_2):
     ratio = r/r_0
     #Selection function as defined by what I got in my email from Professor Feldman
     value = A*(ratio**n_1)*(1+ratio**(n_1+n_2))**-1
-    if value == 0 and r != 0:
-        print("Uh-oh, the value was zero!")
-        print(r,A,r_0,n_1,n_2)
+    # if value == 0 and r != 0:
+    #     print("Uh-oh, the value was zero!")
+    #     print(r,A,r_0,n_1,n_2)
     return value
-
-
 
 def selectrun(args):
     #I'll need from args:
@@ -165,18 +180,19 @@ def selectrun(args):
     else:
         surveySeparation = settings['survey_separation_distance']
         numSurveys       = settings['num_surveys']
-        surveys = genSurveyPos(surveySeparation, boxSize, numSurveys,files)
+        surveys = genSurveyPos(surveySeparation, boxSize, numSurveys,hugeFile)
     
     selectionParams = common.getdict(settings['selection_function_json'])
     
 
-
+    start = time.time()
     pool = multiprocessing.Pool(processes = NUM_PROCESSORS)
     print(surveys,selectionParams,density)
     listOfSurveyContents = pool.starmap(surveyOneFile,zip(files,
                                                           itertools.repeat(surveys),
                                                           itertools.repeat(selectionParams),
                                                           itertools.repeat(density)))
+    print("That took {} seconds.".format(time.time()-start))
     #Format of listOfSurveyContents:
     #List of 1000 elements.
     #Each 'element' is a list of numSurveys elements, each element of which is a list of rows that belong to that
@@ -201,8 +217,7 @@ def selectrun(args):
                                             'settings': settings})
 
 def transposeMappedSurvey(data):
-    #What does this function do?
-    #Ah. It takes a list of lists of surveys, see above in section "Format of listOfSurveyContents"
+    # takes a list of lists of surveys, see above in section "Format of listOfSurveyContents"
     #and flattens it into a single survey
     surveyContent = [[] for i in range(len(data[0]))]
     for mapResult in data:
@@ -213,49 +228,49 @@ def transposeMappedSurvey(data):
 
 def surveyOneFile(hugeFile, surveys,selectionParams,density):
     #Note: it's only called a hugeFile because I'm lazy and don't want to change its name.
+    rng = np.random.RandomState()
     surveyContent = [[] for i in range(len(surveys))]
-    with open(hugeFile, 'r') as theFile:
-        for rawline in theFile:
-            if rawline[0]!='#' and rawline[0] != 'x': #making sure we don't take the header line or any comments
-                line = rawline.strip()
-                row = line.split(',')
-                floatRow = [float(r) for r in row]
-                toAdd = surveyCheck(floatRow, surveys, selectionParams, density)
-                for i,addBool in enumerate(toAdd):
-                    if addBool:
-                        surveyContent[i].append(rawline)
+    galaxies = common.loadData(hugeFile,dataType = 'millPos')
+    #rint(galaxies[0:20])
+    galaxPos = [[galaxy[0],galaxy[1],galaxy[2]] for galaxy in galaxies]
+    distances = space.distance.cdist(galaxPos,surveys)
+    selection_values = selection_function(distances,**(selectionParams["constants"]))
+    wantDensity = selection_values / common.shellVolCenter(distances,selectionParams['info']['shell_thickness'])
+    probability = wantDensity / density
+    dice = rng.random_sample(probability.shape)
+    toAdd = dice < probability
+    for i,galaxy in enumerate(toAdd):
+        for j,addBool in enumerate(galaxy):
+            if addBool:
+                rawLine = galaxies[i][3]
+                surveyContent[j].append(rawLine)
+    print("{} complete!".format(hugeFile))
     return surveyContent
                         
-def surveyCheck(info, surveys, params, density):
-    #This function should go through all the surveys and determine the distance from the data point (info) to the
-    #center of the survey, then figure out the probability that you should pick the point in question.
-    selection = lambda x: selection_function(x,**(params["constants"]))
-    #selection is the specific version of the generalized selection function, a.k.a. the selection function
-    #with all the constants set to their values.
-    x = info[0]
-    y = info[1]
-    z = info[2]
-    distances = [math.sqrt( (x-r[0])**2 +
-                       (y-r[1])**2 +
-                       (z-r[2])**2 ) for r in surveys]
-    surveyAdd = []
-    for i,d in enumerate(distances):
-        rawSelection = selection(d)
-        shellVol = common.shellVolCenter(d,params['info']['shell_thickness'])
-        wantDensity = rawSelection / shellVol
-        probability = wantDensity/density
-        dieroll = np.random.random_sample()
-        addBool = dieroll < probability
-        surveyAdd.append(addBool)
+# def surveyCheck(info, surveys, params, density):
+#     #Deprecated and replaced by numpy
+#     #This function should go through all the surveys and determine the distance from the data point (info) to the
+#     #center of the survey, then figure out the probability that you should pick the point in question.
+#     selection = lambda x: selection_function(x,**(params["constants"]))
+#     #selection is the specific version of the generalized selection function, a.k.a. the selection function
+#     #with all the constants set to their values.
+#     galaxyPos = np.array((info[0],info[1],info[2]))
+#     distances = [np.linalg.norm(np.array(r)-galaxyPos) for r in surveys]
+#     #The default np linalg norm is the same as sqrt( sum(x**2) ) for x in array
+#     surveyAdd = []
+#     for d in distances:
+#         wantDensity = selection(d) / common.shellVolCenter(d,params['info']['shell_thickness'])
+#         probability = wantDensity/density
+#         surveyAdd.append(np.random.random_sample() < probability)
         
-        if addBool:
-            print("{: >10,.2e}{: >10,.2e}{: >10,.2e}{: >10,.2e}{: >10,.2e}{: >10}".format(d,
-                                                                                          rawSelection,
-                                                                                          wantDensity,
-                                                                                          probability,
-                                                                                          dieroll,
-                                                                                          i))
-    return surveyAdd
+#         # if addBool:
+#     #         print("{: >10,.2e}{: >10,.2e}{: >10,.2e}{: >10,.2e}{: >10,.2e}{: >10}".format(d,
+#     #                                                                                       rawSelection,
+#     #                                                                                       wantDensity,
+#     #                                                                                       probability,
+#     #                                                                                       dieroll,
+#     #                                                                                       i))
+#     return surveyAdd
 
 def genSurveyPos(separation, boxsize, numSurveys,files):
     surveys = [] #list of surveys. Each survey is a tuple (x,y,z) of starting position

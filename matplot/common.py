@@ -147,6 +147,8 @@ def loadData(filename, dataType = "guess"):
         return _loadCSVFloatData(filename)
     elif dataType == 'CF2':
         return _loadCF2Data(filename)
+    elif dataType == 'millPos':
+        return _loadMillenniumPositionalData(filename)
 
 def _loadCSVFloatData(filename): 
     """
@@ -166,6 +168,30 @@ def _loadCSVFloatData(filename):
                     except ValueError:
                         valid = False#sometimes the CSV file doesn't contain a number.
                                      #In that case, just skip that row.
+                if valid:
+                    csvData.append(csvRow)
+    return csvData
+
+def _loadMillenniumPositionalData(filename): 
+    """
+    Loads the first three numbers from a csv file.
+    With my millennium data, those three numbers are x,y, and z coordinates
+    The fourth cell of the data is the raw line, just in case you need it.
+    """
+    csvData = []
+    with open(filename, "r") as boxfile:
+        for line in boxfile:
+            if line[0]!="#":#comment lines need to be ignored
+                row = line.split(',')
+                csvRow = []
+                valid = True
+                for cell in row[0:3]:
+                    try:
+                        csvRow.append(float(cell))
+                    except ValueError:
+                        valid = False#sometimes the CSV file doesn't contain a number.
+                                     #In that case, just skip that row.
+                csvRow.append(line)
                 if valid:
                     csvData.append(csvRow)
     return csvData
@@ -301,14 +327,14 @@ class MillenniumFiles:
         self.boxLocation = boxLocation
         #This class is designed for handling millennium directories, so throw an exception if it isn't a directory
         if boxIsDir:
-            self.files = [boxLocation+'/'+fname for fname in os.listdir(boxLocation)]
+            self.files = [boxLocation+fname for fname in os.listdir(boxLocation)]
         else:
             raise TypeError("The MillenniumFiles class may only be used on directories containing many sub-boxes.")
 
         #grab the informational json file. If it doesn't exist, throw the corresponding exception.
-        boxInfoLoc = boxLocation + '_info.json'
+        boxInfoLoc = boxLocation.rstrip('/') + '_info.json'
         if os.path.isfile(boxInfoLoc):
-            self.boxInfo = getdict(boxLocation+'_info.json')
+            self.boxInfo = getdict(boxInfoLoc)
         else:
             raise RuntimeError("The box must have an associated informational JSON file located at {}!".format(boxInfoLoc))
         
@@ -347,7 +373,7 @@ class MillenniumFiles:
         ybox = int(r[1] / size[1])
         zbox = int(r[2] / size[2])
         filename = self.boxInfo["box_filename_format"].format(xi = xbox, yi = ybox, zi = zbox)
-        fullPath = self.boxLocation + '/' + filename
+        fullPath = self.boxLocation + filename
         assert fullPath in self.files #If this assertion fails, you're most likely outside the box.
         return fullPath
         
