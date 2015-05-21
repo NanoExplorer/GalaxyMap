@@ -78,7 +78,7 @@ def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
     pylab.legend()
 
     fig2 = pylab.figure()
-    shellVolume = [((4/3)*math.pi*(robot.centerbins[i])**3-((4/3)*math.pi*(robot.centerbins[i-1])**3 if i > 0 else 0)) for i in range(len(n))]
+    shellVolume = [common.shellVolCenter(robot.centerbins[i],binsize)  for i in range(len(n))]
     print(shellVolume)
     density = [n[i]/shellVolume[i] for i in range(len(n))]
     pylab.plot(robot.centerbins,density)
@@ -171,8 +171,11 @@ def selectrun(args):
 
     if os.path.isdir(hugeFile):
         files = [hugeFile + x for x in os.listdir(hugeFile)]
+        densityMap = common.getdict(hugeFile.rstrip('/') + '_fine_density.json')
+        density = [densityMap[os.path.basename(f)] for f in files]
     else:
         files = hugeFile
+        print("[WARN] Using the huge file will most likely cause problems")
 
     
     if surveyOverride is not None:
@@ -187,11 +190,11 @@ def selectrun(args):
 
     start = time.time()
     pool = multiprocessing.Pool(processes = NUM_PROCESSORS)
-    print(surveys,selectionParams,density)
+    
     listOfSurveyContents = pool.starmap(surveyOneFile,zip(files,
                                                           itertools.repeat(surveys),
                                                           itertools.repeat(selectionParams),
-                                                          itertools.repeat(density)))
+                                                          density))
     print("That took {} seconds.".format(time.time()-start))
     #Format of listOfSurveyContents:
     #List of 1000 elements.
