@@ -76,10 +76,12 @@ def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
     pylab.xlabel("Distance, Mpc/h")
     pylab.title("Distribution of Galaxy Distance")
     pylab.legend()
-
+    pylab.axis([0,chop,0,700])
     fig2 = pylab.figure()
     shellVolume = [common.shellVolCenter(robot.centerbins[i],binsize)  for i in range(len(n))]
-    print(shellVolume)
+    pylab.title("Galaxies per Cubic Mpc")
+    pylab.xlabel("Distance, Mpc/h")
+    pylab.ylabel("Density, galaxies/(Mpc/h)^3")
     density = [n[i]/shellVolume[i] for i in range(len(n))]
     pylab.plot(robot.centerbins,density)
     #Save figure
