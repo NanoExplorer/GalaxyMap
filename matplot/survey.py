@@ -291,15 +291,19 @@ def genSurveyPos(separation, boxsize, numSurveys,files):
             #Note: this is basically the equivalent of bogosort as far as algorithm efficiency
             #is concerned. If you try to cram too many surveys into a box it will fail. There's a built in
             #failsafe that detects infinite looping by failing after it tries too many times. (currently 500,000)
-            edgeBound = separation/2
-            randomCoord = (rng.uniform(edgeBound,boxsize[0]-edgeBound),
-                           rng.uniform(edgeBound,boxsize[1]-edgeBound),
-                           rng.uniform(edgeBound,boxsize[2]-edgeBound))
-            galaxyCoord = millennium.getACloseGalaxy(randomCoord)
+            # randomCoord = (rng.uniform(edgeBound,boxsize[0]-edgeBound),
+            #                rng.uniform(edgeBound,boxsize[1]-edgeBound),
+            #                rng.uniform(edgeBound,boxsize[2]-edgeBound))
+            
+            galaxy = millennium.getARandomGalaxy()
+            galaxyCoord = (galaxy.x,galaxy.y,galaxy.z)
             distances = [math.sqrt((r1[0]-r2[0])**2+
                                    (r1[1]-r2[1])**2+
                                    (r1[2]-r2[2])**2)
                              for r1,r2 in zip(itertools.repeat(galaxyCoord),surveys)]
+            for i,c in enumerate(galaxyCoord):
+                distances.append(c)
+                distances.append(boxsize[i]-c)
             if all(distance > separation for distance in distances):
                 #All is officially the 'coolest function ever.' All of an empty list is true!
                 surveys.append(galaxyCoord)
@@ -309,6 +313,7 @@ def genSurveyPos(separation, boxsize, numSurveys,files):
             if numCatches > 500000:
                 raise RuntimeError("We're probably in an infinite loop. Try reducing the number of surveys generated.")
     print("Caught {}!".format(numCatches))
+    print(surveys)
     return surveys
 
 

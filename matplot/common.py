@@ -38,6 +38,7 @@ import matplotlib.pyplot as plt
 import os
 import math
 import scipy.spatial as space
+import random
 
 def sphereVol(radius):
     return (4/3)*(np.pi)*(radius**3)
@@ -361,7 +362,24 @@ class MillenniumFiles:
         kd_galaxies = space.cKDTree(spatialInfo)
         distance, index = kd_galaxies.query(r)
         return spatialInfo[index]
+
+    def getARandomGalaxy(self):
+        box = self.getARandomBox()
+        #Waterman's reservoir algorithm from Knuth's Art of Computer Programming and
+        #http://stackoverflow.com/questions/3540288/how-do-i-read-a-random-line-from-one-file-in-python
+        with open(box,'r') as f:
+            line = next(f)
+            while line[0] == 'x' or line[0] =='#':
+                line = next(f)
+            for num, templine in enumerate(f):
+                if random.randrange(num + 2) == 0 and line[0] != '#':
+                    #Picks a random number from the range [0,num+2). if the number picked is zero,
+                    #we replace the stored line with a new one.
+                    line = templine
+        return MillenniumGalaxy(line) # If this fails, that means a comment line probably slipped by somehow.
         
+    def getARandomBox(self):
+        return random.choice(self.files)
             
     def getBox(self,r):
         """
@@ -386,7 +404,7 @@ class MillenniumGalaxy:
         """
         #If we get the entire csv line as a string, we can just split it and make sure everything's a float.
         if type(galaxy) is str:
-            self.galaxList = [float(x) for x in galaxy.split(',')]
+            self.galaxList = [float(x) for x in galaxy.strip().split(',')]
         elif type(galaxy) is list:
             #If we get a list, we assume it is already full of floats.
             self.galaxList = list(galaxy)
