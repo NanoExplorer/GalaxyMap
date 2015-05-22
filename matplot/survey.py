@@ -303,7 +303,7 @@ def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram):
             if addBool:
                 rawLine = galaxies[i][3]
                 surveyContent[j].append(rawLine)
-    print("{} complete!".format(hugeFile))
+    #print("{} complete!".format(hugeFile))
     return surveyContent
                         
 # def surveyCheck(info, surveys, params, density):
