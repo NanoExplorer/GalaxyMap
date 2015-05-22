@@ -9,6 +9,7 @@ import multiprocessing
 import time
 import pylab
 import matplotlib.backends.backend_pdf as pdfback
+
 NUM_PROCESSORS = 4
 np.seterr(all='raise')
 #When having problems with dividing by zero, we can debug more easily by having execution
@@ -71,7 +72,7 @@ def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
    
     
 
-    #Add axis labels
+    #Add axis labelsgl
     pylab.ylabel("Galaxy count")
     pylab.xlabel("Distance, Mpc/h")
     pylab.title("Distribution of Galaxy Distance")
@@ -166,18 +167,16 @@ def selectrun(args):
     settings = common.getdict(args.settings)
     
     hugeFile       = settings["dataset_filename"]
-    density        = settings['dataset_density']
+    #density        = settings['dataset_density']
     surveyOverride = settings['survey_position_override']
     boxSize        = settings['box_size']
     outFileName    = settings['survey_output_files']
 
     if os.path.isdir(hugeFile):
         files = [hugeFile + x for x in os.listdir(hugeFile)]
-        densityMap = common.getdict(hugeFile.rstrip('/') + '_fine_density.json')
-        density = [densityMap[os.path.basename(f)] for f in files]
     else:
         files = hugeFile
-        print("[WARN] Using the huge file will most likely cause problems")
+        print("[WARN] Using the gigantic file is no longer supported and will probably cause really weird errors.")
 
     
     if surveyOverride is not None:
@@ -188,16 +187,43 @@ def selectrun(args):
         surveys = genSurveyPos(surveySeparation, boxSize, numSurveys,hugeFile)
     
     selectionParams = common.getdict(settings['selection_function_json'])
-    
 
-    start = time.time()
-    pool = multiprocessing.Pool(processes = NUM_PROCESSORS)
+    distFileBase = outFileName + "_{:x}/".format(hash(tuple([tuple(x) for x in surveys]))) 
+    distanceFiles = [distFileBase + os.path.basename(os.path.splitext(milFile)[0]) + '.npy' for milFile in files]
+    #Distance file format: outFile location + hash of survey centerpoints / xi.yi.zi.npy
     
+    pool = multiprocessing.Pool(processes = NUM_PROCESSORS)
+
+    if not os.path.exists(distFileBase):
+        start = time.time()
+        print("Generating distance data...")
+        os.mkdir(distFileBase)
+        pool.starmap(distanceOneBox,zip(files,
+                                        itertools.repeat(surveys),
+                                        distanceFiles))
+        print("Generating distance data took {} seconds.".format(time.time()-start))
+    else:
+        print("Found distance data!")
+    if not os.path.exists(distFileBase+'hist.npy'):
+        print("Generating histograms...")
+        start = time.time()
+        listOfHistograms = pool.starmap(surveyBins,zip(distanceFiles,
+                                                       itertools.repeat(selectionParams["info"]["shell_thickness"]),
+                                                       itertools.repeat(space.distance.euclidean([0,0,0],boxSize))))
+        full_histogram = sum(listOfHistograms)
+        print("Generating histograms took {} seconds.".format(time.time()-start))
+        #because the surveyBins function returns a numpy array, the sum function will add them all together element-wise!
+    else:
+        print("Found histogram!")
+        full_histogram = np.load(distFileBase+'hist.npy')
+        
+    print("Generating surveys...")
+    start = time.time()
     listOfSurveyContents = pool.starmap(surveyOneFile,zip(files,
-                                                          itertools.repeat(surveys),
+                                                          distanceFiles,
                                                           itertools.repeat(selectionParams),
-                                                          density))
-    print("That took {} seconds.".format(time.time()-start))
+                                                          itertools.repeat(full_histogram)))
+    print("Generating surveys took {} seconds.".format(time.time()-start))
     #Format of listOfSurveyContents:
     #List of 1000 elements.
     #Each 'element' is a list of numSurveys elements, each element of which is a list of rows that belong to that
@@ -231,17 +257,45 @@ def transposeMappedSurvey(data):
                 surveyContent[i].append(line)
     return surveyContent
 
-def surveyOneFile(hugeFile, surveys,selectionParams,density):
-    #Note: it's only called a hugeFile because I'm lazy and don't want to change its name.
+
+def distanceOneBox(hugeFile,surveys,outFile):
+    galaxies = common.loadData(hugeFile,dataType = 'millPos')
+    galaxPos = [galaxy[0:3] for galaxy in galaxies]
+    distances = space.distance.cdist(galaxPos,surveys)
+    np.save(outFile,distances)
+    
+
+def surveyBins(distanceFile,binsize,boxMaxDistance):
+    """
+    Takes in the survey centerpoints and calculates bins for each of the surveys
+    By that I mean it counts the number of galaxies in each bin up to 'chop' using the same method
+    as surveystats.
+    """
+    distances = np.load(distanceFile)
+    histogram = np.zeros((distances.shape[1],int(boxMaxDistance/binsize)+1)) #list of surveys. Each survey will contain a list of bins,
+    #Each bin will contain the number of galaxies in that bin.
+    
+    for i,galaxy in enumerate(distances):
+        for surveyNum,distance in enumerate(galaxy):
+            histogram[surveyNum][int(distance/binsize)] += 1
+    return histogram
+    
+def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram):
     rng = np.random.RandomState()
-    surveyContent = [[] for i in range(len(surveys))]
+    distances = np.load(distanceFile)
+    surveyContent = [[] for i in range(distances.shape[1])]
     galaxies = common.loadData(hugeFile,dataType = 'millPos')
     #rint(galaxies[0:20])
-    galaxPos = [[galaxy[0],galaxy[1],galaxy[2]] for galaxy in galaxies]
-    distances = space.distance.cdist(galaxPos,surveys)
     selection_values = selection_function(distances,**(selectionParams["constants"]))
-    wantDensity = selection_values / common.shellVolCenter(distances,selectionParams['info']['shell_thickness'])
-    probability = wantDensity / density
+    binsize = selectionParams['info']['shell_thickness']
+    wantDensity = selection_values / common.shellVolCenter(distances,binsize)
+    originalDensity = np.zeros(distances.shape)
+    distBinNotAnInt =distances/binsize
+    for i,galaxy in enumerate(distances):
+        for j,surveyDist in enumerate(galaxy):
+            distBin = int(distBinNotAnInt[i][j])
+            originalDensity[i][j] = histogram[j][distBin] / common.shellVolCenter(distBin*binsize + (binsize/2),binsize)
+    probability = wantDensity / originalDensity
     dice = rng.random_sample(probability.shape)
     toAdd = dice < probability
     for i,galaxy in enumerate(toAdd):
@@ -287,7 +341,7 @@ def genSurveyPos(separation, boxsize, numSurveys,files):
         #Estimate the volume of the box and the volume of the surveys to determine whether we can physically
         #fit numSurveys into the box. This is a lower bound, so you might get the warning and still be fine.
         print("[WARN] there may be too many surveys for this box size and separation distance.")
-    rng = np.random.RandomState()
+    #rng = np.random.RandomState()
     for i in range(numSurveys):
         while True:
             #Note: this is basically the equivalent of bogosort as far as algorithm efficiency
@@ -341,3 +395,4 @@ def transpose(args):
             
 if __name__ == "__main__":
     print("This does not run standalone.")
+    
