@@ -18,10 +18,19 @@
         },
         "boxname": "boxes/TEST_BOX/testbox"
     },
-    "survey": {
+    "surveystats": {
         "num_bins": "30",
         "output_filename": "SAMPLE_OUTPUT.json",
         "survey_filename": "SAMPLE.txt"
+    },
+    "surveyselect": {
+        "dataset_filename": "database/millennium.mil",
+        "dataset_density": 0.21429724,
+        "selection_function_json": "output/CF2-group_test10_params.json",
+        "survey_separation_distance": 100,
+	"num_surveys": 5,
+	"box_size": [500,500,500],
+	"survey_position_override": null
     },
     "test": {
         "a thing": "another thing"
