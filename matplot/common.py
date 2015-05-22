@@ -444,7 +444,11 @@ class MillenniumGalaxy:
         self.mag_kBulge = self.galaxList[21]
 
         
-def distance(r1,r2):
-    r1 = [float(r) for r in r1]
-    r2 = [float(r) for r in r2]
-    return math.sqrt((r1[0]-r2[0])**2+(r1[1]-r2[1])**2+(r1[2]-r2[2])**2)
+def crossProductMatrix(r):
+    r1 = r[0]
+    r2 = r[1]
+    r3 = r[2]
+    return np.array([[0,-r3,r2],
+                     [r3,0,-r1],
+                     [-r2,r1,0]])
+    #definition from http://en.wikipedia.org/wiki/Cross_product#Conversion_to_matrix_multiplication

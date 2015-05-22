@@ -185,6 +185,22 @@ def selectrun(args):
         surveySeparation = settings['survey_separation_distance']
         numSurveys       = settings['num_surveys']
         surveys = genSurveyPos(surveySeparation, boxSize, numSurveys,hugeFile)
+
+    #Generate the vector that's normal to the "plane of the galaxy" Of course this is actually fake,
+    #we don't know the vector for real. So we have to pretend. Later this could be used to make sure
+    #we don't select galaxies in the plane of the galaxy.
+    rawSurveyUpVectors = np.random.normal(0,0.1,(len(surveys),3))
+    upVectorLengths = np.linalg.norm(rawSurveyUpVectors,axis=1) #The axis=1 means this is an array of 3-vectors,
+                                                                #and not a single 5x3 vector
+    surveyUpVectors = np.array([vec/length for vec,length in zip(rawSurveyUpVectors,list(upVectorLengths))])
+    surveyRotationAngles = np.random.uniform(0,2*math.pi,surveyUpVectors.shape[0])
+
+    #Definition from http://en.wikipedia.org/wiki/Rotation_matrix#Conversion_from_and_to_axis-angle
+    axisAngletoMatrix = lambda r, theta: (math.cos(theta)*np.identity(3) +
+                                          math.sin(theta)*common.crossProductMatrix(r) +
+                                          (1-math.cos(theta))*np.outer(r,r))
+    print(surveyUpVectors,surveyRotationAngles)
+    rotationMatrices = [axisAngletoMatrix(r,theta) for r,theta in zip(surveyUpVectors,list(surveyRotationAngles))]
     
     selectionParams = common.getdict(settings['selection_function_json'])
 
@@ -211,6 +227,7 @@ def selectrun(args):
                                                        itertools.repeat(selectionParams["info"]["shell_thickness"]),
                                                        itertools.repeat(space.distance.euclidean([0,0,0],boxSize))))
         full_histogram = sum(listOfHistograms)
+        np.save(distFileBase+'hist.npy',full_histogram)
         print("Generating histograms took {} seconds.".format(time.time()-start))
         #because the surveyBins function returns a numpy array, the sum function will add them all together element-wise!
     else:
@@ -242,7 +259,7 @@ def selectrun(args):
         with open(surveyFileName, 'w') as surveyFile:
             for line in surveyFinal:
                 surveyFile.write(line)
-        info.append({'name':surveyFileName,'center':surveys[i]})
+        info.append({'name':surveyFileName,'center':surveys[i],'rot':[[d for d in c] for c in rotationMatrices[i]]})
     common.writedict(outFileName + '.json', info)
     common.writedict(outFileName + '_info.json',{'selection_params': selectionParams,
                                             'settings': settings})
@@ -303,33 +320,9 @@ def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram):
             if addBool:
                 rawLine = galaxies[i][3]
                 surveyContent[j].append(rawLine)
-    #print("{} complete!".format(hugeFile))
     return surveyContent
                         
-# def surveyCheck(info, surveys, params, density):
-#     #Deprecated and replaced by numpy
-#     #This function should go through all the surveys and determine the distance from the data point (info) to the
-#     #center of the survey, then figure out the probability that you should pick the point in question.
-#     selection = lambda x: selection_function(x,**(params["constants"]))
-#     #selection is the specific version of the generalized selection function, a.k.a. the selection function
-#     #with all the constants set to their values.
-#     galaxyPos = np.array((info[0],info[1],info[2]))
-#     distances = [np.linalg.norm(np.array(r)-galaxyPos) for r in surveys]
-#     #The default np linalg norm is the same as sqrt( sum(x**2) ) for x in array
-#     surveyAdd = []
-#     for d in distances:
-#         wantDensity = selection(d) / common.shellVolCenter(d,params['info']['shell_thickness'])
-#         probability = wantDensity/density
-#         surveyAdd.append(np.random.random_sample() < probability)
-        
-#         # if addBool:
-#     #         print("{: >10,.2e}{: >10,.2e}{: >10,.2e}{: >10,.2e}{: >10,.2e}{: >10}".format(d,
-#     #                                                                                       rawSelection,
-#     #                                                                                       wantDensity,
-#     #                                                                                       probability,
-#     #                                                                                       dieroll,
-#     #                                                                                       i))
-#     return surveyAdd
+
 
 def genSurveyPos(separation, boxsize, numSurveys,files):
     surveys = [] #list of surveys. Each survey is a tuple (x,y,z) of starting position
@@ -347,10 +340,6 @@ def genSurveyPos(separation, boxsize, numSurveys,files):
             #Note: this is basically the equivalent of bogosort as far as algorithm efficiency
             #is concerned. If you try to cram too many surveys into a box it will fail. There's a built in
             #failsafe that detects infinite looping by failing after it tries too many times. (currently 500,000)
-            # randomCoord = (rng.uniform(edgeBound,boxsize[0]-edgeBound),
-            #                rng.uniform(edgeBound,boxsize[1]-edgeBound),
-            #                rng.uniform(edgeBound,boxsize[2]-edgeBound))
-            
             galaxy = millennium.getARandomGalaxy()
             galaxyCoord = (galaxy.x,galaxy.y,galaxy.z)
             distances = [math.sqrt((r1[0]-r2[0])**2+
@@ -367,7 +356,7 @@ def genSurveyPos(separation, boxsize, numSurveys,files):
             else:
                 numCatches += 1
             if numCatches > 500000:
-                raise RuntimeError("We're probably in an infinite loop. Try reducing the number of surveys generated.")
+                raise RuntimeError("We're probably in an infinite loop. Try reducing the number of surveys to make.")
     print("Caught {}!".format(numCatches))
     print(surveys)
     return surveys
@@ -380,10 +369,14 @@ def transpose(args):
         outCF2String = "" 
         with open(survey['name'],'r') as csvFile:
             for line in csvFile:
-                row = line.strip().split(',')
+                galaxy=common.MillenniumGalaxy(line)
                 center = survey['center']
+                rotationMatrix = survey['rot']
+                
+                ontoGalaxy = np.array([galaxy.x,galaxy.y,galaxy.z])
+                #posVec = ontoGalaxy/space.distance.euclidean(ontoGalaxy,(0,0,0))
                 cf2row = [0,#cz
-                          common.distance((row[0],row[1],row[2]),center),#distance (mpc/h)
+                          space.distance.euclidean(ontoGalaxy,center),#distance (mpc/h)
                           0,#peculiar velocity km/sec
                           0,#dv
                           0,#longitude degrees
