@@ -199,7 +199,7 @@ def selectrun(args):
     axisAngletoMatrix = lambda r, theta: (math.cos(theta)*np.identity(3) +
                                           math.sin(theta)*common.crossProductMatrix(r) +
                                           (1-math.cos(theta))*np.outer(r,r))
-    print(surveyUpVectors,surveyRotationAngles)
+    
     rotationMatrices = [axisAngletoMatrix(r,theta) for r,theta in zip(surveyUpVectors,list(surveyRotationAngles))]
     
     selectionParams = common.getdict(settings['selection_function_json'])
@@ -371,16 +371,24 @@ def transpose(args):
             for line in csvFile:
                 galaxy=common.MillenniumGalaxy(line)
                 center = survey['center']
-                rotationMatrix = survey['rot']
-                
-                ontoGalaxy = np.array([galaxy.x,galaxy.y,galaxy.z])
+                rotationMatrix = np.matrix(survey['rot'])
+                ontoGalaxy = np.array([galaxy.x-center[0],galaxy.y-center[1],galaxy.z-center[2]])
+                #ontoGalaxy is the vector from the survey origin to the galaxy
+                rotatedCoord = ontoGalaxy * rotationMatrix
+                x = ontoGalaxy[0]
+                y = ontoGalaxy[1]
+                z = ontoGalaxy[2]
+                rho = space.distance.euclidean(ontoGalaxy,[0,0,0])
+                phi = math.acos(z/rho)*180/math.pi - 90
+                theta = math.atan2(y,x)*180/math.pi + 180
+                peculiarVel = np.dot(ontoGalaxy,[galaxy.velX,galaxy.velY,galaxy.velZ])/rho
                 #posVec = ontoGalaxy/space.distance.euclidean(ontoGalaxy,(0,0,0))
                 cf2row = [0,#cz
-                          space.distance.euclidean(ontoGalaxy,center),#distance (mpc/h)
-                          0,#peculiar velocity km/sec
+                          rho,#distance (mpc/h)
+                          peculiarVel,#peculiar velocity km/sec
                           0,#dv
-                          0,#longitude degrees
-                          0]#latitude degrees
+                          theta,#longitude degrees - 0 - 360
+                          phi]#latitude degrees - -90 - 90
                 #WARNING: The CF2 conversion algorithm is not complete yet!
                 outCF2String = outCF2String + '{}  {}  {}  {}  {}  {}\n'.format(*cf2row)
         with open(survey['name'] + '_cf2.txt', 'w') as cf2outfile:
