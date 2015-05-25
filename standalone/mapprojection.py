@@ -14,7 +14,7 @@ import common
 #rho = [math.sqrt(x**2+y**2+z**2) for x,y,z in zip(xs,ys,zs)]
 mag = 1#[500/(x**2+y**2+z**2) for x,y,z in zip(xs,ys,zs)]
 
-galaxies = common.loadData("../COMPOSITE-new-survey.dat.txt")
+galaxies = common.loadData("../matplot/Yuyu data/SimulCatalogue/CF2_group_simul.txt")
 thetas = [galaxy.lon*(pi/180)-pi for galaxy in galaxies]
 phis = [galaxy.lat*(pi/180) for galaxy in galaxies]
 
@@ -40,9 +40,9 @@ plt.ylabel('elevation')
 #ax3 = fig.add_subplot(133)
 #ax3.scatter(phis, thetas, c = 'r', marker = 'o')
 
-plt.show()
-# print("Saving plots...")
-# with pdfback.PdfPages('out.pdf') as pdf:    
-#     pdf.savefig(fig)
+#plt.show()
+print("Saving plots...")
+with pdfback.PdfPages('SIM_Yuyu.pdf') as pdf:    
+    pdf.savefig(fig)
 
 print("Done!")

@@ -36,15 +36,8 @@ def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
     fig = pylab.figure()
     galaxies = common.loadData(filename, dataType = "CF2")
     distances = [galaxy.d for galaxy in galaxies]
-    #get a list of all the distances to galaxies. This will let us send it directly to the histogram function
+    #get a list of all the distances to galaxies. This will let us send it directly to the histogram 
 
-    # for i in range(len(distances)-1,-1,-1):
-    #     #loop BACKWARDS through the array and get rid of entries bigger than the chop value.
-    #     #Why are we doing this? Does it actually affect the results positively?
-    #     #Answer: it appears this was an artifact of a previous chop implementation.
-    #     if distances[i] > chop:
-    #         del distances[i]
-    
     bins_orig = genBins(binsize,chop)
 
     #Make a histogram using pylab histogram function.
@@ -54,6 +47,7 @@ def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
     pylab.setp(patches, 'facecolor','g','alpha',0.75)
     robot = chi_sq_solver(bins,n,selection_function)
     if modelOverride is None:
+        #If we don't have an existing model to use, we find a best fit and plot it
         #Solve the chi squared optimization for the histogram and selection function
         params = robot.result.x
         #Plot the best fit
@@ -62,6 +56,7 @@ def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
         pylab.plot(domain,model, 'k--',linewidth=1.5,label="Model fit: $A = {:.3f}$\n$r_0 = {:.3f}$\n$n_1 = {:.3f}$\n$n_2={:.3f}$\n$\chi^2={chisq:.3f}$".format(*(robot.result.x),chisq = robot.result.fun))
         chisq = robot.result.fun
     else:
+        #Plot the model given in the settings function instead of calculating a new one
         mo = modelOverride["constants"]
         params = [mo['A'], mo['r_0'], mo['n_1'], mo['n_2']]
         chisq = robot.chi_sq(params)
@@ -72,7 +67,7 @@ def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
    
     
 
-    #Add axis labelsgl
+    #Add axis labels
     pylab.ylabel("Galaxy count")
     pylab.xlabel("Distance, Mpc/h")
     pylab.title("Distribution of Galaxy Distance")
@@ -147,23 +142,14 @@ def selection_function(r, A, r_0, n_1, n_2):
 
 def selectrun(args):
     #I'll need from args:
-    #The input file name (5+gb csv file from millennium)
-    #Density of the input file name
-    #The survey function (could be the filename of the function parameter json)
+    #The input file folder name (5+gb csv file from millennium)
+    #Density of the input file name (in shells around the survey centers)
+    #The survey function (the filename of the function parameter json)
     #minimum distance between surveys
-    #number of surveys (?)
-    #Capitalized variables refer to variables that have not been implemented yet.
+    #number of surveys
     
-    #I'll need to go through each line in the file manually to avoid memory overflows.
+    #I'll need to go through the database in blocks using the usual sub-box method 
 
-    #Now: make a list of the survey starting points. The data structure should be:
-    #list of origin tuples, (x,y,z). The index will be the ID of the survey. So we save each
-    #survey in a file named based on the list index.
-
-    #The survey starting points will all need to be more than MIN_DIST from each other, so I will
-    #either need a way of generating random points that are a certain minimum distance from each other or I'll
-    #need to manually make a list of a bunch of points to use, then recycle them. The first method would be
-    #better, under some circumstances probably.
     settings = common.getdict(args.settings)
     
     hugeFile       = settings["dataset_filename"]
@@ -178,6 +164,9 @@ def selectrun(args):
         files = hugeFile
         print("[WARN] Using the gigantic file is no longer supported and will probably cause really weird errors.")
 
+    #Now: make a list of the survey starting points. The data structure should be:
+    #list of origin tuples, (x,y,z). The index will be the ID of the survey. So we save each
+    #survey in a file named based on the list index.
     
     if surveyOverride is not None:
         surveys = surveyOverride
@@ -186,24 +175,31 @@ def selectrun(args):
         numSurveys       = settings['num_surveys']
         surveys = genSurveyPos(surveySeparation, boxSize, numSurveys,hugeFile)
 
-    #Generate the vector that's normal to the "plane of the galaxy" Of course this is actually fake,
-    #we don't know the vector for real. So we have to pretend. Later this could be used to make sure
-    #we don't select galaxies in the plane of the galaxy.
+    #Generate a coordinate system for each survey to use
+    #Method: Since the normal distribution is symmetric around its mean, if each coordinate is
+    #normally distributed around a mean of zero then the distribution is spherically symmetric
+    #While the variable name is "up vector," it more closely represents the rotation angle to
+    #rotate the coordinate system around. 
     rawSurveyUpVectors = np.random.normal(0,0.1,(len(surveys),3))
     upVectorLengths = np.linalg.norm(rawSurveyUpVectors,axis=1) #The axis=1 means this is an array of 3-vectors,
                                                                 #and not a single 5x3 vector
+
+    #Normalized version of the original 'raw' survey up vectors
     surveyUpVectors = np.array([vec/length for vec,length in zip(rawSurveyUpVectors,list(upVectorLengths))])
     surveyRotationAngles = np.random.uniform(0,2*math.pi,surveyUpVectors.shape[0])
+    #Rotation angles is the angle by which the coordinate system is rotated about the 'up' vector
 
+    #Now we make a rotation matrix out of the vector-angle rotation
     #Definition from http://en.wikipedia.org/wiki/Rotation_matrix#Conversion_from_and_to_axis-angle
     axisAngletoMatrix = lambda r, theta: (math.cos(theta)*np.identity(3) +
                                           math.sin(theta)*common.crossProductMatrix(r) +
                                           (1-math.cos(theta))*np.outer(r,r))
-    
+    #It turns out that the rows of these rotation matrices form the basis vectors for the new coordinate system
     rotationMatrices = [axisAngletoMatrix(r,theta) for r,theta in zip(surveyUpVectors,list(surveyRotationAngles))]
     
     selectionParams = common.getdict(settings['selection_function_json'])
 
+    #Grab the pre-computed distance files if they exist, or if not generate them.
     distFileBase = outFileName + "_{:x}/".format(hash(tuple([tuple(x) for x in surveys]))) 
     distanceFiles = [distFileBase + os.path.basename(os.path.splitext(milFile)[0]) + '.npy' for milFile in files]
     #Distance file format: outFile location + hash of survey centerpoints / xi.yi.zi.npy
@@ -220,6 +216,8 @@ def selectrun(args):
         print("Generating distance data took {} seconds.".format(time.time()-start))
     else:
         print("Found distance data!")
+
+    #Generate lookup-tables for 'original-number-of-galaxies' if they don't already exist
     if not os.path.exists(distFileBase+'hist.npy'):
         print("Generating histograms...")
         start = time.time()
@@ -253,7 +251,9 @@ def selectrun(args):
     #         ...],
     #       [],[],...,[]]
     info = []
+    #Jam the arrays back together 
     surveyContent = transposeMappedSurvey(listOfSurveyContents)
+    #write them to the disk
     for i,surveyFinal in enumerate(surveyContent):
         surveyFileName = outFileName + str(i) + '.mil'
         with open(surveyFileName, 'w') as surveyFile:
@@ -276,10 +276,13 @@ def transposeMappedSurvey(data):
 
 
 def distanceOneBox(hugeFile,surveys,outFile):
+    #Generate distance data for one sub-box - distance from each galaxy to each survey center
+    #These distances are not returned, instead they are only written to the disk.
     galaxies = common.loadData(hugeFile,dataType = 'millPos')
     galaxPos = [galaxy[0:3] for galaxy in galaxies]
     distances = space.distance.cdist(galaxPos,surveys)
     np.save(outFile,distances)
+    #Write distances to files for later use
     
 
 def surveyBins(distanceFile,binsize,boxMaxDistance):
@@ -287,27 +290,40 @@ def surveyBins(distanceFile,binsize,boxMaxDistance):
     Takes in the survey centerpoints and calculates bins for each of the surveys
     By that I mean it counts the number of galaxies in each bin up to 'chop' using the same method
     as surveystats.
+
+    The distance file MUST exist before this method is called.
     """
     distances = np.load(distanceFile)
-    histogram = np.zeros((distances.shape[1],int(boxMaxDistance/binsize)+1)) #list of surveys. Each survey will contain a list of bins,
+    histogram = np.zeros((distances.shape[1],int(boxMaxDistance/binsize)+1))
+    #list of surveys. Each survey will contain a list of bins,
     #Each bin will contain the number of galaxies in that bin.
-    
+    #This is the list we're generating.
+
+    #This method is not necessarily the best - it basically counts galaxies.
+    #Maybe there's a better way?
     for i,galaxy in enumerate(distances):
         for surveyNum,distance in enumerate(galaxy):
             histogram[surveyNum][int(distance/binsize)] += 1
     return histogram
     
 def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram):
+    """
+    Given the original data, distances, wanted numbers, and other parameters we actually generate the
+    mock surveys. This is currently the biggest bottleneck of the program, but I'm ot entirely sure why.
+    """
     rng = np.random.RandomState()
     distances = np.load(distanceFile)
     surveyContent = [[] for i in range(distances.shape[1])]
     galaxies = common.loadData(hugeFile,dataType = 'millPos')
-    #rint(galaxies[0:20])
     selection_values = selection_function(distances,**(selectionParams["constants"]))
     binsize = selectionParams['info']['shell_thickness']
     wantDensity = selection_values / common.shellVolCenter(distances,binsize)
     originalDensity = np.zeros(distances.shape)
     distBinNotAnInt =distances/binsize
+    #I'm currently under the impression that this for loop is the main bottleneck in this function.
+    #It isn't a complicated task, so it might be worthwhile to consider alternate implementations.
+    #Let's see...
+    #This for loop uses information from distances, binsize, histogram
     for i,galaxy in enumerate(distances):
         for j,surveyDist in enumerate(galaxy):
             distBin = int(distBinNotAnInt[i][j])
@@ -325,6 +341,11 @@ def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram):
 
 
 def genSurveyPos(separation, boxsize, numSurveys,files):
+
+    #The survey starting points will all need to be more than MIN_DIST from each other,
+    #To achieve this, and make sure that surveys start AT galaxies, I'll select
+    #random galaxies from the simulation then make sure that they are far enough from each other
+    
     surveys = [] #list of surveys. Each survey is a tuple (x,y,z) of starting position
     numCatches = 0 #number of times we've tried to grab a position and failed
     millennium = common.MillenniumFiles(files)
