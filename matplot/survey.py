@@ -337,7 +337,8 @@ def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram):
                 rawLine = galaxies[i][3]
                 surveyContent[j].append(rawLine)
     return surveyContent
-                        
+
+
 
 
 def genSurveyPos(separation, boxsize, numSurveys,files):
@@ -351,7 +352,7 @@ def genSurveyPos(separation, boxsize, numSurveys,files):
     millennium = common.MillenniumFiles(files)
     assert numSurveys > 0
     
-    if not numSurveys*separation**3 < (boxsize[0] - separation)*(boxsize[1] - separation)*(boxsize[2] - separation):
+    if not numSurveys*separation**3 < (boxsize[0] - 2*separation)*(boxsize[1] - 2*separation)*(boxsize[2] - 2*separation):
         #Estimate the volume of the box and the volume of the surveys to determine whether we can physically
         #fit numSurveys into the box. This is a lower bound, so you might get the warning and still be fine.
         print("[WARN] there may be too many surveys for this box size and separation distance.")
