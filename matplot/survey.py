@@ -25,7 +25,18 @@ def statsrun(args):
         override = common.getdict(all_settings["model_override"])
     else:
         override = None
-    singlerun(filename,outputFile,binsize,chop,override)
+
+    if "many" in all_settings and all_settings["many"] == True:
+        num_files = all_settings["num_files"]
+        for x in range(num_files):
+            singlerun(filename.format(x),
+                      outputFile.format(x),
+                      binsize,
+                      chop,
+                      override
+            )
+    else:
+        singlerun(filename,outputFile,binsize,chop,override)
         
 def genBins(binsize,chop):
     return [x*binsize for x in range(int(chop/binsize)+2)]
@@ -84,17 +95,18 @@ def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
     with pdfback.PdfPages(outputFile+str(binsize)) as pdf:
         pdf.savefig(fig)
         pdf.savefig(fig2)
-    
+    if modelOverride is None:
     #Write paramaters to a file for later use.
-    common.writedict(outputFile+str(binsize)+'_params.json',{'constants':{'A':params[0],
-                                                                          'r_0':params[1],
-                                                                          'n_1':params[2],
-                                                                          'n_2':params[3]},
-                                                             'info':{'shell_thickness': binsize,
-                                                                     'max_radius': chop,
-                                                                     'chisq': chisq
-                                                                 }
-                                                            })
+        common.writedict(outputFile+str(binsize)+'_params.json',{'constants':{'A':params[0],
+                                                                              'r_0':params[1],
+                                                                              'n_1':params[2],
+                                                                              'n_2':params[3]},
+                                                                 'info':{'shell_thickness': binsize,
+                                                                         'max_radius': chop,
+                                                                         'chisq': chisq
+                                                                     }
+                                                             })
+    pylab.close('all')
 
 class chi_sq_solver:
     def __init__(self,bins,ys,function):
@@ -218,12 +230,14 @@ def selectrun(args):
         print("Found distance data!")
 
     #Generate lookup-tables for 'original-number-of-galaxies' if they don't already exist
+    boxMaxDistance = space.distance.euclidean([0,0,0],boxSize)
     if not os.path.exists(distFileBase+'hist.npy'):
         print("Generating histograms...")
         start = time.time()
+        
         listOfHistograms = pool.starmap(surveyBins,zip(distanceFiles,
                                                        itertools.repeat(selectionParams["info"]["shell_thickness"]),
-                                                       itertools.repeat(space.distance.euclidean([0,0,0],boxSize))))
+                                                       itertools.repeat(boxMaxDistance)))
         full_histogram = sum(listOfHistograms)
         np.save(distFileBase+'hist.npy',full_histogram)
         print("Generating histograms took {} seconds.".format(time.time()-start))
@@ -237,7 +251,9 @@ def selectrun(args):
     listOfSurveyContents = pool.starmap(surveyOneFile,zip(files,
                                                           distanceFiles,
                                                           itertools.repeat(selectionParams),
-                                                          itertools.repeat(full_histogram)))
+                                                          itertools.repeat(full_histogram),
+                                                          itertools.repeat(boxMaxDistance)
+                                                      ))
     print("Generating surveys took {} seconds.".format(time.time()-start))
     #Format of listOfSurveyContents:
     #List of 1000 elements.
@@ -283,6 +299,7 @@ def distanceOneBox(hugeFile,surveys,outFile):
     distances = space.distance.cdist(galaxPos,surveys)
     np.save(outFile,distances)
     #Write distances to files for later use
+    #Also this algorithm seems VERY fast. It also doesn't seem to get slower with more surveys!
     
 
 def surveyBins(distanceFile,binsize,boxMaxDistance):
@@ -294,48 +311,65 @@ def surveyBins(distanceFile,binsize,boxMaxDistance):
     The distance file MUST exist before this method is called.
     """
     distances = np.load(distanceFile)
-    histogram = np.zeros((distances.shape[1],int(boxMaxDistance/binsize)+1))
+    numSurveys = distances.shape[1]
+    bins = genBins(binsize,boxMaxDistance)
+    histogram = [] #np.zeros((distances.shape[1],int(boxMaxDistance/binsize)+1))
     #list of surveys. Each survey will contain a list of bins,
     #Each bin will contain the number of galaxies in that bin.
     #This is the list we're generating.
 
     #This method is not necessarily the best - it basically counts galaxies.
     #Maybe there's a better way?
-    for i,galaxy in enumerate(distances):
-        for surveyNum,distance in enumerate(galaxy):
-            histogram[surveyNum][int(distance/binsize)] += 1
-    return histogram
+    #Answer - definitely! Numpy.histogram.
+    for i in range(numSurveys):
+        thisSurveyDistances = distances[:,i] #This means take distances for all the galaxies, but only the ith survey
+        #That works since the first dimension of distances is the galaxies and the second dimension is surveys
+        hist,edges = np.histogram(thisSurveyDistances, bins)
+        histogram.append(hist)
+    # for i,galaxy in enumerate(distances):
+    #     for surveyNum,distance in enumerate(galaxy):
+    #         histogram[surveyNum][int(distance/binsize)] += 1
+    return np.array(histogram)
     
-def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram):
+def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram,boxMaxDistance):
     """
     Given the original data, distances, wanted numbers, and other parameters we actually generate the
     mock surveys. This is currently the biggest bottleneck of the program, but I'm ot entirely sure why.
     """
-    rng = np.random.RandomState()
-    distances = np.load(distanceFile)
-    surveyContent = [[] for i in range(distances.shape[1])]
-    galaxies = common.loadData(hugeFile,dataType = 'millPos')
+    #Set up variables
+    rng = np.random.RandomState() #Make a process-safe random number generator
+    distances = np.load(distanceFile) #load the distance file
+    surveyContent = [[] for i in range(distances.shape[1])] #Make the skeleton structure for the end result
+    galaxies = common.loadData(hugeFile,dataType = 'millRaw') #Load the galaxies
+    binsize = selectionParams['info']['shell_thickness'] #Load the size of a bin
+    bins = genBins(binsize,boxMaxDistance)
+    numSurveys = distances.shape[1]
+    
+    #Do calculations
     selection_values = selection_function(distances,**(selectionParams["constants"]))
-    binsize = selectionParams['info']['shell_thickness']
     wantDensity = selection_values / common.shellVolCenter(distances,binsize)
-    originalDensity = np.zeros(distances.shape)
-    distBinNotAnInt =distances/binsize
+    distBin = [np.digitize(distances[:,n],bins)-1 for n in range(numSurveys)]
+    originalCount = np.transpose(np.array([histogram[n][distBin[n]] for n in range(numSurveys)]))
+    volumes = common.shellVolCenter(np.transpose(np.array(distBin))*binsize + (binsize/2),binsize)
+    originalDensity = originalCount / volumes
     #I'm currently under the impression that this for loop is the main bottleneck in this function.
     #It isn't a complicated task, so it might be worthwhile to consider alternate implementations.
     #Let's see...
     #This for loop uses information from distances, binsize, histogram
-    for i,galaxy in enumerate(distances):
-        for j,surveyDist in enumerate(galaxy):
-            distBin = int(distBinNotAnInt[i][j])
-            originalDensity[i][j] = histogram[j][distBin] / common.shellVolCenter(distBin*binsize + (binsize/2),binsize)
+    
+    # for i,galaxy in enumerate(distances):
+    #     for j,surveyDist in enumerate(galaxy):
+    #         distBin = int(distBinNotAnInt[i][j])
+    #         originalDensity[i][j] = histogram[j][distBin] / common.shellVolCenter(distBin*binsize + (binsize/2),binsize)
     probability = wantDensity / originalDensity
     dice = rng.random_sample(probability.shape)
     toAdd = dice < probability
-    for i,galaxy in enumerate(toAdd):
-        for j,addBool in enumerate(galaxy):
-            if addBool:
-                rawLine = galaxies[i][3]
-                surveyContent[j].append(rawLine)
+    # for i,galaxy in enumerate(toAdd):
+    #     for j,addBool in enumerate(galaxy):
+    #         if addBool:
+    #             rawLine = galaxies[i][3]
+    #             surveyContent[j].append(rawLine)
+    surveyContent = [np.array(galaxies)[toAdd[:,n]] for n in range(numSurveys)]
     return surveyContent
 
 
@@ -361,7 +395,7 @@ def genSurveyPos(separation, boxsize, numSurveys,files):
         while True:
             #Note: this is basically the equivalent of bogosort as far as algorithm efficiency
             #is concerned. If you try to cram too many surveys into a box it will fail. There's a built in
-            #failsafe that detects infinite looping by failing after it tries too many times. (currently 500,000)
+            #failsafe that detects infinite looping by failing after it tries too many times. (currently 10000)
             galaxy = millennium.getARandomGalaxy()
             galaxyCoord = (galaxy.x,galaxy.y,galaxy.z)
             distances = [math.sqrt((r1[0]-r2[0])**2+
@@ -377,7 +411,9 @@ def genSurveyPos(separation, boxsize, numSurveys,files):
                 break
             else:
                 numCatches += 1
-            if numCatches > 500000:
+            if numCatches % 100 == 0:
+                print("So far we have tried {} times".format(numCatches))
+            if numCatches > 10000:
                 raise RuntimeError("We're probably in an infinite loop. Try reducing the number of surveys to make.")
     print("Caught {}!".format(numCatches))
     print(surveys)
@@ -397,9 +433,9 @@ def transpose(args):
                 ontoGalaxy = np.array([galaxy.x-center[0],galaxy.y-center[1],galaxy.z-center[2]])
                 #ontoGalaxy is the vector from the survey origin to the galaxy
                 rotatedCoord = ontoGalaxy * rotationMatrix
-                x = ontoGalaxy[0]
-                y = ontoGalaxy[1]
-                z = ontoGalaxy[2]
+                x = rotatedCoord.item(0)
+                y = rotatedCoord.item(1)
+                z = rotatedCoord.item(2)
                 rho = space.distance.euclidean(ontoGalaxy,[0,0,0])
                 phi = math.acos(z/rho)*180/math.pi - 90
                 theta = math.atan2(y,x)*180/math.pi + 180
@@ -411,7 +447,7 @@ def transpose(args):
                           0,#dv
                           theta,#longitude degrees - 0 - 360
                           phi]#latitude degrees - -90 - 90
-                #WARNING: The CF2 conversion algorithm is not complete yet!
+                #Still missing redshift calculation, but that's it!
                 outCF2String = outCF2String + '{}  {}  {}  {}  {}  {}\n'.format(*cf2row)
         with open(survey['name'] + '_cf2.txt', 'w') as cf2outfile:
             cf2outfile.write(outCF2String)

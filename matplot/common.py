@@ -150,6 +150,8 @@ def loadData(filename, dataType = "guess"):
         return _loadCF2Data(filename)
     elif dataType == 'millPos':
         return _loadMillenniumPositionalData(filename)
+    elif dataType == 'millRaw':
+        return _loadMillenniumRawLines(filename)
 
 def _loadCSVFloatData(filename): 
     """
@@ -173,6 +175,26 @@ def _loadCSVFloatData(filename):
                     csvData.append(csvRow)
     return csvData
 
+def _loadMillenniumRawLines(filename): 
+    """
+    Loads the raw CSV lines from a CSV file
+    """
+    csvData = []
+    with open(filename, "r") as boxfile:
+        for line in boxfile:
+            if line[0]!="#":#comment lines need to be ignored
+                row = line.split(',')
+                valid = True
+                for cell in row[0:3]:
+                    try:
+                        x =float(cell)
+                    except ValueError:
+                        valid = False#sometimes the CSV file doesn't contain a number.
+                                     #In that case, just skip that row.
+                if valid:
+                    csvData.append(line)
+    return csvData
+    
 def _loadMillenniumPositionalData(filename): 
     """
     Loads the first three numbers from a csv file.
