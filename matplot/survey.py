@@ -348,7 +348,7 @@ def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram,boxMaxDistance
     #Do calculations
     selection_values = selection_function(distances,**(selectionParams["constants"]))
     wantDensity = selection_values / common.shellVolCenter(distances,binsize)
-    distBin = [np.digitize(distances[:,n],bins)-1 for n in range(numSurveys)]
+    distBin = (np.digitize(distances.flatten(),bins)-1).reshape(distances.shape)
     originalCount = np.transpose(np.array([histogram[n][distBin[n]] for n in range(numSurveys)]))
     volumes = common.shellVolCenter(np.transpose(np.array(distBin))*binsize + (binsize/2),binsize)
     originalDensity = originalCount / volumes
