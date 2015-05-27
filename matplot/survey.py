@@ -226,6 +226,9 @@ def selectrun(args):
                                         itertools.repeat(surveys),
                                         distanceFiles))
         print("Generating distance data took {} seconds.".format(time.time()-start))
+        #Single core version for use with profiling
+        #os.mkdir(distFileBase)
+        #[distanceOneBox(afile,surveys,distanceFile) for afile,distanceFile in zip(files,distanceFiles)]
     else:
         print("Found distance data!")
 
@@ -247,7 +250,12 @@ def selectrun(args):
         full_histogram = np.load(distFileBase+'hist.npy')
         
     print("Generating surveys...")
+    # Single-core method for profiling
+    # listOfSurveyContents = [surveyOneFile(afile,distanceFile,selectionParams,full_histogram,boxMaxDistance) for afile,distanceFile in zip(files,distanceFiles)]
+    
+    
     start = time.time()
+    
     listOfSurveyContents = pool.starmap(surveyOneFile,zip(files,
                                                           distanceFiles,
                                                           itertools.repeat(selectionParams),
@@ -255,6 +263,7 @@ def selectrun(args):
                                                           itertools.repeat(boxMaxDistance)
                                                       ))
     print("Generating surveys took {} seconds.".format(time.time()-start))
+    
     #Format of listOfSurveyContents:
     #List of 1000 elements.
     #Each 'element' is a list of numSurveys elements, each element of which is a list of rows that belong to that
@@ -290,7 +299,7 @@ def transposeMappedSurvey(data):
                 surveyContent[i].append(line)
     return surveyContent
 
-
+#@profile
 def distanceOneBox(hugeFile,surveys,outFile):
     #Generate distance data for one sub-box - distance from each galaxy to each survey center
     #These distances are not returned, instead they are only written to the disk.
@@ -330,7 +339,8 @@ def surveyBins(distanceFile,binsize,boxMaxDistance):
     #     for surveyNum,distance in enumerate(galaxy):
     #         histogram[surveyNum][int(distance/binsize)] += 1
     return np.array(histogram)
-    
+
+@profile
 def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram,boxMaxDistance):
     """
     Given the original data, distances, wanted numbers, and other parameters we actually generate the
@@ -348,7 +358,7 @@ def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram,boxMaxDistance
     #Do calculations
     selection_values = selection_function(distances,**(selectionParams["constants"]))
     wantDensity = selection_values / common.shellVolCenter(distances,binsize)
-    distBin = (np.digitize(distances.flatten(),bins)-1).reshape(distances.shape)
+    distBin = np.transpose((np.digitize(distances.flatten(),bins)-1).reshape(distances.shape))
     originalCount = np.transpose(np.array([histogram[n][distBin[n]] for n in range(numSurveys)]))
     volumes = common.shellVolCenter(np.transpose(np.array(distBin))*binsize + (binsize/2),binsize)
     originalDensity = originalCount / volumes
@@ -369,7 +379,8 @@ def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram,boxMaxDistance
     #         if addBool:
     #             rawLine = galaxies[i][3]
     #             surveyContent[j].append(rawLine)
-    surveyContent = [np.array(galaxies)[toAdd[:,n]] for n in range(numSurveys)]
+    arrGalaxies = np.array(galaxies)
+    surveyContent = [arrGalaxies[toAdd[:,n]] for n in range(numSurveys)]
     return surveyContent
 
 
@@ -422,6 +433,7 @@ def genSurveyPos(separation, boxsize, numSurveys,files):
 
 
 def transpose(args):
+    hubble_constant = 74.4
     survey_info = common.getdict(args.survey_file)
     for survey in survey_info:
         outCF2String = "" 
@@ -441,13 +453,12 @@ def transpose(args):
                 theta = math.atan2(y,x)*180/math.pi + 180
                 peculiarVel = np.dot(ontoGalaxy,[galaxy.velX,galaxy.velY,galaxy.velZ])/rho
                 #posVec = ontoGalaxy/space.distance.euclidean(ontoGalaxy,(0,0,0))
-                cf2row = [0,#cz
+                cf2row = [rho*hubble_constant+peculiarVel,#cz
                           rho,#distance (mpc/h)
                           peculiarVel,#peculiar velocity km/sec
                           0,#dv
                           theta,#longitude degrees - 0 - 360
                           phi]#latitude degrees - -90 - 90
-                #Still missing redshift calculation, but that's it!
                 outCF2String = outCF2String + '{}  {}  {}  {}  {}  {}\n'.format(*cf2row)
         with open(survey['name'] + '_cf2.txt', 'w') as cf2outfile:
             cf2outfile.write(outCF2String)
