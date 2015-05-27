@@ -340,7 +340,7 @@ def surveyBins(distanceFile,binsize,boxMaxDistance):
     #         histogram[surveyNum][int(distance/binsize)] += 1
     return np.array(histogram)
 
-@profile
+#@profile
 def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram,boxMaxDistance):
     """
     Given the original data, distances, wanted numbers, and other parameters we actually generate the
@@ -427,7 +427,7 @@ def genSurveyPos(separation, boxsize, numSurveys,files):
             if numCatches > 10000:
                 raise RuntimeError("We're probably in an infinite loop. Try reducing the number of surveys to make.")
     print("Caught {}!".format(numCatches))
-    print(surveys)
+    print([list(survey) for survey in surveys])
     return surveys
 
 
