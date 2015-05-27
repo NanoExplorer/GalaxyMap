@@ -5,44 +5,85 @@ matplotlib.use("TkAgg")
 import matplotlib.backends.backend_pdf as pdfback
 import numpy as np
 from math import pi
-#from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
-import common
+import argparse
 
 
-#phis and thetas are the phi and theta spherical coordinates accd. to my calculus book (except for elevations)
-#rho = [math.sqrt(x**2+y**2+z**2) for x,y,z in zip(xs,ys,zs)]
-mag = 1#[500/(x**2+y**2+z**2) for x,y,z in zip(xs,ys,zs)]
-
-galaxies = common.loadData("../matplot/Yuyu data/SimulCatalogue/CF2_group_simul.txt")
-thetas = [galaxy.lon*(pi/180)-pi for galaxy in galaxies]
-phis = [galaxy.lat*(pi/180) for galaxy in galaxies]
-
-print("Generating plots...")
-fig=plt.figure(figsize=(8,4.5), dpi=180)
-ax = fig.add_subplot(111, projection='hammer')
-ax.scatter(thetas, phis, s=mag, color = 'r', marker = '.', linewidth = "1")
-ax.set_title('Angular Distribution of Galaxies')
-plt.xlabel('azimuth')
-plt.ylabel('elevation')
-#ax2 = fig.add_subplot(212)
-#numbins = 50
-#ax2.hist(rho,numbins,color='g',alpha=0.8)
 
 
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("inputFile", help="The input CF2 whitespace-delimited file",type=str)
+    parser.add_argument("-o","--output", help="Write the resulting plot to a PDF file instead of displaying interactively",type=str)
+    args = parser.parse_args()
     
-#ax = fig.add_subplot(131, projection='hammer')
-#ax.scatter(thetas, phis, c='r', marker = 'o')
+    mag = 1 #could be a list. Dictates the size of each plotted point
 
-#ax2 = fig.add_subplot(132, projection='3d')
-#ax2.scatter(xs, ys, zs, c='r', marker = 'o')
+    galaxies = loadCF2Data(args.inputFile)
 
-#ax3 = fig.add_subplot(133)
-#ax3.scatter(phis, thetas, c = 'r', marker = 'o')
+    #Convert latitude and longitude (degrees) into radians, and move them to the ranges used by the plot
+    #For longitude, we want it in the range -pi to pi instead of 0 to 2pi
+    thetas = [galaxy.lon*(pi/180)-pi for galaxy in galaxies]
+    phis = [galaxy.lat*(pi/180) for galaxy in galaxies]
 
-#plt.show()
-print("Saving plots...")
-with pdfback.PdfPages('SIM_Yuyu.pdf') as pdf:    
-    pdf.savefig(fig)
+    print("Generating plots...")
+    fig=plt.figure(figsize=(8,4.5), dpi=180)
+    ax = fig.add_subplot(111, projection='hammer')
 
-print("Done!")
+    #Plot the data
+    ax.scatter(thetas, phis, s=mag, color = 'r', marker = '.', linewidth = "1")
+
+    #Set titles and axis labels
+    ax.set_title('Angular Distribution of Galaxies',y=1.08)
+    plt.xlabel('Galactic Longitude')
+    plt.ylabel('Galactic Latitude')
+
+    #Show the grid
+    plt.grid(True)
+    
+    
+    if args.output:
+        print("Saving plots...")
+        with pdfback.PdfPages(args.output) as pdf:    
+            pdf.savefig(fig)
+    else:
+        plt.show()
+    print("Done!")
+
+def loadCF2Data(filename):
+    """
+    Loads galaxy data from a TXT file. Assumes that the data is in the same format
+    as the CF2 and COMPOSITE surveys:
+    two-space-delimited, with columns
+            cz (km/s)
+            distance (Mpc/h)
+            radial velocity(km/s)
+            error in radial velocity(km/s)
+            Galactic Longitude (degrees)
+            Galactic Latitude (degrees)
+    """
+
+    galaxies = [] 
+    with open(filename, "r") as boxfile:
+        for line in boxfile:
+            row = line.split()
+            floats = [float(x) for x in row]
+            galaxies.append(CF2(floats))
+    return galaxies
+
+class CF2:
+    """
+    Data structure for holding a cf2 galaxy. The constructor takes a list of attributes,
+    in the order given by the cf2 files. 
+    """
+    def __init__(self, data):
+        self.cz = data[0]
+        self.d = data[1]
+        self.v = data[2]
+        self.dv = data[3]
+        self.lon = data[4]
+        self.lat = data[5]
+
+
+if __name__ == "__main__":
+    main()
