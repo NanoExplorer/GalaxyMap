@@ -4,6 +4,8 @@ import correlation_func
 import dicer
 import stats
 import survey
+import surveytranspose
+import surveystats
 import jackknife
 
 def main():
@@ -35,7 +37,7 @@ def main():
 
     parser_surveystats = subparsers.add_parser('surveystats',help='Takes in a survey file, bins it into a histogram and fits the survey function to it.')
     parser_surveystats.add_argument("settings",help='JSON file to read settings from.',type=str)
-    parser_surveystats.set_defaults(func=survey.statsrun)
+    parser_surveystats.set_defaults(func=surveystats.statsrun)
 
     parser_selectsurvey = subparsers.add_parser('select',help='Uses a settings file to extract lots of virtual surveys (like the cf2 and composite ones) from the huge millennium data file.')
     parser_selectsurvey.add_argument('settings',help='JSON file to read settings from.',type=str)
@@ -43,7 +45,7 @@ def main():
 
     parser_surveytranspose = subparsers.add_parser('transpose',help='Transforms cartesian surveys into CF2 format')
     parser_surveytranspose.add_argument('survey_file',help='survey.json file that contains a list of surveys and all of their center points.')
-    parser_surveytranspose.set_defaults(func=survey.transpose)
+    parser_surveytranspose.set_defaults(func=surveytranspose.transpose)
 
     args = parser.parse_args()
 
