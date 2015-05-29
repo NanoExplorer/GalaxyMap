@@ -1,147 +1,18 @@
 import common
 import numpy as np
 import math
-import scipy.optimize as optimize
 import scipy.spatial as space
 import itertools
 import os
 import multiprocessing
 import time
-import pylab
-import matplotlib.backends.backend_pdf as pdfback
 import random
 NUM_PROCESSORS = 4
-np.seterr(all='raise')
-#When having problems with dividing by zero, we can debug more easily by having execution
-#stop completely when we encounter one, instead of continuing on with only a warning
 
-def statsrun(args):
-    all_settings = common.getdict(args.settings)
-    binsize = int(all_settings["binsize"])
-    outputFile = all_settings["output_filename"]
-    filename = all_settings["survey_filename"]
-    chop = float(all_settings["chop"])
-    if all_settings["model_override"] is not None:
-        override = common.getdict(all_settings["model_override"])
-    else:
-        override = None
-
-    if "many" in all_settings and all_settings["many"] == True:
-        num_files = all_settings["num_files"]
-        for x in range(num_files):
-            singlerun(filename.format(x),
-                      outputFile.format(x),
-                      binsize,
-                      chop,
-                      override
-            )
-    else:
-        singlerun(filename,outputFile,binsize,chop,override)
-        
 def genBins(binsize,chop):
     return [x*binsize for x in range(int(chop/binsize)+2)]
     #generates bins for a certain bin size. Stops with the bin that slightly overshoots the chop value
     #Always starts at zero
-    
-def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
-    fig = pylab.figure()
-    galaxies = common.loadData(filename, dataType = "CF2")
-    distances = [galaxy.d for galaxy in galaxies]
-    #get a list of all the distances to galaxies. This will let us send it directly to the histogram 
-
-    bins_orig = genBins(binsize,chop)
-
-    #Make a histogram using pylab histogram function.
-    n, bins, patches = pylab.hist(distances, bins_orig, histtype="stepfilled",label="Galaxy Distribution,\n binsize={:.2f}Mpc".format(binsize))
-
-    #Change visual properties of the histogram
-    pylab.setp(patches, 'facecolor','g','alpha',0.75)
-    robot = chi_sq_solver(bins,n,selection_function)
-    if modelOverride is None:
-        #If we don't have an existing model to use, we find a best fit and plot it
-        #Solve the chi squared optimization for the histogram and selection function
-        params = robot.result.x
-        #Plot the best fit
-        domain = np.arange(0,chop,1)
-        model = [selection_function(r,*(robot.result.x)) for r in domain]
-        pylab.plot(domain,model, 'k--',linewidth=1.5,label="Model fit: $A = {:.3f}$\n$r_0 = {:.3f}$\n$n_1 = {:.3f}$\n$n_2={:.3f}$\n$\chi^2={chisq:.3f}$".format(*(robot.result.x),chisq = robot.result.fun))
-        chisq = robot.result.fun
-    else:
-        #Plot the model given in the settings function instead of calculating a new one
-        mo = modelOverride["constants"]
-        params = [mo['A'], mo['r_0'], mo['n_1'], mo['n_2']]
-        chisq = robot.chi_sq(params)
-        domain = np.arange(0,chop,1)
-        model = [selection_function(r,*params) for r in domain]
-        pylab.plot(domain,model, 'k--',linewidth=1.5,label="Model fit: $A = {:.3f}$\n$r_0 = {:.3f}$\n$n_1 = {:.3f}$\n$n_2={:.3f}$\n$\chi^2={chisq:.3f}$".format(*params,chisq = chisq))
-        
-   
-    
-
-    #Add axis labels
-    pylab.ylabel("Galaxy count")
-    pylab.xlabel("Distance, Mpc/h")
-    pylab.title("Distribution of Galaxy Distance")
-    pylab.legend()
-    pylab.axis([0,chop,0,1000])
-    fig2 = pylab.figure()
-    shellVolume = [common.shellVolCenter(robot.centerbins[i],binsize)  for i in range(len(n))]
-    pylab.title("Galaxies per Cubic Mpc")
-    pylab.xlabel("Distance, Mpc/h")
-    pylab.ylabel("Density, galaxies/(Mpc/h)^3")
-    density = [n[i]/shellVolume[i] for i in range(len(n))]
-    pylab.plot(robot.centerbins,density)
-    #Save figure
-    with pdfback.PdfPages(outputFile+str(binsize)) as pdf:
-        pdf.savefig(fig)
-        pdf.savefig(fig2)
-    if modelOverride is None:
-    #Write paramaters to a file for later use.
-        common.writedict(outputFile+str(binsize)+'_params.json',{'constants':{'A':params[0],
-                                                                              'r_0':params[1],
-                                                                              'n_1':params[2],
-                                                                              'n_2':params[3]},
-                                                                 'info':{'shell_thickness': binsize,
-                                                                         'max_radius': chop,
-                                                                         'chisq': chisq
-                                                                     }
-                                                             })
-    pylab.close('all')
-
-class chi_sq_solver:
-    def __init__(self,bins,ys,function):
-        #Initialize object members
-        self.bins = bins
-        self.ys = ys
-        self.centerbins = self.centers(self.bins)
-        self.function = function
-        #Calculate minimum chi squared fit
-        self.result = optimize.minimize(self.chi_sq,
-                                        np.array([1000,10,0.005,0.005]),
-                                        bounds = [(1,None),(0.01,None),(0,20),(0,20)])
-        
-    def chi_sq(self, args):
-        #Return the chi_squared statistic for the binned data and the arguments for the function
-        sum = 0
-        for i in range(len(self.ys)-1):
-            try:
-                E = self.function(self.centerbins[i], *args)
-            except FloatingPointError:
-                print("Oh no! There was a floating point error.")
-                print(self.centerbins[i],*args)
-                exit()
-            sum += (self.ys[i]-E)**2/E
-        return sum
-
-    def centers(self,bins):
-        #Calculate the centers of the bins, or the average x value of each bin.
-        #Would be mathematically cool if we could average the x values of all the data points,
-        #but that probably shouldn't affect anything substantially.
-        centers = []
-        for i in range(len(bins)-1):
-            centers.append((bins[i+1]-bins[i])/2+bins[i])
-            #Take the average value of two bins and add it to the lower bin value
-        return centers
 
 def selection_function(r, A, r_0, n_1, n_2):
     ratio = r/r_0
@@ -151,6 +22,7 @@ def selection_function(r, A, r_0, n_1, n_2):
     #     print("Uh-oh, the value was zero!")
     #     print(r,A,r_0,n_1,n_2)
     return value
+
 
 def selectrun(args):
     #I'll need from args:
@@ -402,14 +274,15 @@ def genSurveyPos(separation, boxsize, numSurveys,files):
         print("[WARN] there may be too many surveys for this box size and separation distance.")
     #rng = np.random.RandomState()
     #WAAAY more overhead, but as far as I know, also way faster in the long run
-    positionList = millennium.getAllPositions()
+    #positionList = millennium.getAllPositions()
     for i in range(numSurveys):
         while True:
             #Note: this is basically the equivalent of bogosort as far as algorithm efficiency
             #is concerned. If you try to cram too many surveys into a box it will fail. There's a built in
             #failsafe that detects infinite looping by failing after it tries too many times. (currently 10000)
-            galaxyCoord = random.choice(positionList)
-            #galaxyCoord = (galaxy.x,galaxy.y,galaxy.z)
+            #galaxyCoord = random.choice(positionList)
+            galaxy=millennium.getARandomGalaxy()
+            galaxyCoord = (galaxy.x,galaxy.y,galaxy.z)
             distances = [math.sqrt((r1[0]-r2[0])**2+
                                    (r1[1]-r2[1])**2+
                                    (r1[2]-r2[2])**2)
@@ -430,40 +303,3 @@ def genSurveyPos(separation, boxsize, numSurveys,files):
     print("Caught {}!".format(numCatches))
     print([list(survey) for survey in surveys])
     return surveys
-
-
-
-def transpose(args):
-    hubble_constant = 74.4
-    survey_info = common.getdict(args.survey_file)
-    for survey in survey_info:
-        outCF2String = "" 
-        with open(survey['name'],'r') as csvFile:
-            for line in csvFile:
-                galaxy=common.MillenniumGalaxy(line)
-                center = survey['center']
-                rotationMatrix = np.matrix(survey['rot'])
-                ontoGalaxy = np.array([galaxy.x-center[0],galaxy.y-center[1],galaxy.z-center[2]])
-                #ontoGalaxy is the vector from the survey origin to the galaxy
-                rotatedCoord = ontoGalaxy * rotationMatrix
-                x = rotatedCoord.item(0)
-                y = rotatedCoord.item(1)
-                z = rotatedCoord.item(2)
-                rho = space.distance.euclidean(ontoGalaxy,[0,0,0])
-                phi = math.acos(z/rho)*180/math.pi - 90
-                theta = math.atan2(y,x)*180/math.pi + 180
-                peculiarVel = np.dot(ontoGalaxy,[galaxy.velX,galaxy.velY,galaxy.velZ])/rho
-                #posVec = ontoGalaxy/space.distance.euclidean(ontoGalaxy,(0,0,0))
-                cf2row = [rho*hubble_constant+peculiarVel,#cz
-                          rho,#distance (mpc/h)
-                          peculiarVel,#peculiar velocity km/sec
-                          0,#dv
-                          theta,#longitude degrees - 0 - 360
-                          phi]#latitude degrees - -90 - 90
-                outCF2String = outCF2String + '{}  {}  {}  {}  {}  {}\n'.format(*cf2row)
-        with open(survey['name'] + '_cf2.txt', 'w') as cf2outfile:
-            cf2outfile.write(outCF2String)
-            
-if __name__ == "__main__":
-    print("This does not run standalone.")
-    
