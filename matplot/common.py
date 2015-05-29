@@ -199,7 +199,6 @@ def _loadMillenniumPositionalData(filename):
     """
     Loads the first three numbers from a csv file.
     With my millennium data, those three numbers are x,y, and z coordinates
-    The fourth cell of the data is the raw line, just in case you need it.
     """
     csvData = []
     with open(filename, "r") as boxfile:
@@ -214,7 +213,6 @@ def _loadMillenniumPositionalData(filename):
                     except ValueError:
                         valid = False#sometimes the CSV file doesn't contain a number.
                                      #In that case, just skip that row.
-                csvRow.append(line)
                 if valid:
                     csvData.append(csvRow)
     return csvData
@@ -394,7 +392,7 @@ class MillenniumFiles:
             while line[0] == 'x' or line[0] =='#':
                 line = next(f)
             for num, templine in enumerate(f):
-                if random.randrange(num + 2) == 0 and line[0] != '#':
+                if random.randrange(num + 2) == 0 and templine[0] != '#':
                     #Picks a random number from the range [0,num+2). if the number picked is zero,
                     #we replace the stored line with a new one.
                     line = templine
@@ -416,6 +414,18 @@ class MillenniumFiles:
         fullPath = self.boxLocation + filename
         assert fullPath in self.files #If this assertion fails, you're most likely outside the box.
         return fullPath
+
+    def getAllPositions(self):
+        """
+        WARNING: This function may be subject to large amounts of memory usage.
+        Use with caution.
+        """
+        positionList = []
+        for box in self.files:
+            posList = loadData(box,'millPos')
+            positionList += posList
+        return positionList
+        
         
 class MillenniumGalaxy:
     def __init__(self,galaxy):

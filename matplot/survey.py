@@ -9,7 +9,7 @@ import multiprocessing
 import time
 import pylab
 import matplotlib.backends.backend_pdf as pdfback
-
+import random
 NUM_PROCESSORS = 4
 np.seterr(all='raise')
 #When having problems with dividing by zero, we can debug more easily by having execution
@@ -83,7 +83,7 @@ def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
     pylab.xlabel("Distance, Mpc/h")
     pylab.title("Distribution of Galaxy Distance")
     pylab.legend()
-    pylab.axis([0,chop,0,700])
+    pylab.axis([0,chop,0,1000])
     fig2 = pylab.figure()
     shellVolume = [common.shellVolCenter(robot.centerbins[i],binsize)  for i in range(len(n))]
     pylab.title("Galaxies per Cubic Mpc")
@@ -212,7 +212,7 @@ def selectrun(args):
     selectionParams = common.getdict(settings['selection_function_json'])
 
     #Grab the pre-computed distance files if they exist, or if not generate them.
-    distFileBase = outFileName + "_{:x}/".format(hash(tuple([tuple(x) for x in surveys]))) 
+    distFileBase = hugeFile.rstrip('/') + "_distances_{:x}/".format(hash(tuple([tuple(x) for x in surveys]))) 
     distanceFiles = [distFileBase + os.path.basename(os.path.splitext(milFile)[0]) + '.npy' for milFile in files]
     #Distance file format: outFile location + hash of survey centerpoints / xi.yi.zi.npy
     
@@ -385,7 +385,6 @@ def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram,boxMaxDistance
 
 
 
-
 def genSurveyPos(separation, boxsize, numSurveys,files):
 
     #The survey starting points will all need to be more than MIN_DIST from each other,
@@ -402,13 +401,15 @@ def genSurveyPos(separation, boxsize, numSurveys,files):
         #fit numSurveys into the box. This is a lower bound, so you might get the warning and still be fine.
         print("[WARN] there may be too many surveys for this box size and separation distance.")
     #rng = np.random.RandomState()
+    #WAAAY more overhead, but as far as I know, also way faster in the long run
+    positionList = millennium.getAllPositions()
     for i in range(numSurveys):
         while True:
             #Note: this is basically the equivalent of bogosort as far as algorithm efficiency
             #is concerned. If you try to cram too many surveys into a box it will fail. There's a built in
             #failsafe that detects infinite looping by failing after it tries too many times. (currently 10000)
-            galaxy = millennium.getARandomGalaxy()
-            galaxyCoord = (galaxy.x,galaxy.y,galaxy.z)
+            galaxyCoord = random.choice(positionList)
+            #galaxyCoord = (galaxy.x,galaxy.y,galaxy.z)
             distances = [math.sqrt((r1[0]-r2[0])**2+
                                    (r1[1]-r2[1])**2+
                                    (r1[2]-r2[2])**2)
@@ -422,10 +423,10 @@ def genSurveyPos(separation, boxsize, numSurveys,files):
                 break
             else:
                 numCatches += 1
-            if numCatches % 100 == 0:
-                print("So far we have tried {} times".format(numCatches))
-            if numCatches > 10000:
-                raise RuntimeError("We're probably in an infinite loop. Try reducing the number of surveys to make.")
+            if numCatches % 500 == 0:
+                print("So far we have tried {} times, and have {} surveys".format(numCatches,len(surveys)))
+            #if numCatches > 100000:
+            #    raise RuntimeError("We're probably in an infinite loop. Try reducing the number of surveys to make.")
     print("Caught {}!".format(numCatches))
     print([list(survey) for survey in surveys])
     return surveys
