@@ -7,21 +7,33 @@ import os
 import multiprocessing
 import time
 import random
+import pycuda.autoinit
+from pycuda import gpuarray
 NUM_PROCESSORS = 4
 
 def genBins(binsize,chop):
     return [x*binsize for x in range(int(chop/binsize)+2)]
     #generates bins for a certain bin size. Stops with the bin that slightly overshoots the chop value
     #Always starts at zero
-
-def selection_function(r, A, r_0, n_1, n_2):
-    ratio = r/r_0
-    #Selection function as defined by what I got in my email from Professor Feldman
-    value = A*(ratio**n_1)*(1+ratio**(n_1+n_2))**-1
-    # if value == 0 and r != 0:
-    #     print("Uh-oh, the value was zero!")
-    #     print(r,A,r_0,n_1,n_2)
-    return value
+@profile
+def compute_want_density(r,binsize, A, r_0, n_1, n_2):
+    r_in = r.astype(np.float32)
+    r_gpu = gpuarray.to_gpu(r_in)
+    dr = binsize/2
+    ftpi = (4/3) * np.pi
+    
+    r_out = ((A*((r_gpu/r_0)**n_1)*(1+(r_gpu/r_0)**(n_1+n_2))**-1) / ((ftpi*(r_gpu+dr)**3)-(ftpi*(r_gpu-dr)**3))).get()
+  
+    return r_out
+@profile
+def calcVolumes(r,binsize):
+    r_in = r.astype(np.float32)
+    r_gpu = gpuarray.to_gpu(r_in)
+    ftpi = (4/3) * np.pi
+    
+    r_out = ((ftpi*r_gpu**3)-(ftpi*(r_gpu+binsize)**3)).get()
+  
+    return r_out
 
 
 def selectrun(args):
@@ -122,11 +134,12 @@ def selectrun(args):
         full_histogram = np.load(distFileBase+'hist.npy')
         
     print("Generating surveys...")
-    # Single-core method for profiling
-    # listOfSurveyContents = [surveyOneFile(afile,distanceFile,selectionParams,full_histogram,boxMaxDistance) for afile,distanceFile in zip(files,distanceFiles)]
-    
-    
+    #Single-core method for profiling
     start = time.time()
+    listOfSurveyContents = [surveyOneFile(afile,distanceFile,selectionParams,full_histogram,boxMaxDistance) for afile,distanceFile in zip(files,distanceFiles)]
+    print("Generating surveys took {} seconds.".format(time.time()-start))
+    """
+    
     
     listOfSurveyContents = pool.starmap(surveyOneFile,zip(files,
                                                           distanceFiles,
@@ -134,8 +147,8 @@ def selectrun(args):
                                                           itertools.repeat(full_histogram),
                                                           itertools.repeat(boxMaxDistance)
                                                       ))
-    print("Generating surveys took {} seconds.".format(time.time()-start))
     
+    """
     #Format of listOfSurveyContents:
     #List of 1000 elements.
     #Each 'element' is a list of numSurveys elements, each element of which is a list of rows that belong to that
@@ -212,7 +225,7 @@ def surveyBins(distanceFile,binsize,boxMaxDistance):
     #         histogram[surveyNum][int(distance/binsize)] += 1
     return np.array(histogram)
 
-#@profile
+@profile
 def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram,boxMaxDistance):
     """
     Given the original data, distances, wanted numbers, and other parameters we actually generate the
@@ -220,19 +233,21 @@ def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram,boxMaxDistance
     """
     #Set up variables
     rng = np.random.RandomState() #Make a process-safe random number generator
-    distances = np.load(distanceFile) #load the distance file
+    distances = np.load(distanceFile) #load the distance file !! 7.3% !!
     surveyContent = [[] for i in range(distances.shape[1])] #Make the skeleton structure for the end result
-    galaxies = common.loadData(hugeFile,dataType = 'millRaw') #Load the galaxies
+    galaxies = common.loadData(hugeFile,dataType = 'millRaw') #Load the galaxies !! 13.9% !!
     binsize = selectionParams['info']['shell_thickness'] #Load the size of a bin
     bins = genBins(binsize,boxMaxDistance)
     numSurveys = distances.shape[1]
     
     #Do calculations
-    selection_values = selection_function(distances,**(selectionParams["constants"]))
-    wantDensity = selection_values / common.shellVolCenter(distances,binsize)
-    distBin = np.transpose((np.digitize(distances.flatten(),bins)-1).reshape(distances.shape))
-    originalCount = np.transpose(np.array([histogram[n][distBin[n]] for n in range(numSurveys)]))
-    volumes = common.shellVolCenter(np.transpose(np.array(distBin))*binsize + (binsize/2),binsize)
+    wantDensity = compute_want_density(distances,binsize,**(selectionParams["constants"])) #!! 20 % !!
+    #wantDensity  =selection_values / common.shellVolCenter(distances,binsize)         #!! 22 % !!
+    tdistBin =(np.digitize(distances.flatten(),bins)-1).reshape(distances.shape)
+    distBin = np.transpose(tdistBin)# !! 6 % !!
+    originalCount = np.transpose(np.array([histogram[n][distBin[n]] for n in range(numSurveys)])) # 2.2%
+    #volumes = calcVolumes(np.transpose(np.array(distBin))*binsize + (binsize/2),binsize)# !! 23 % !!
+    volumes = calcVolumes(tdistBin,binsize)# !! 23 % !!
     originalDensity = originalCount / volumes
     #I'm currently under the impression that this for loop is the main bottleneck in this function.
     #It isn't a complicated task, so it might be worthwhile to consider alternate implementations.
