@@ -67,6 +67,7 @@ def lin_intervals(min_r,step_size,numpoints,dr):
         intervals.append(x-(dr/2.0))
         intervals.append(x+(dr/2.0))    
     return (xs, intervals)
+    
 def log_intervals(min_r,step_size,numpoints,dr):
     """
     dr is a measure of the size of each interval, as a percentage of the distance between the previous and
@@ -310,7 +311,7 @@ def mainrun(args):
     try:
         step_type = settings["step_type"]
     except KeyError:
-        print("We've added a new argument \"step_type\" to the settings file.\nPlease update {} to include this argument.\nDefault value is \"lin\" for linear steps on the x axis.\nOther values are \"log\" for logarithmic point spacing. More types to come.")
+        print("We've added a new argument \"step_type\" to the settings file.\nPlease update {} to include this argument.\nDefault value is \"lin\" for linear steps on the x axis.\nOther values are \"log\" for logarithmic point spacing. More types to come.".format(args.settings))
     boxinfo = common.getdict(boxname)
     print("Computing correlation function...")
     argslist = [(x,

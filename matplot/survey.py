@@ -7,21 +7,62 @@ import os
 import multiprocessing
 import time
 import random
+try:
+    import pycuda.autoinit
+    from pycuda import gpuarray
+    print("[INFO] GPU available for use.")
+    USE_GPU=True    
+except:
+    print("[INFO] GPU unavailable.")
+    USE_GPU=False
+
 NUM_PROCESSORS = 4
 
 def genBins(binsize,chop):
     return [x*binsize for x in range(int(chop/binsize)+2)]
     #generates bins for a certain bin size. Stops with the bin that slightly overshoots the chop value
     #Always starts at zero
+#@profile
+def compute_want_density(r,binsize, A, r_0, n_1, n_2):
+    if USE_GPU:
+        r_in = r.astype(np.float32)
+        r_gpu = gpuarray.to_gpu(r_in)
+    else:
+        r_in = r
+        r_gpu = r
+        
+    dr = binsize/2
+    ftpi = (4/3) * np.pi
+    
+    r_calc = (A*((r_gpu/r_0)**n_1)*(1+(r_gpu/r_0)**(n_1+n_2))**-1) / ((ftpi*(r_gpu+dr)**3)-(ftpi*(r_gpu-dr)**3))
+    #(A*(r/r0)^n_1)*(1+(r/r0)^(n1+n2))^-1 is the selection function, i.e. number of galaxies in a binsize Mpc bin
+    #centered on r distance from center
 
-def selection_function(r, A, r_0, n_1, n_2):
-    ratio = r/r_0
-    #Selection function as defined by what I got in my email from Professor Feldman
-    value = A*(ratio**n_1)*(1+ratio**(n_1+n_2))**-1
-    # if value == 0 and r != 0:
-    #     print("Uh-oh, the value was zero!")
-    #     print(r,A,r_0,n_1,n_2)
-    return value
+    #4/3 pi * (r+dr)^3 - 4/3 pi * (r-dr)^3 is the volume of that bin
+
+    #divide count by volume to get density.
+    if USE_GPU:
+        r_out = r_calc.get()
+    else:
+        r_out = r_calc
+  
+    return r_out
+#@profile
+def calcVolumes(c,binsize):
+    if USE_GPU:
+        c_in = c.astype(np.float32)
+        c_gpu = gpuarray.to_gpu(c_in)
+    else:
+        c_in = c
+        c_gpu = c
+        
+    ftpi = (4/3) * np.pi
+    r_gpu = c_gpu * binsize
+    r_out = (ftpi*(r_gpu+binsize)**3)-(ftpi*(r_gpu)**3)
+    if USE_GPU:
+        r_out = r_out.get()
+    
+    return r_out
 
 
 def selectrun(args):
@@ -33,7 +74,8 @@ def selectrun(args):
     #number of surveys
     
     #I'll need to go through the database in blocks using the usual sub-box method 
-
+    USE_GPU = args.gpu and USE_GPU
+    #USE_GPU represents whether we can and want to use the gpu. 
     settings = common.getdict(args.settings)
     
     hugeFile       = settings["dataset_filename"]
@@ -122,20 +164,20 @@ def selectrun(args):
         full_histogram = np.load(distFileBase+'hist.npy')
         
     print("Generating surveys...")
-    # Single-core method for profiling
-    # listOfSurveyContents = [surveyOneFile(afile,distanceFile,selectionParams,full_histogram,boxMaxDistance) for afile,distanceFile in zip(files,distanceFiles)]
-    
-    
+    #Single-core method for profiling
     start = time.time()
+    if USE_GPU:
+        listOfSurveyContents = [surveyOneFile(afile,distanceFile,selectionParams,full_histogram,boxMaxDistance) for afile,distanceFile in zip(files,distanceFiles)]
+    else:
+        listOfSurveyContents = pool.starmap(surveyOneFile,zip(files,
+                                                              distanceFiles,
+                                                              itertools.repeat(selectionParams),
+                                                              itertools.repeat(full_histogram),
+                                                              itertools.repeat(boxMaxDistance)
+                                                          ))
     
-    listOfSurveyContents = pool.starmap(surveyOneFile,zip(files,
-                                                          distanceFiles,
-                                                          itertools.repeat(selectionParams),
-                                                          itertools.repeat(full_histogram),
-                                                          itertools.repeat(boxMaxDistance)
-                                                      ))
     print("Generating surveys took {} seconds.".format(time.time()-start))
-    
+       
     #Format of listOfSurveyContents:
     #List of 1000 elements.
     #Each 'element' is a list of numSurveys elements, each element of which is a list of rows that belong to that
@@ -220,19 +262,21 @@ def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram,boxMaxDistance
     """
     #Set up variables
     rng = np.random.RandomState() #Make a process-safe random number generator
-    distances = np.load(distanceFile) #load the distance file
+    distances = np.load(distanceFile) #load the distance file !! 7.3% !!
     surveyContent = [[] for i in range(distances.shape[1])] #Make the skeleton structure for the end result
-    galaxies = common.loadData(hugeFile,dataType = 'millRaw') #Load the galaxies
+    galaxies = common.loadData(hugeFile,dataType = 'millRaw') #Load the galaxies !! 13.9% !!
     binsize = selectionParams['info']['shell_thickness'] #Load the size of a bin
     bins = genBins(binsize,boxMaxDistance)
     numSurveys = distances.shape[1]
     
     #Do calculations
-    selection_values = selection_function(distances,**(selectionParams["constants"]))
-    wantDensity = selection_values / common.shellVolCenter(distances,binsize)
-    distBin = np.transpose((np.digitize(distances.flatten(),bins)-1).reshape(distances.shape))
-    originalCount = np.transpose(np.array([histogram[n][distBin[n]] for n in range(numSurveys)]))
-    volumes = common.shellVolCenter(np.transpose(np.array(distBin))*binsize + (binsize/2),binsize)
+    wantDensity = compute_want_density(distances,binsize,**(selectionParams["constants"])) #!! 20 % !!
+    #wantDensity  =selection_values / common.shellVolCenter(distances,binsize)         #!! 22 % !!
+    tdistBin =(np.digitize(distances.flatten(),bins)-1).reshape(distances.shape)
+    distBin = np.transpose(tdistBin)# !! 6 % !!
+    originalCount = np.transpose(np.array([histogram[n][distBin[n]] for n in range(numSurveys)])) # 2.2%
+    #volumes = calcVolumes(np.transpose(np.array(distBin))*binsize + (binsize/2),binsize)# !! 23 % !!
+    volumes = calcVolumes(tdistBin,binsize)# !! 23 % !!
     originalDensity = originalCount / volumes
     #I'm currently under the impression that this for loop is the main bottleneck in this function.
     #It isn't a complicated task, so it might be worthwhile to consider alternate implementations.
