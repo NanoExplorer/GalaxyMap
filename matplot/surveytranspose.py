@@ -20,8 +20,8 @@ def transpose(args):
                 y = rotatedCoord.item(1)
                 z = rotatedCoord.item(2)
                 rho = space.distance.euclidean(ontoGalaxy,[0,0,0])
-                phi = math.acos(z/rho)*180/math.pi - 90
-                theta = math.atan2(y,x)*180/math.pi + 180
+                phi = math.degrees(math.acos(z/rho)) - 90
+                theta = math.degrees(math.atan2(y,x))+ 180
                 peculiarVel = np.dot(ontoGalaxy,[galaxy.velX,galaxy.velY,galaxy.velZ])/rho
                 #posVec = ontoGalaxy/space.distance.euclidean(ontoGalaxy,(0,0,0))
                 cf2row = [rho*hubble_constant+peculiarVel,#cz
