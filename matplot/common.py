@@ -40,6 +40,29 @@ import math
 import scipy.spatial as space
 import random
 
+def lin_intervals(min_r,step_size,numpoints,dr):
+    xs = [(min_r+step_size*x) for x in range(numpoints)]
+    intervals = []
+    for x in xs:
+        intervals.append(x-(dr/2.0))
+        intervals.append(x+(dr/2.0))    
+    return (xs, intervals)
+    
+def log_intervals(min_r,step_size,numpoints,dr):
+    """
+    dr is a measure of the size of each interval, as a percentage of the distance between the previous and
+    next interval edges. if dr is .5 then exactly all of the range will be covered with zero overlap.
+
+    """
+    xs = [(min_r + 10**(step_size*x) - 1) for x in range(numpoints)]
+    intervals = []
+    for i in range(numpoints):
+        x = xs[i]
+        intervals.append(x-(dr*((10**(step_size*i))*(1-10**(-step_size)))))
+        intervals.append(x+(dr*((10**(step_size*i))*(10**(step_size)-1))))
+    return (xs, intervals)
+
+
 def sphereVol(radius):
     return (4/3)*(np.pi)*(radius**3)
 
