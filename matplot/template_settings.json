@@ -18,26 +18,38 @@
         },
         "boxname": "boxes/TEST_BOX/testbox"
     },
+    "surveyselect": {
+        "box_size": [
+            500,
+            500,
+            500
+        ],
+        "dataset_density": 0.21429724,
+        "dataset_filename": "database/millennium.mil",
+        "num_surveys": 5,
+        "selection_function_json": "output/CF2-group_test10_params.json",
+        "survey_output_files": "surveys/test",
+        "survey_position_override": null,
+        "survey_separation_distance": 100
+    },
     "surveystats": {
         "binsize": 10,
-        "output_filename": "if many is true, use {} to insert file number [0,num_files) e.g. output/COMPOSITE_mock{}",
-        "survey_filename": "if many is true, use {} to insert file number. e.g. surveys/test{}.mil_cf2.txt",
         "chop": 225,
-        "model_override": "output/COMPOSITE_test10_params.json",
         "many": true,
-        "num_files": 5
-    },
-    "surveyselect": {
-        "dataset_filename": "database/millennium.mil",
-        "dataset_density": 0.21429724,
-        "selection_function_json": "output/CF2-group_test10_params.json",
-        "survey_separation_distance": 100,
-	    "num_surveys": 5,
-	    "box_size": [500,500,500],
-	    "survey_position_override": null,
-	    "survey_output_files": "surveys/test"
+        "model_override": "output/COMPOSITE_test10_params.json",
+        "num_files": 5,
+        "output_filename": "if many is true, use {} to insert file number [0,num_files) e.g. output/COMPOSITE_mock{}",
+        "survey_filename": "if many is true, use {} to insert file number. e.g. surveys/test{}.mil_cf2.txt"
     },
     "test": {
         "a thing": "another thing"
+    },
+    "velocitycorrelation": {
+        "dr": 1,
+        "min_r": 1,
+        "numpoints": 10,
+        "output_data_folder": "output/",
+        "step_size": 1,
+        "step_type": "log|lin"
     }
 }
