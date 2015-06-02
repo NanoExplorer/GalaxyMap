@@ -331,7 +331,13 @@ class CF2:
                     "dv": "km/sec",
                     "lon":"degrees",
                     "lat":"degrees"}
-
+    
+        self.theta = math.radians(self.lon-180)
+        self.phi = math.radians(self.lat+90)
+        self.x = self.d*math.sin(self.phi)*math.cos(self.theta)
+        self.y = self.d*math.sin(self.phi)*math.sin(self.theta)
+        self.z = self.d*math.cos(self.phi)
+        
 class MillenniumFiles:
     """
     Handles certain operations with regards to boxes of millennium files. 
