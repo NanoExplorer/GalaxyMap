@@ -120,6 +120,7 @@ def calculate_correlations(args):
     xs,intervals = inter_fun(min_r, step_size, numpoints, dr)
     left_drs = getLeftdrs(xs,intervals)
     right_drs = getRightdrs(xs,intervals)
+    #Left and right drs are used when plotting error bars
     check_list = np.array(intervals)
     lower = min(check_list)
     #assert(lower >= 0)
@@ -290,7 +291,7 @@ def mainrun(args):
     try:
         step_type = settings["step_type"]
     except KeyError:
-        print("We've added a new argument \"step_type\" to the settings file.\nPlease update {} to include this argument.\nDefault value is \"lin\" for linear steps on the x axis.\nOther values are \"log\" for logarithmic point spacing. More types to come.".format(args.settings))
+        print("We've added a new argument \"step_type\" to the settings file.\nPlease update {} to include this argument.\nDefault value is \"lin\" for linear steps on the x axis.\nOther values are \"log\" for logarithmic point spacing. More types to come. Maybe.".format(args.settings))
     boxinfo = common.getdict(boxname)
     print("Computing correlation function...")
     argslist = [(x,

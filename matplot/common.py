@@ -40,20 +40,31 @@ import math
 import scipy.spatial as space
 import random
 
+def intervals(min_r,step_size,numpoints,dr,step_type):
+    """
+    returns xs, intervals where xs are the center points, intervals are the 'bin edges'
+    """
+    if step_type == 'lin':
+        return lin_intervals(min_r,step_size,numpoints,dr)
+    elif step_type == 'log':
+        return log_intervals(min_r,step_size,numpoints,dr)
+    else:
+        return RuntimeError("Interval type {} not recognized".format(step_type))
+
 def lin_intervals(min_r,step_size,numpoints,dr):
     xs = [(min_r+step_size*x) for x in range(numpoints)]
     intervals = []
     for x in xs:
         intervals.append(x-(dr/2.0))
-        intervals.append(x+(dr/2.0))    
+        intervals.append(x+(dr/2.0))
     return (xs, intervals)
     
 def log_intervals(min_r,step_size,numpoints,dr):
     """
     dr is a measure of the size of each interval, as a percentage of the distance between the previous and
     next interval edges. if dr is .5 then exactly all of the range will be covered with zero overlap.
-
     """
+    #The minus one exists so that when x is zero xs is equal to min_r
     xs = [(min_r + 10**(step_size*x) - 1) for x in range(numpoints)]
     intervals = []
     for i in range(numpoints):
@@ -360,6 +371,11 @@ class CF2:
         self.x = self.d*math.sin(self.phi)*math.cos(self.theta)
         self.y = self.d*math.sin(self.phi)*math.sin(self.theta)
         self.z = self.d*math.cos(self.phi)
+    def __str__(self):
+        outstr = "CF2 galaxy at redshift {} km/s, distance {} Mpc/h,\n".format(self.cz,self.d)
+        outstr += "with peculiar velocity {} km/s.\n".format(self.v)
+        outstr += "This galaxy is in the sky at galactic latitude {} and longitude {} (deg)".format(self.lat,self.lon)
+        return outstr
         
 class MillenniumFiles:
     """
