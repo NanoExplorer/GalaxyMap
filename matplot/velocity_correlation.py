@@ -27,7 +27,7 @@ def psiTwoNumerator(rv1,rv2,costheta1,costheta2):
 def psiTwoDenominator(costheta1,costheta2,cosdTheta):
     return costheta1*costheta2*cosdTheta
 
-#@profile
+@profile
 def main(args):
     """
     Grab the CF2 file, chug it into cartesian (automatically done in common.py now!), plug into cKDTree, grab pairs
@@ -40,44 +40,49 @@ def main(args):
     step_size = settings["step_size"]
     outfile =   settings["output_data_folder"]
     step_type = settings["step_type"]
-    infile =    settings["input_file"]
-    galaxies = common.loadData(infile, dataType = "CF2")
-    xs,intervals = common.intervals(min_r,step_size,numpoints,dr,step_type)
-    positions = [(a.x,a.y,a.z) for a in galaxies]
-    pool = Pool()
-    interval_shells = [(intervals[i+1],intervals[i]) for i in range(0,len(intervals),2)]
-    raw_pair_sets = list(pool.starmap(kd_query,zip(itertools.repeat(positions),
-                                                        interval_shells)))
-    
-
-    psi = list(itertools.starmap(correlation,zip(raw_pair_sets,
-                                      itertools.repeat(galaxies))))
-    psione = [a[0]/10**4 for a in psi]
-    psitwo = [a[1]/10**4 for a in psi]
-    a = [a[2] for a in psi]
-    # print(xs)
-    # print(psione)
-    # print(psitwo)
-    fig = pylab.figure()
-    pylab.plot(xs,a,'-',label="$\cal A$")
-    pylab.title("Moment of the selection function")
-    pylab.ylabel("$\cal A$")
-    pylab.xlabel("Distance, Mpc/h")
-    #pylab.yscale('log')
-    #pylab.xscale('log')
-    pylab.legend()
-
-    fig2 = pylab.figure()
-    pylab.plot(xs,psione,'-',label="$\psi_1$")
-    pylab.plot(xs,psitwo,'k--',label="$\psi_2$")
-    pylab.title("Velocity correlation function")
-    pylab.xlabel("Distance, Mpc/h")
-    pylab.ylabel("Correlation")
-    pylab.legend()
-
-    pylab.show()
+    rawInFile =    settings["input_file"]
+    if settings["many"]:
+        inFileList = [rawInFile.format(x) for x in range(settings["num_files"])]
+    else:
+        inFileList = [rawInFile]
+    for infile in inFileList:
+        galaxies = common.loadData(infile, dataType = "CF2")
+        xs,intervals = common.intervals(min_r,step_size,numpoints,dr,step_type)
+        positions = [(a.x,a.y,a.z) for a in galaxies]
+        pool = Pool()
+        interval_shells = [(intervals[i+1],intervals[i]) for i in range(0,len(intervals),2)]
+        raw_pair_sets = list(pool.starmap(kd_query,zip(itertools.repeat(positions),
+                                                       interval_shells)))
 
 
+        psi = list(itertools.starmap(correlation,zip(raw_pair_sets,
+                                                     itertools.repeat(galaxies))))
+        psione = [a[0]/10**4 for a in psi]
+        psitwo = [a[1]/10**4 for a in psi]
+        a = [a[2] for a in psi]
+        # print(xs)
+        # print(psione)
+        # print(psitwo)
+        fig = pylab.figure()
+        pylab.plot(xs,a,'-',label="$\cal A$")
+        pylab.title("Moment of the selection function")
+        pylab.ylabel("$\cal A$")
+        pylab.xlabel("Distance, Mpc/h")
+        #pylab.yscale('log')
+        #pylab.xscale('log')
+        pylab.legend()
+
+        fig2 = pylab.figure()
+        pylab.plot(xs,psione,'-',label="$\psi_1$")
+        pylab.plot(xs,psitwo,'k--',label="$\psi_2$")
+        pylab.title("Velocity correlation function, $10^4 (km/s)^2$")
+        pylab.xlabel("Distance, Mpc/h")
+        pylab.ylabel("Correlation")
+        pylab.legend()
+
+        pylab.show()
+
+@profile
 def correlation(interval_shell,galaxies):
     galaxies = [(galaxies[a],galaxies[b]) for a,b in interval_shell]
     raw_correlations = list(itertools.starmap(single_correlation,galaxies))
@@ -88,7 +93,7 @@ def correlation(interval_shell,galaxies):
     a = sum([elem[4] for elem in raw_correlations])/sum([elem[5] for elem in raw_correlations])
     return (psione,psitwo,a)
 
-#@profile
+@profile
 def single_correlation(galaxy1,galaxy2):
     rv1 = galaxy1.v
     rv2 = galaxy2.v

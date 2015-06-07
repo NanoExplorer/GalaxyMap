@@ -7,6 +7,7 @@ import survey
 import surveytranspose
 import surveystats
 import jackknife
+import velocity_correlation
 
 def main():
     #Handle command line arguments
@@ -14,7 +15,7 @@ def main():
     subparsers = parser.add_subparsers()
 
     #Generate settings file
-    parser_gensettings = subparsers.add_parser('sset', help="generates a sample settings file")
+    parser_gensettings = subparsers.add_parser('gensettings', help="generates a sample settings file")
     parser_gensettings.add_argument("-m","--module",type=str,default="correlation",help="Which module to generate settings for. Default: correlation.")
     parser_gensettings.set_defaults(func=common.gensettings)
 
@@ -48,12 +49,17 @@ def main():
     parser_surveytranspose.add_argument('survey_file',help='survey.json file that contains a list of surveys and all of their center points.')
     parser_surveytranspose.set_defaults(func=surveytranspose.transpose)
 
+    parser_velocity = subparsers.add_parser('vcorr',help='Computes the velocity correlations of a sample, according to the options in the settings file.')
+    parser_velocity.add_argument("settings",help='JSON file to read settings from.',type=str)
+    parser_velocity.set_defaults(func=velocity_correlation.main)
+
     args = parser.parse_args()
 
     function = None
     try:
         function =args.func
     except AttributeError:
+        print("Function not found")
         parser.print_help()
         exit()
     function(args)

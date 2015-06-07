@@ -47,7 +47,9 @@
     "velocitycorrelation": {
         "dr": 1,
         "input_file": "../CF2_whatever.txt",
+        "many": false,
         "min_r": 1,
+        "num_files": 1,
         "numpoints": 10,
         "output_data_folder": "output/",
         "step_size": 1,
