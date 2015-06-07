@@ -20,7 +20,6 @@ def psiOneNumerator(rv1, rv2, cosdTheta):
     """
     Calculates \psi 1's numerator as defined in the Gorski paper
     This is one iteration. So call this function a billion times then add up all the results.
-    This function could be a good candidate for GPU-ing
     """
     return rv1*rv2*cosdTheta
 
@@ -33,7 +32,7 @@ def psiTwoNumerator(rv1,rv2,costheta1,costheta2):
 def psiTwoDenominator(costheta1,costheta2,cosdTheta):
     return costheta1*costheta2*cosdTheta
 
-@profile
+#@profile
 def main(args):
     """
     Grab the CF2 file, chug it into cartesian (automatically done in common.py now!), plug into cKDTree, grab pairs
@@ -90,7 +89,7 @@ def main(args):
             pdf.savefig(fig)
             pdf.savefig(fig2)
 
-@profile
+#@profile
 def correlation(interval_shell,galaxies):
     galaxies = [(galaxies[a],galaxies[b]) for a,b in interval_shell]
     #"Galaxy 1 VelocitieS"
@@ -114,7 +113,7 @@ def correlation(interval_shell,galaxies):
     cosdTheta = inner1d(g1norm,g2norm)
     cosTheta1 = inner1d(r,g1norm)
     cosTheta2 = inner1d(r,g2norm)
-
+    print(cosTheta1.dtype,cosTheta2.dtype,r.dtype,distBetweenG1G2.dtype)
     psiOneNum = psiOneNumerator(g1vs,g2vs,cosdTheta).sum()
     psiOneDen = psiOneDenominator(cosdTheta).sum()
     psiTwoNum = psiTwoNumerator(g1vs,g2vs,cosTheta1,cosTheta2).sum()
