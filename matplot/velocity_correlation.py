@@ -6,6 +6,12 @@ from multiprocessing import Pool
 import itertools
 import pylab
 import matplotlib.backends.backend_pdf as pdfback
+from numpy.core.umath_tests import inner1d #Note: this function has no documentation and could easily be deprecated.
+#if that happens, you can always use the syntax (a*b).sum(axis=1), which is ever so slightly slower and much more
+#ugly.
+#emergency abort function:
+# def inner1d(a,b):
+#     return (a*b).sum(axis=1)
 
 def length(a):
     return math.sqrt(a[0]**2+a[1]**2+a[2]**2)
@@ -80,43 +86,71 @@ def main(args):
         pylab.ylabel("Correlation")
         pylab.legend()
 
-        pylab.show()
+        with pdfback.PdfPages(outfile+'testgraphs.pdf') as pdf:
+            pdf.savefig(fig)
+            pdf.savefig(fig2)
 
 @profile
 def correlation(interval_shell,galaxies):
     galaxies = [(galaxies[a],galaxies[b]) for a,b in interval_shell]
-    raw_correlations = list(itertools.starmap(single_correlation,galaxies))
-    oned = [elem[1] for elem in raw_correlations]
-    twod = [elem[3] for elem in raw_correlations]
-    psione = sum([elem[0] for elem in raw_correlations])/sum(oned)
-    psitwo = sum([elem[2] for elem in raw_correlations])/sum(twod)
-    a = sum([elem[4] for elem in raw_correlations])/sum([elem[5] for elem in raw_correlations])
+    #"Galaxy 1 VelocitieS"
+    g1vs = np.array([x[0].v for x in galaxies])
+    g2vs = np.array([x[1].v for x in galaxies])
+    g1pos = np.array([(gal[0].x,gal[0].y,gal[0].z) for gal in galaxies])
+    g2pos = np.array([(gal[1].x,gal[1].y,gal[1].z) for gal in galaxies])
+
+    g1dist = np.linalg.norm(g1pos,axis=1)
+    g2dist = np.linalg.norm(g2pos,axis=1)
+
+    #Normalized galaxy position vectors
+    #The extra [:,None] is there to make the denominator axis correct. See
+    #http://stackoverflow.com/questions/19602187/numpy-divide-each-row-by-a-vector-element
+    g1norm = g1pos/g1dist[:,None] 
+    g2norm = g2pos/g2dist[:,None]
+    
+    distBetweenG1G2 = np.linalg.norm(g2pos-g1pos,axis=1)
+    r = g2pos-g1pos / distBetweenG1G2[:,None]
+
+    cosdTheta = inner1d(g1norm,g2norm)
+    cosTheta1 = inner1d(r,g1norm)
+    cosTheta2 = inner1d(r,g2norm)
+
+    psiOneNum = psiOneNumerator(g1vs,g2vs,cosdTheta).sum()
+    psiOneDen = psiOneDenominator(cosdTheta).sum()
+    psiTwoNum = psiTwoNumerator(g1vs,g2vs,cosTheta1,cosTheta2).sum()
+    psiTwoDen = psiTwoDenominator(cosTheta1,cosTheta2,cosdTheta).sum()
+    aNum = aNumerator(cosdTheta,g1dist,g2dist,distBetweenG1G2).sum()
+    aDen = aDenominator(cosdTheta,distBetweenG1G2).sum()
+    
+    psione = psiOneNum/psiOneDen
+    psitwo = psiTwoNum/psiTwoDen
+    a = aNum/aDen
     return (psione,psitwo,a)
 
-@profile
-def single_correlation(galaxy1,galaxy2):
-    rv1 = galaxy1.v
-    rv2 = galaxy2.v
+# @profile
+# def single_correlation(galaxy1,galaxy2):
+#     rv1 = galaxy1.v
+#     rv2 = galaxy2.v
     
-    g1pos =np.array((galaxy1.x,galaxy1.y,galaxy1.z))
-    g2pos =np.array((galaxy2.x,galaxy2.y,galaxy2.z))
-    g1dist = length(g1pos)
-    g2dist = length(g2pos)
+#     g1pos =np.array((galaxy1.x,galaxy1.y,galaxy1.z))
+#     g2pos =np.array((galaxy2.x,galaxy2.y,galaxy2.z))
+#     g1dist = length(g1pos)
+#     g2dist = length(g2pos)
     
-    cosdTheta = np.dot(g1pos/g1dist,g2pos/g2dist)
+#     cosdTheta = np.dot(g1pos/g1dist,g2pos/g2dist)
 
-    distBetweenG1G2 =length(g2pos-g1pos)
-    r = (g2pos-g1pos) / distBetweenG1G2
+#     distBetweenG1G2 =length(g2pos-g1pos)
+#     r = (g2pos-g1pos) / distBetweenG1G2
 
-    costheta1 = np.inner(r,g1pos/g1dist)
-    costheta2 = np.inner(r,g2pos/g2dist)
-    psiOneNum = psiOneNumerator(rv1,rv2,cosdTheta)
-    psiOneDen = psiOneDenominator(cosdTheta)
-    psiTwoNum = psiTwoNumerator(rv1,rv2,costheta1,costheta2)
-    psiTwoDen = psiTwoDenominator(costheta1,costheta2,cosdTheta)
-    aNum = aNumerator(cosdTheta,g1dist,g2dist,distBetweenG1G2)
-    aDen = aDenominator(cosdTheta,distBetweenG1G2)
-    return (psiOneNum,psiOneDen,psiTwoNum,psiTwoDen,aNum,aDen)
+#     costheta1 = np.inner(r,g1pos/g1dist)
+#     costheta2 = np.inner(r,g2pos/g2dist)
+#     psiOneNum = psiOneNumerator(rv1,rv2,cosdTheta)
+#     psiOneDen = psiOneDenominator(cosdTheta)
+#     psiTwoNum = psiTwoNumerator(rv1,rv2,costheta1,costheta2)
+#     psiTwoDen = psiTwoDenominator(costheta1,costheta2,cosdTheta)
+#     aNum = aNumerator(cosdTheta,g1dist,g2dist,distBetweenG1G2)
+#     aDen = aDenominator(cosdTheta,distBetweenG1G2)
+#     return (psiOneNum,psiOneDen,psiTwoNum,psiTwoDen,aNum,aDen)
 
 def aNumerator(cosdTheta,g1d,g2d,r):
     return (g1d*g2d*(cosdTheta-1)+(r**2)*cosdTheta)*cosdTheta
