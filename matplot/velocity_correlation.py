@@ -27,7 +27,7 @@ def psiTwoNumerator(rv1,rv2,costheta1,costheta2):
 def psiTwoDenominator(costheta1,costheta2,cosdTheta):
     return costheta1*costheta2*cosdTheta
 
-@profile
+#@profile
 def main(args):
     """
     Grab the CF2 file, chug it into cartesian (automatically done in common.py now!), plug into cKDTree, grab pairs
@@ -82,7 +82,7 @@ def main(args):
 
         pylab.show()
 
-@profile
+#@profile
 def correlation(interval_shell,galaxies):
     galaxies = [(galaxies[a],galaxies[b]) for a,b in interval_shell]
     raw_correlations = list(itertools.starmap(single_correlation,galaxies))
@@ -93,7 +93,7 @@ def correlation(interval_shell,galaxies):
     a = sum([elem[4] for elem in raw_correlations])/sum([elem[5] for elem in raw_correlations])
     return (psione,psitwo,a)
 
-@profile
+#@profile
 def single_correlation(galaxy1,galaxy2):
     rv1 = galaxy1.v
     rv2 = galaxy2.v
