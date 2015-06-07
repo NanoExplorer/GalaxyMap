@@ -108,7 +108,7 @@ def correlation(interval_shell,galaxies):
     g2norm = g2pos/g2dist[:,None]
     
     distBetweenG1G2 = np.linalg.norm(g2pos-g1pos,axis=1)
-    r = g2pos-g1pos / distBetweenG1G2[:,None]
+    r = (g2pos-g1pos) / distBetweenG1G2[:,None]
 
     cosdTheta = inner1d(g1norm,g2norm)
     cosTheta1 = inner1d(r,g1norm)
