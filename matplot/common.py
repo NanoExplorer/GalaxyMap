@@ -353,7 +353,7 @@ class CF2:
         self.dv = data[3]
         self.lon = data[4]
         self.lat = data[5]
-        self.doc = {"cz": "Unknown. Has units km/sec.",
+        self.doc = {"cz": "Redshift. Has units km/sec.",
                     "d": "Distance. Has units Mpc/h.",
                     "v": "Peculiar (radial) velocity in km/sec.",
                     "dv": "Error in peculiar velocity. Units: km/sec.",
