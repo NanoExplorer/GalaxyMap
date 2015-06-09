@@ -51,6 +51,7 @@
         "min_r": 1,
         "num_files": 1,
         "numpoints": 10,
+	"offset": 0,
         "output_data_folder": "output/",
         "step_size": 1,
         "step_type": "log|lin"
