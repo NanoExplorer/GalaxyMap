@@ -9,11 +9,12 @@ import matplotlib.backends.backend_pdf as pdfback
 from numpy.core.umath_tests import inner1d #Note: this function has no documentation and could easily be deprecated.
 #if that happens, you can always use the syntax (a*b).sum(axis=1), which is ever so slightly slower and much more
 #ugly.
-#emergency abort function:
+#Alternate definition:
 # def inner1d(a,b):
 #     return (a*b).sum(axis=1)
 
 def length(a):
+    #Deprecated in favor of using numpy arrays for everything
     return math.sqrt(a[0]**2+a[1]**2+a[2]**2)
 
 def psiOneNumerator(rv1, rv2, cosdTheta):
@@ -34,10 +35,9 @@ def psiTwoDenominator(costheta1,costheta2,cosdTheta):
 
 #@profile
 def main(args):
+    """ Compute the velocity correlations on one or many galaxy surveys. 
     """
-    Grab the CF2 file, chug it into cartesian (automatically done in common.py now!), plug into cKDTree, grab pairs
-    plug information about pairs into psi functions, sum them, return values.
-    """
+    #Get setup information from the settings file
     settings = common.getdict(args.settings)
     numpoints = settings["numpoints"]
     dr =        settings["dr"]
@@ -49,26 +49,39 @@ def main(args):
     rawInFile = settings["input_file"]
     pool = Pool()
     if settings["many"]:
+        #If there are lots of files, set them up accordingly.
         inFileList = [rawInFile.format(x+settings['offset']) for x in range(settings["num_files"])]
     else:
         inFileList = [rawInFile]
     for n,infile in enumerate(inFileList):
+        #Load the survey
         galaxies = common.loadData(infile, dataType = "CF2")
+        
+        #Make an array of just the x,y,z coordinate and radial component of peculiar velocity (v)
         galaxyXYZV = np.array([(a.x,a.y,a.z,a.v) for a in galaxies])
+        
+        #Generate bins (format: [left, right, left, right...], where left is the left edge of a bin and right is the right
+        #edge of it.
         xs,intervals = common.intervals(min_r,step_size,numpoints,dr,step_type)
+        
+        #Put just the galaxy positions into one array
         positions = galaxyXYZV[:,0:3] # [(x,y,z),...]
 
         interval_shells = [(intervals[i+1],intervals[i]) for i in range(0,len(intervals),2)]
+        
+        #Get the galaxy pairs in each bin
         raw_pair_sets = list(itertools.starmap(kd_query,zip(itertools.repeat(positions),
                                                        interval_shells)))
-
-
+        #Calculate the actual correlations
         psi = list(itertools.starmap(correlation,zip(raw_pair_sets,
                                                      itertools.repeat(galaxyXYZV))))
+                                                     
+        #Divide by 10^4 as per the convention in Borgani
         psione = [a[0]/10**4 for a in psi]
         psitwo = [a[1]/10**4 for a in psi]
         a = [a[2] for a in psi]
-
+        
+        #Write the data to a file for use by the 'stats' method
         common.writedict(outfolder+outfile.format(n+settings['offset'])+'_rawdata.json',{'psione':psione,
                                                                                          'psitwo':psitwo,
                                                                                          'a':a,
@@ -79,7 +92,7 @@ def main(args):
 #@profile
 def correlation(interval_shell,galaxies):
     # galaxies = [(galaxies[a],galaxies[b]) for a,b in interval_shell] 
-    galaxyPairs = np.array(list(interval_shell))
+    galaxyPairs = np.array(list(interval_shell)) #This line takes more time than all the others in this method combined...
     lGalaxies = galaxies[galaxyPairs[:,0]]
     rGalaxies = galaxies[galaxyPairs[:,1]]
 
@@ -89,6 +102,7 @@ def correlation(interval_shell,galaxies):
     g1pos = lGalaxies[:,0:3]
     g2pos = rGalaxies[:,0:3]
 
+    #Distances from galaxy to center
     g1dist = np.linalg.norm(g1pos,axis=1)
     g2dist = np.linalg.norm(g2pos,axis=1)
 
@@ -99,6 +113,8 @@ def correlation(interval_shell,galaxies):
     g2norm = g2pos/g2dist[:,None]
     
     distBetweenG1G2 = np.linalg.norm(g2pos-g1pos,axis=1)
+    
+    #r is a unit vector pointing from g2 to g1
     r = (g2pos-g1pos) / distBetweenG1G2[:,None]
 
     cosdTheta = inner1d(g1norm,g2norm)
@@ -117,21 +133,17 @@ def correlation(interval_shell,galaxies):
     a = aNum/aDen
     return (psione,psitwo,a)
 
-# @profile
+# Old abandoned function. Does the same thing as above, but less efficiently
 # def single_correlation(galaxy1,galaxy2):
 #     rv1 = galaxy1.v
 #     rv2 = galaxy2.v
-    
 #     g1pos =np.array((galaxy1.x,galaxy1.y,galaxy1.z))
 #     g2pos =np.array((galaxy2.x,galaxy2.y,galaxy2.z))
 #     g1dist = length(g1pos)
 #     g2dist = length(g2pos)
-    
 #     cosdTheta = np.dot(g1pos/g1dist,g2pos/g2dist)
-
 #     distBetweenG1G2 =length(g2pos-g1pos)
 #     r = (g2pos-g1pos) / distBetweenG1G2
-
 #     costheta1 = np.inner(r,g1pos/g1dist)
 #     costheta2 = np.inner(r,g2pos/g2dist)
 #     psiOneNum = psiOneNumerator(rv1,rv2,cosdTheta)
@@ -150,19 +162,21 @@ def aDenominator(cosdTheta,r):
     
 #@profile
 def kd_query(positions,interval):
+    """Get all pairs of galaxies at distances inside the interval. 
+    interval is a tuple of (upper,lower) bounds for the distance bin.
+    """
     kd = cKDTree(positions)
-    #It's great that you can subtract sets! Subtracting set a from set b removes everything in set a from set b
-    #so if a=[1,2,3,4,5] and b=[2,4,6,8,10], a-b=[1,3,5]
     one = kd.query_pairs(interval[0])
     two = kd.query_pairs(interval[1])
-    one.difference_update(two) # Use this instead of one - two because of time complexity.
+    one.difference_update(two) #Get rid of pairs at separations less than the lower bound
+    # Use this instead of one - two because of time complexity.
     #see: https://wiki.python.org/moin/TimeComplexity
     return one
 
 def stats(args):
-
+    """Make plots of the data output by the main function"""
+    #Get settings
     settings = common.getdict(args.settings)
-    
     outfolder = settings["output_data_folder"]
     outfile   = settings["output_file_name"]
     rawInFile = settings["input_file"]
