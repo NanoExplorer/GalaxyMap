@@ -6,6 +6,7 @@ from multiprocessing import Pool
 import itertools
 import pylab
 import matplotlib.backends.backend_pdf as pdfback
+#import pdb
 from numpy.core.umath_tests import inner1d #Note: this function has no documentation and could easily be deprecated.
 #if that happens, you can always use the syntax (a*b).sum(axis=1), which is ever so slightly slower and much more
 #ugly.
@@ -86,6 +87,7 @@ def main(args):
                                                                                          'psitwo':psitwo,
                                                                                          'a':a,
                                                                                          'xs':xs})
+    stats(args)
 
         
 
@@ -166,12 +168,14 @@ def kd_query(positions,interval):
     interval is a tuple of (upper,lower) bounds for the distance bin.
     """
     kd = cKDTree(positions)
-    one = kd.query_pairs(interval[0])
-    two = kd.query_pairs(interval[1])
-    one.difference_update(two) #Get rid of pairs at separations less than the lower bound
+    upper = kd.query_pairs(interval[0])
+    print(len(upper))
+    lower = kd.query_pairs(interval[1])
+    upper.difference_update(lower) #Get rid of pairs at separations less than the lower bound
     # Use this instead of one - two because of time complexity.
     #see: https://wiki.python.org/moin/TimeComplexity
-    return one
+    
+    return upper
 
 def stats(args):
     """Make plots of the data output by the main function"""
@@ -209,7 +213,7 @@ def stats(args):
         pylab.title("Velocity correlation function")
         pylab.xlabel("Distance, Mpc/h")
         pylab.ylabel("Correlation, $10^4 (km/s)^2$")
-        pylab.axis((0,31,0,70))
+        pylab.axis((0,51,0,70))
         pylab.legend()
 
         with pdfback.PdfPages(outfolder+outfile.format(n+settings['offset'])) as pdf:
