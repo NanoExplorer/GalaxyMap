@@ -34,7 +34,7 @@ def psiTwoNumerator(rv1,rv2,costheta1,costheta2):
 def psiTwoDenominator(costheta1,costheta2,cosdTheta):
     return costheta1*costheta2*cosdTheta
 
-#@profile
+@profile
 def main(args):
     """ Compute the velocity correlations on one or many galaxy surveys. 
     """
@@ -71,10 +71,10 @@ def main(args):
         interval_shells = [(intervals[i+1],intervals[i]) for i in range(0,len(intervals),2)]
         
         #Get the galaxy pairs in each bin
-        raw_pair_sets = list(itertools.starmap(kd_query,zip(itertools.repeat(positions),
+        raw_pair_sets = list(pool.starmap(kd_query,zip(itertools.repeat(positions),
                                                        interval_shells)))
         #Calculate the actual correlations
-        psi = list(itertools.starmap(correlation,zip(raw_pair_sets,
+        psi = list(pool.starmap(correlation,zip(raw_pair_sets,
                                                      itertools.repeat(galaxyXYZV))))
                                                      
         #Divide by 10^4 as per the convention in Borgani
