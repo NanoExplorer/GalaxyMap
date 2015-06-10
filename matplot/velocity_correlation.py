@@ -169,7 +169,6 @@ def kd_query(positions,interval):
     """
     kd = cKDTree(positions)
     upper = kd.query_pairs(interval[0])
-    print(len(upper))
     lower = kd.query_pairs(interval[1])
     upper.difference_update(lower) #Get rid of pairs at separations less than the lower bound
     # Use this instead of one - two because of time complexity.
