@@ -49,7 +49,7 @@ def intervals(min_r,step_size,numpoints,dr,step_type):
     elif step_type == 'log':
         return log_intervals(min_r,step_size,numpoints,dr)
     else:
-        return RuntimeError("Interval type {} not recognized".format(step_type))
+        raise RuntimeError("Interval type {} not recognized".format(step_type))
 
 def lin_intervals(min_r,step_size,numpoints,dr):
     xs = [(min_r+step_size*x) for x in range(numpoints)]
@@ -73,7 +73,24 @@ def log_intervals(min_r,step_size,numpoints,dr):
         intervals.append(x+(dr*((10**(step_size*i))*(10**(step_size)-1))))
     return (xs, intervals)
 
+def genBins(min_r,numpoints,dr,step_type):
+    if step_type == 'lin':
+        return lin_bins(min_r,numpoints,dr)
+    elif step_type == 'log':
+        return log_bins(min_r,numpoints,dr)
+    else:
+        raise RuntimeError("Bin type {} not recognized".format(step_type))
 
+def lin_bins(min_r,numpoints,dr):
+    xs = [min_r + dr*x for x in range(numpoints)]
+    intervals = [(min_r-dr/2)+(dr*x) for x in range(numpoints + 1)]
+    return (xs,intervals)
+    
+def log_bins(min_r,numpoints,dr):
+    xs = [(min_r + 10**(dr*x) - 1) for x in range(numpoints + 1)]
+    intervals = [x-(.5*((10**(dr*i))*(1-10**(-dr)))) for i,x in enumerate(xs)]
+    return(xs,intervals)
+    
 def sphereVol(radius):
     return (4/3)*(np.pi)*(radius**3)
 
@@ -184,6 +201,8 @@ def loadData(filename, dataType = "guess"):
         return _loadCF2Data(filename)
     elif dataType == 'millPos':
         return _loadMillenniumPositionalData(filename)
+    elif dataType == 'millVel':
+        return _loadMillenniumVelocityData(filename)
     elif dataType == 'millRaw':
         return _loadMillenniumRawLines(filename)
 
@@ -227,6 +246,24 @@ def _loadMillenniumRawLines(filename):
                                      #In that case, just skip that row.
                 if valid:
                     csvData.append(line)
+    return csvData
+
+def _loadMillenniumVelocityData(filename):
+    csvData = []
+    with open(filename, "r") as boxfile:
+        for line in boxfile:
+            if line[0]!="#":#comment lines need to be ignored
+                row = line.split(',')
+                csvRow = []
+                valid = True
+                for cell in row[0:6]:
+                    try:
+                        csvRow.append(float(cell))
+                    except ValueError:
+                        valid = False#sometimes the CSV file doesn't contain a number.
+                                     #In that case, just skip that row.
+                if valid:
+                    csvData.append(csvRow)
     return csvData
     
 def _loadMillenniumPositionalData(filename): 

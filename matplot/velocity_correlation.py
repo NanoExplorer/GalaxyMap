@@ -34,8 +34,9 @@ def psiTwoNumerator(rv1,rv2,costheta1,costheta2):
 def psiTwoDenominator(costheta1,costheta2,cosdTheta):
     return costheta1*costheta2*cosdTheta
 
-@profile
+#@profile
 def main(args):
+    np.seterr(divide='ignore',invalid='ignore')
     """ Compute the velocity correlations on one or many galaxy surveys. 
     """
     #Get setup information from the settings file
@@ -43,7 +44,6 @@ def main(args):
     numpoints = settings["numpoints"]
     dr =        settings["dr"]
     min_r =     settings["min_r"]
-    step_size = settings["step_size"]
     outfolder = settings["output_data_folder"]
     outfile   = settings["output_file_name"]
     step_type = settings["step_type"]
@@ -54,47 +54,54 @@ def main(args):
         inFileList = [rawInFile.format(x+settings['offset']) for x in range(settings["num_files"])]
     else:
         inFileList = [rawInFile]
-    for n,infile in enumerate(inFileList):
-        #Load the survey
-        galaxies = common.loadData(infile, dataType = "CF2")
-        
-        #Make an array of just the x,y,z coordinate and radial component of peculiar velocity (v)
-        galaxyXYZV = np.array([(a.x,a.y,a.z,a.v) for a in galaxies])
-        
-        #Generate bins (format: [left, right, left, right...], where left is the left edge of a bin and right is the right
-        #edge of it.
-        xs,intervals = common.intervals(min_r,step_size,numpoints,dr,step_type)
-        
-        #Put just the galaxy positions into one array
-        positions = galaxyXYZV[:,0:3] # [(x,y,z),...]
 
-        interval_shells = [(intervals[i+1],intervals[i]) for i in range(0,len(intervals),2)]
-        
-        #Get the galaxy pairs in each bin
-        raw_pair_sets = list(pool.starmap(kd_query,zip(itertools.repeat(positions),
-                                                       interval_shells)))
-        #Calculate the actual correlations
-        psi = list(pool.starmap(correlation,zip(raw_pair_sets,
-                                                     itertools.repeat(galaxyXYZV))))
-                                                     
-        #Divide by 10^4 as per the convention in Borgani
-        psione = [a[0]/10**4 for a in psi]
-        psitwo = [a[1]/10**4 for a in psi]
-        a = [a[2] for a in psi]
-        
-        #Write the data to a file for use by the 'stats' method
+    xs,intervals = common.genBins(min_r,numpoints,dr,step_type)
+
+    plots = pool.starmap(singlePlot,zip(inFileList,
+                                        itertools.repeat(intervals)))
+    
+    for n,plot in enumerate(plots):
+        psione = [x for x in plot[0]]
+        psitwo = [y for y in plot[1]]
+        a = [z for z in plot[2]]
         common.writedict(outfolder+outfile.format(n+settings['offset'])+'_rawdata.json',{'psione':psione,
                                                                                          'psitwo':psitwo,
                                                                                          'a':a,
                                                                                          'xs':xs})
+        #End for loop
     stats(args)
 
-        
 
 #@profile
-def correlation(interval_shell,galaxies):
+def singlePlot(infile,intervals):
+    #Load the survey
+    galaxies = common.loadData(infile, dataType = "CF2")
+
+    #Make an array of just the x,y,z coordinate and radial component of peculiar velocity (v)
+    galaxyXYZV = np.array([(a.x,a.y,a.z,a.v) for a in galaxies])
+
+    #Put just the galaxy positions into one array
+    positions = galaxyXYZV[:,0:3] # [(x,y,z),...]
+
+    kd = cKDTree(positions)
+    #Get the galaxy pairs in each bin
+    pairs = kd.query_pairs(max(intervals))
+    #list(pool.starmap(kd_query,zip(itertools.repeat(positions),
+             #                                      interval_shells)))
+    #Calculate the actual correlations
+    psiOne,psiTwo,a = correlation(pairs,galaxyXYZV,intervals)
+
+    #Divide by 10^4 as per the convention in Borgani
+    psione = psiOne / 10**4
+    psitwo = psiTwo / 10**4
+
+    #Write the data to a file for use by the 'stats' method
+    return (psione,psitwo,a)
+
+#@profile
+def correlation(pairs,galaxies,intervals):
     # galaxies = [(galaxies[a],galaxies[b]) for a,b in interval_shell] 
-    galaxyPairs = np.array(list(interval_shell)) #This line takes more time than all the others in this method combined...
+    galaxyPairs = np.array(list(pairs)) #This line takes more time than all the others in this method combined...
     lGalaxies = galaxies[galaxyPairs[:,0]]
     rGalaxies = galaxies[galaxyPairs[:,1]]
 
@@ -122,13 +129,23 @@ def correlation(interval_shell,galaxies):
     cosdTheta = inner1d(g1norm,g2norm)
     cosTheta1 = inner1d(r,g1norm)
     cosTheta2 = inner1d(r,g2norm)
-    
-    psiOneNum = psiOneNumerator(g1vs,g2vs,cosdTheta).sum()
-    psiOneDen = psiOneDenominator(cosdTheta).sum()
-    psiTwoNum = psiTwoNumerator(g1vs,g2vs,cosTheta1,cosTheta2).sum()
-    psiTwoDen = psiTwoDenominator(cosTheta1,cosTheta2,cosdTheta).sum()
-    aNum = aNumerator(cosdTheta,g1dist,g2dist,distBetweenG1G2).sum()
-    aDen = aDenominator(cosdTheta,distBetweenG1G2).sum()
+
+    #The 'ind' stands for individual
+    indPsiOneNum = psiOneNumerator(g1vs,g2vs,cosdTheta)
+    indPsiOneDen = psiOneDenominator(cosdTheta)
+    indPsiTwoNum = psiTwoNumerator(g1vs,g2vs,cosTheta1,cosTheta2)
+    indPsiTwoDen = psiTwoDenominator(cosTheta1,cosTheta2,cosdTheta)
+    indANum = aNumerator(cosdTheta,g1dist,g2dist,distBetweenG1G2)
+    indADen = aDenominator(cosdTheta,distBetweenG1G2)
+
+    #The numpy histogram function returns a tuple of (stuff we want, the bins)
+    #Since we already know the bins, we throw them out by taking the [0] element of the tuple.
+    psiOneNum = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiOneNum)[0]
+    psiOneDen = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiOneDen)[0]
+    psiTwoNum = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiTwoNum)[0]
+    psiTwoDen = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiTwoDen)[0]
+    aNum      = np.histogram(distBetweenG1G2,bins = intervals,weights = indANum)[0]
+    aDen      = np.histogram(distBetweenG1G2,bins = intervals,weights = indADen)[0]
     
     psione = psiOneNum/psiOneDen
     psitwo = psiTwoNum/psiTwoDen
@@ -176,6 +193,7 @@ def kd_query(positions,interval):
     
     return upper
 
+#@profile
 def stats(args):
     """Make plots of the data output by the main function"""
     #Get settings
@@ -212,11 +230,11 @@ def stats(args):
         pylab.title("Velocity correlation function")
         pylab.xlabel("Distance, Mpc/h")
         pylab.ylabel("Correlation, $10^4 (km/s)^2$")
-        pylab.axis((0,51,0,70))
+        pylab.axis((0,31,0,32))
         pylab.legend()
 
         with pdfback.PdfPages(outfolder+outfile.format(n+settings['offset'])) as pdf:
-            pdf.savefig(fig)
+            #pdf.savefig(fig)
             pdf.savefig(fig2)
         pylab.close('all')
 
