@@ -8,6 +8,7 @@ import surveytranspose
 import surveystats
 import jackknife
 import velocity_correlation
+import rawvcorr
 
 def main():
     #Handle command line arguments
@@ -53,6 +54,9 @@ def main():
     parser_velocity.add_argument("settings",help='JSON file to read settings from.',type=str)
     parser_velocity.set_defaults(func=velocity_correlation.main)
 
+    add_parser(subparsers, 'rawvcorr', 'Computes the velocity correlations using full 3-dimensional velocities',
+               [['settings']], ['The settings json file'], [str], rawvcorr.main)
+
     args = parser.parse_args()
 
     function = None
@@ -66,7 +70,11 @@ def main():
 
 
 
-
+def add_parser(subparser, moduleName, moduleHelp, argumentsList, argumentsHelpList, argumentsTypeList, defaultFunc):
+    theParser = subparser.add_parser(moduleName, help = moduleHelp)
+    for argument,theHelp,theType in zip(argumentsList, argumentsHelpList, argumentsTypeList):
+        theParser.add_argument(*argument, help = theHelp, type = theType)
+    theParser.set_defaults(func=defaultFunc)
 
 
 

@@ -1,33 +1,6 @@
 """
 This file contains common functions used by my millenium programs. It contains mostly housekeeping functions
-like loading files and outputting data.
-
-Function reference:
-    sphereVol(radius):
-        returns the volume of the sphere
-    shellVolCenter(r, thickness):
-        returns the volume of a shell centered on radius r with a certain thickness
-    shellVol(r1,r2)
-        returns the volume of a shell with defined inner and outer radii
-    getdict(filename)
-        Gets json settings stored in the filename, parses them and returns them as a python dictionary
-    gensettings(args)
-        takes an args paramater from argparse (assumed to have a  and writes a sample settings json file
-        to settings.json in the current folder.
-    loadCSVData(filename)
-        Loads galaxy coordinates from a CSV file.
-        Returns (xs, ys, zs) as a tuple
-    makeplot(xs,ys,title,xl,yl)
-        Deprecated
-        makes a matplotlib plot with the given X values, Y values, title, x label and y label.
-    makeplotWithErrors
-        Deprecated. 
-    writecsv(xslist,yslist)
-        Deprecated
-        Writes a csv file with alternating X and Y columns, where x is a list of lists of x coordinates
-        and yslist is a list of lists of y coordinates.
-    See docstrings for more information
-
+like loading files and outputting 
 """
 import matplotlib
 matplotlib.use("TkAgg")
@@ -40,9 +13,21 @@ import math
 import scipy.spatial as space
 import random
 
+def parseCmdArgs(argumentList,helpList,typeList):
+    """Parses command-line arguments. Useful for moving away from the galaxy.py universal interface
+    because it takes so much time to start up, and has to import everything. 
+    """
+    parser = argparse.ArgumentParser()
+    for argument,theHelp,theType in zip(argumentList,helpList,typeList):
+        parser.add_argument(*argument,help=theHelp,type=theType)
+    return parser.parse_args()
+
+
 def intervals(min_r,step_size,numpoints,dr,step_type):
     """
     returns xs, intervals where xs are the center points, intervals are the 'bin edges'
+    In theory, this lets me make lots of mistakes, and it is currently preferred that you use
+    the genBins function below instead.
     """
     if step_type == 'lin':
         return lin_intervals(min_r,step_size,numpoints,dr)
@@ -52,6 +37,7 @@ def intervals(min_r,step_size,numpoints,dr,step_type):
         raise RuntimeError("Interval type {} not recognized".format(step_type))
 
 def lin_intervals(min_r,step_size,numpoints,dr):
+    """Generates linearly-spaced intervals, and their center points."""
     xs = [(min_r+step_size*x) for x in range(numpoints)]
     intervals = []
     for x in xs:
@@ -60,7 +46,7 @@ def lin_intervals(min_r,step_size,numpoints,dr):
     return (xs, intervals)
     
 def log_intervals(min_r,step_size,numpoints,dr):
-    """
+    """Generates logarithmically spaced intervals and their center points
     dr is a measure of the size of each interval, as a percentage of the distance between the previous and
     next interval edges. if dr is .5 then exactly all of the range will be covered with zero overlap.
     """
@@ -74,6 +60,8 @@ def log_intervals(min_r,step_size,numpoints,dr):
     return (xs, intervals)
 
 def genBins(min_r,numpoints,dr,step_type):
+    """Generates bins that are compatible with sci- and num-py histogram functions.
+    """
     if step_type == 'lin':
         return lin_bins(min_r,numpoints,dr)
     elif step_type == 'log':
@@ -82,28 +70,37 @@ def genBins(min_r,numpoints,dr,step_type):
         raise RuntimeError("Bin type {} not recognized".format(step_type))
 
 def lin_bins(min_r,numpoints,dr):
+    """Generates linearly-spaced bins that can be used with histogram functions."""
     xs = [min_r + dr*x for x in range(numpoints)]
     intervals = [(min_r-dr/2)+(dr*x) for x in range(numpoints + 1)]
     return (xs,intervals)
     
 def log_bins(min_r,numpoints,dr):
+    """Generates logarithmically spaced bins that can be used with histogram functions."""
     xs = [(min_r + 10**(dr*x) - 1) for x in range(numpoints + 1)]
     intervals = [x-(.5*((10**(dr*i))*(1-10**(-dr)))) for i,x in enumerate(xs)]
     return(xs,intervals)
     
 def sphereVol(radius):
+    """Returns the volume of sphere"""
     return (4/3)*(np.pi)*(radius**3)
 
 def shellVolCenter(r, thickness):
+    """Returns the volume of a shell centered on radius r, with specified thickness."""
     dr = thickness/2
     left = r-dr
     right = r+dr
     return shellVol(left,right)
         
 def shellVol(r1,r2):
+    """Returns the volume of a shell with inner edge r1 and outer edge r2"""
     return abs(sphereVol(r1)-sphereVol(r2))
 
 def gensettings(args):
+    """Makes a sample settings file called settings_<MODULENAME>.json
+    The sample settings file contains the settings information from that module contained in the
+    template_settings.json file.
+    """
     module = args.module
     filename = "settings_{}.json".format(module)
     template = getdict("template_settings.json")
@@ -118,6 +115,10 @@ def gensettings(args):
     exit()
 
 def writedict(filename, dictionary):
+    """Given a filename and a dictionary (or list...), writes the dictionary to file as json.
+    The dictionary can then be retrieved with the getdict function below.
+    Setting pretty to false can make the file considerably smaller, at the cost of being almost unintelligable.
+    """
     with open(filename,'w') as jsonfile:
         jsonfile.write(json.dumps(dictionary,
                                   sort_keys=True,
@@ -126,6 +127,8 @@ def writedict(filename, dictionary):
 
 
 def getdict(filename):
+    """Given the name of a json file, reads the file in and returns the object it contains
+    """
     jsondict = None
     with open(filename,'r') as settings:
         jsondict = json.loads(settings.read())
@@ -135,6 +138,7 @@ def getdict(filename):
 
 
 def makeplot(xs,ys,title,xl,yl):
+    """DEPRECATED. Avoid if possible."""
     fig = plt.figure(figsize=(4,3),dpi=100)
     ax = fig.add_subplot(111)
     ax.loglog(xs,ys,'o')
@@ -144,6 +148,7 @@ def makeplot(xs,ys,title,xl,yl):
     plt.show()
 
 def makeplotWithErrors(data,title,xl,yl):
+    """DEPRECATED. Avoid if possible."""
     fig = plt.figure(figsize=(4,3),dpi=100)
     ax = fig.add_subplot(111)
     ax.set_xscale("log", nonposx='clip')
@@ -331,10 +336,9 @@ def _loadCSVData(filename):
 
 def _loadDATData(filename):
     """
-        Loads galaxy data from a DAT file. Assumes that the data is in the same format that my dat box was in,
-        that is that X, Y, and Z are in columns 0, 1, and 2 respectively.
-        """
-#    print("Loading Coordinates...")
+    Loads galaxy data from a DAT file. Assumes that the data is in the same format that my dat box was in,
+    that is that X, Y, and Z are in columns 0, 1, and 2 respectively.
+    """
 
     xs = []#list of x coordinates of galaxies. The coordinates of galaxy zero are (xs[0],ys[0],zs[0])
     ys = []
@@ -370,6 +374,7 @@ def _loadCF2Data(filename):
     return galaxies
 
 def writecsv(xslist,yslist):
+    """Deprecated. I remember that this function is mostly useless, but I don't remember exactly what it does."""
     assert(len(xslist)==len(yslist))
     with open("./out2.csv",'w') as csv:
         for row in range(len(xslist[0])):
@@ -466,6 +471,10 @@ class MillenniumFiles:
         return spatialInfo[index]
 
     def getARandomGalaxy(self):
+        """Gets a random galaxy from the simulation. The randomness is not quite distributed properly -
+        to fix, the getARandomBox function should choose weighted random based on the number of galaxies in each box.
+        right now, galaxies in more sparsely populated boxes are slightly more likely to be chosen
+        """
         box = self.getARandomBox()
         #Waterman's reservoir algorithm from Knuth's Art of Computer Programming and
         #http://stackoverflow.com/questions/3540288/how-do-i-read-a-random-line-from-one-file-in-python
@@ -481,6 +490,7 @@ class MillenniumFiles:
         return MillenniumGalaxy(line) # If this fails, that means a comment line probably slipped by somehow.
         
     def getARandomBox(self):
+        """NOT A WEIGHTED RANDOM"""
         return random.choice(self.files)
             
     def getBox(self,r):
@@ -499,8 +509,8 @@ class MillenniumFiles:
 
     def getAllPositions(self):
         """
-        WARNING: This function may be subject to large amounts of memory usage.
-        Use with caution.
+        WARNING: This function may be subject to large amounts of memory usage and loading time.
+        Use with caution and discretion.
         """
         positionList = []
         for box in self.files:

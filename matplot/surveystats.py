@@ -3,11 +3,13 @@ import numpy as np
 import scipy.optimize as optimize
 import pylab
 import matplotlib.backends.backend_pdf as pdfback
-np.seterr(all='raise')
-#When having problems with dividing by zero, we can debug more easily by having execution
-#stop completely when we encounter one, instead of continuing on with only a warning
 
 def statsrun(args):
+
+    #When having problems with dividing by zero, we can debug more easily by having execution
+    #stop completely when we encounter one, instead of continuing on with only a warning
+
+    np.seterr(all='raise')
     all_settings = common.getdict(args.settings)
     binsize = int(all_settings["binsize"])
     outputFile = all_settings["output_filename"]
