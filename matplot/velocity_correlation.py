@@ -1,7 +1,6 @@
 import common
 from scipy.spatial import cKDTree
 import numpy as np
-import math
 from multiprocessing import Pool
 import itertools
 import pylab
@@ -13,26 +12,6 @@ from numpy.core.umath_tests import inner1d #Note: this function has no documenta
 #Alternate definition:
 # def inner1d(a,b):
 #     return (a*b).sum(axis=1)
-
-def length(a):
-    #Deprecated in favor of using numpy arrays for everything
-    return math.sqrt(a[0]**2+a[1]**2+a[2]**2)
-
-def psiOneNumerator(rv1, rv2, cosdTheta):
-    """
-    Calculates \psi 1's numerator as defined in the Gorski paper
-    This is one iteration. So call this function a billion times then add up all the results.
-    """
-    return rv1*rv2*cosdTheta
-
-def psiOneDenominator(cosdTheta):
-    return (cosdTheta)**2
-
-def psiTwoNumerator(rv1,rv2,costheta1,costheta2):
-    return rv1*rv2*costheta1*costheta2
-
-def psiTwoDenominator(costheta1,costheta2,cosdTheta):
-    return costheta1*costheta2*cosdTheta
 
 #@profile
 def main(args):
@@ -64,12 +43,21 @@ def main(args):
         psione = [x for x in plot[0]]
         psitwo = [y for y in plot[1]]
         a = [z for z in plot[2]]
+        b = [dataPoint for dataPoint in plot[3]]
+        af = [thing for thing in plot[4]]
         common.writedict(outfolder+outfile.format(n+settings['offset'])+'_rawdata.json',{'psione':psione,
                                                                                          'psitwo':psitwo,
                                                                                          'a':a,
-                                                                                         'xs':xs})
+                                                                                         'b':b,
+                                                                                         'xs':xs,
+                                                                                         'af':af
+                                                                                     })
+        np.save(outfolder+outfile.format(n+settings['offset'])+'_rawdata.npy',np.array([psione,psitwo,a,b,af]))
         #End for loop
-    stats(args)
+    if not hasattr(args,'plot'):
+        #This function was called by the galaxy.py interface, and we should plot.
+        #If the attribute exists, then the if __name__=='__main__': thingy will take care of everything.
+        stats(args)
 
 
 #@profile
@@ -89,14 +77,17 @@ def singlePlot(infile,intervals):
     #list(pool.starmap(kd_query,zip(itertools.repeat(positions),
              #                                      interval_shells)))
     #Calculate the actual correlations
-    psiOne,psiTwo,a = correlation(pairs,galaxyXYZV,intervals)
 
-    #Divide by 10^4 as per the convention in Borgani
-    psione = psiOne / 10**4
-    psitwo = psiTwo / 10**4
+    #Find zero-distance pairs
+    removePairs = kd.query_pairs(np.finfo(float).eps)
+    pairs.difference_update(removePairs)
+    try:
+        thingy = correlation(pairs,galaxyXYZV,intervals)
+    except RuntimeError:
+        print("Runtime Error encountered at {}.".format(infile))
+        raise
+    return thingy
 
-    #Write the data to a file for use by the 'stats' method
-    return (psione,psitwo,a)
 
 #@profile
 def correlation(pairs,galaxies,intervals):
@@ -137,6 +128,10 @@ def correlation(pairs,galaxies,intervals):
     indPsiTwoDen = psiTwoDenominator(cosTheta1,cosTheta2,cosdTheta)
     indANum = aNumerator(cosdTheta,g1dist,g2dist,distBetweenG1G2)
     indADen = aDenominator(cosdTheta,distBetweenG1G2)
+    indAFeldmanNum = aFeldmanNumerator(cosTheta1,cosTheta2,cosdTheta)
+    indAFeldmanDen = aFeldmanDenominator(cosdTheta)
+    indBNum = bNumerator(cosTheta1,cosTheta2)
+    indBDen = bDenominator(cosTheta1,cosTheta2,cosdTheta)
 
     #The numpy histogram function returns a tuple of (stuff we want, the bins)
     #Since we already know the bins, we throw them out by taking the [0] element of the tuple.
@@ -146,11 +141,48 @@ def correlation(pairs,galaxies,intervals):
     psiTwoDen = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiTwoDen)[0]
     aNum      = np.histogram(distBetweenG1G2,bins = intervals,weights = indANum)[0]
     aDen      = np.histogram(distBetweenG1G2,bins = intervals,weights = indADen)[0]
+    afNum     = np.histogram(distBetweenG1G2,bins = intervals,weights = indAFeldmanNum)[0]
+    afDen     = np.histogram(distBetweenG1G2,bins = intervals,weights = indAFeldmanDen)[0]
+    bNum      = np.histogram(distBetweenG1G2,bins = intervals,weights = indBNum)[0]
+    bDen      = np.histogram(distBetweenG1G2,bins = intervals,weights = indBDen)[0]
     
     psione = psiOneNum/psiOneDen
     psitwo = psiTwoNum/psiTwoDen
     a = aNum/aDen
-    return (psione,psitwo,a)
+    b = bNum/bDen
+    af = afNum/afDen
+    for i,num in enumerate(distBetweenG1G2):
+        if abs(num) < 0.0000001:
+            print('********** BEGIN UH-OH REPORT *********** ')
+            print(galaxyPairs[i])
+            print(lGalaxies[i])
+            print(rGalaxies[i])
+            print('********** END UH-OH REPORT ************* ')
+            raise RuntimeError("TESTING and trapping nans")
+            
+            
+    if np.isnan(np.sum(psione)):
+        #if there is a nan in the array, the sum of the array will be nan as well.
+        print('psi 1 is NaN')
+        print(np.isnan(np.sum(indPsiOneNum)))
+        print(np.isnan(np.sum(indPsiOneDen)))
+    if np.isnan(np.sum(psitwo)):
+        print('psi 2 is NaN')
+        print(np.isnan(np.sum(indPsiTwoNum)))
+        print(np.isnan(np.sum(indPsiTwoDen)))
+    if np.isnan(np.sum(a)):
+        print('a is NaN')
+        print(np.isnan(np.sum(indANum)))
+        print(np.isnan(np.sum(indADen)))
+    if np.isnan(np.sum(b)):
+        print('b is NaN')
+        print(np.isnan(np.sum(indBNum)))
+        print(np.isnan(np.sum(indBDen)))
+    if np.isnan(np.sum(af)):
+        print('a feldman is NaN')
+        print(np.isnan(np.sum(indAFeldmanNum)))
+        print(np.isnan(np.sum(indAFeldmanDen)))
+    return (psione,psitwo,a,b,af)
 
 # Old abandoned function. Does the same thing as above, but less efficiently
 # def single_correlation(galaxy1,galaxy2):
@@ -173,25 +205,54 @@ def correlation(pairs,galaxies,intervals):
 #     aDen = aDenominator(cosdTheta,distBetweenG1G2)
 #     return (psiOneNum,psiOneDen,psiTwoNum,psiTwoDen,aNum,aDen)
 
+def psiOneNumerator(rv1, rv2, cosdTheta):
+    """
+    Calculates \psi 1's numerator as defined in the Gorski paper
+    This is one iteration. So call this function a billion times then add up all the results.
+    Or, call this function once using numPy arrays!
+    """
+    return rv1*rv2*cosdTheta
+
+def psiOneDenominator(cosdTheta):
+    return (cosdTheta)**2
+
+def psiTwoNumerator(rv1,rv2,costheta1,costheta2):
+    return rv1*rv2*costheta1*costheta2
+
+def psiTwoDenominator(costheta1,costheta2,cosdTheta):
+    return costheta1*costheta2*cosdTheta
+
 def aNumerator(cosdTheta,g1d,g2d,r):
     return (g1d*g2d*(cosdTheta-1)+(r**2)*cosdTheta)*cosdTheta
 
 def aDenominator(cosdTheta,r):
     return (cosdTheta**2)*(r**2)
+
+def aFeldmanNumerator(costheta1,costheta2,cosdTheta):
+    return costheta1*costheta2*cosdTheta
+
+def aFeldmanDenominator(cosdTheta):
+    return cosdTheta**2
+
+def bNumerator(costheta1,costheta2):
+    return (costheta1**2)*(costheta2**2)
+    
+def bDenominator(costheta1,costheta2,cosdTheta):
+    return costheta1*costheta2*cosdTheta
     
 #@profile
-def kd_query(positions,interval):
-    """Get all pairs of galaxies at distances inside the interval. 
-    interval is a tuple of (upper,lower) bounds for the distance bin.
-    """
-    kd = cKDTree(positions)
-    upper = kd.query_pairs(interval[0])
-    lower = kd.query_pairs(interval[1])
-    upper.difference_update(lower) #Get rid of pairs at separations less than the lower bound
-    # Use this instead of one - two because of time complexity.
-    #see: https://wiki.python.org/moin/TimeComplexity
+# def kd_query(positions,interval):
+#     """Get all pairs of galaxies at distances inside the interval. 
+#     interval is a tuple of (upper,lower) bounds for the distance bin.
+#     """
+#     kd = cKDTree(positions)
+#     upper = kd.query_pairs(interval[0])
+#     lower = kd.query_pairs(interval[1])
+#     upper.difference_update(lower) #Get rid of pairs at separations less than the lower bound
+#     # Use this instead of one - two because of time complexity.
+#     #see: https://wiki.python.org/moin/TimeComplexity
     
-    return upper
+#     return upper
 
 #@profile
 def stats(args):
@@ -200,7 +261,7 @@ def stats(args):
     settings = common.getdict(args.settings)
     outfolder = settings["output_data_folder"]
     outfile   = settings["output_file_name"]
-    rawInFile = settings["input_file"]
+    #XSrawInFile = settings["input_file"]
     
     if settings["many"]:
         inFileList = [outfolder+outfile.format(x+settings['offset'])+'_rawdata.json' for x in range(settings["num_files"])]
@@ -211,17 +272,22 @@ def stats(args):
         data = common.getdict(infile)
         xs = data['xs']
         a = data['a']
-        psione = data['psione']
-        psitwo = data['psitwo']
+        b = data['b']
+        af = [x + .3 for x in data['af']]
+        psione = [x/10**4 for x in data['psione']]
+        psitwo = [x/10**4 for x in data['psitwo']]
+        
 
         fig = pylab.figure()
         pylab.plot(xs,a,'-',label="$\cal A$")
+        pylab.plot(xs,b,'k--',label="$\cal B$")
+        pylab.plot(xs,af,'-',label="$\cal A$ (alternate)")
         pylab.title("Moment of the selection function")
         pylab.ylabel("$\cal A$")
         pylab.xlabel("Distance, Mpc/h")
         #pylab.yscale('log')
         #pylab.xscale('log')
-        pylab.axis((0,31,.62,.815))
+        #pylab.axis((0,31,.62,.815))
         pylab.legend()
 
         fig2 = pylab.figure()
@@ -230,30 +296,22 @@ def stats(args):
         pylab.title("Velocity correlation function")
         pylab.xlabel("Distance, Mpc/h")
         pylab.ylabel("Correlation, $10^4 (km/s)^2$")
-        pylab.axis((0,31,0,32))
+        #pylab.axis((0,31,0,32))
         pylab.legend()
 
         with pdfback.PdfPages(outfolder+outfile.format(n+settings['offset'])) as pdf:
-            #pdf.savefig(fig)
             pdf.savefig(fig2)
+            pdf.savefig(fig)
         pylab.close('all')
 
-class FakeArgs:
-    def __init__(self, filename):
-        self.settings = filename
-
 if __name__ == "__main__":
-    settingsFile = input("Input settings file name: ")
-    print("Input function.")
-    print("1: only computations.")
-    print("2: only plotting.")
-    print("3: compute correlations then plot.")
-    choice = input("Your choice? ")
-    arrrghs = FakeArgs(settingsFile)
-    if choice == '1' or choice == '3':
+    arrrghs = common.parseCmdArgs([['settings'],['-c','--comp'],['-p','--plot']],
+                        ['Settings json file','only do computations, no plotting','only plot, no computations'],
+                                  [str,'bool','bool'])
+    if not arrrghs.plot:
         print("computing...")
         main(arrrghs)
-    if choice == '2' or choice == '3':
+    if not arrrghs.comp:
         print('plotting...')
         stats(arrrghs)
 

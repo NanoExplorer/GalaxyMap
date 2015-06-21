@@ -12,6 +12,7 @@ import os
 import math
 import scipy.spatial as space
 import random
+import argparse
 
 def parseCmdArgs(argumentList,helpList,typeList):
     """Parses command-line arguments. Useful for moving away from the galaxy.py universal interface
@@ -19,7 +20,10 @@ def parseCmdArgs(argumentList,helpList,typeList):
     """
     parser = argparse.ArgumentParser()
     for argument,theHelp,theType in zip(argumentList,helpList,typeList):
-        parser.add_argument(*argument,help=theHelp,type=theType)
+        if theType == 'bool':
+            parser.add_argument(*argument,help=theHelp,action='store_true')
+        else:
+            parser.add_argument(*argument,help=theHelp,type=theType)
     return parser.parse_args()
 
 

@@ -55,7 +55,7 @@ def main(args):
         pylab.plot(xs,average)
         pylab.title('3-D velocity correlation')
         pylab.xlabel('Distance, Mpc/h')
-        pylab.ylabel('correlation')
+        pylab.ylabel('correlation, $10^4 (km/s)^2$')
         pylab.axis((0,31,0,32))
         pylab.show()
         with pdfback.PdfPages(outfolder+outfile.format(index)) as pdf:
