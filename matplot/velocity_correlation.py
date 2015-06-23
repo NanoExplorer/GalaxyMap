@@ -36,8 +36,11 @@ def main(args):
 
     xs,intervals = common.genBins(min_r,numpoints,dr,step_type)
 
-    plots = pool.starmap(singlePlot,zip(inFileList,
+    plots = pool.starmap(singlePlot,zip(inFileList, 
                                         itertools.repeat(intervals)))
+    #NOTE: If this line gives you trouble (e.g. 'pool doesn't have a member called starmap'), just replace
+    #that line with this one:
+    #plots = pool.map(singlePlotStar,zip(inFileList,
     
     for n,plot in enumerate(plots):
         psione = [x for x in plot[0]]
@@ -59,7 +62,9 @@ def main(args):
         #If the attribute exists, then the if __name__=='__main__': thingy will take care of everything.
         stats(args)
 
-
+def singlePlotStar(args):
+    return singlePlot(*args)
+    
 #@profile
 def singlePlot(infile,intervals):
     #Load the survey

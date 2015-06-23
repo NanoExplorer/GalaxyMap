@@ -167,7 +167,12 @@ def selectrun(args):
     #Single-core method for profiling
     start = time.time()
     if USE_GPU:
-        listOfSurveyContents = [surveyOneFile(afile,distanceFile,selectionParams,full_histogram,boxMaxDistance) for afile,distanceFile in zip(files,distanceFiles)]
+        listOfSurveyContents = itertools.starmap(surveyOneFile,zip(files,
+                                                                   distanceFiles,
+                                                                   itertools.repeat(selectionParams),
+                                                                   itertools.repeat(full_histogram),
+                                                                   itertools.repeat(boxMaxDistance)
+                                                               ))
     else:
         listOfSurveyContents = pool.starmap(surveyOneFile,zip(files,
                                                               distanceFiles,
@@ -223,6 +228,7 @@ def distanceOneBox(hugeFile,surveys,outFile):
     np.save(outFile,distances)
     #Write distances to files for later use
     #Also this algorithm seems VERY fast. It also doesn't seem to get slower with more surveys!
+    #Which means that it doesn't get faster with fewer surveys...
     
 
 def surveyBins(distanceFile,binsize,boxMaxDistance):
@@ -258,7 +264,9 @@ def surveyBins(distanceFile,binsize,boxMaxDistance):
 def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram,boxMaxDistance):
     """
     Given the original data, distances, wanted numbers, and other parameters we actually generate the
-    mock surveys. This is currently the biggest bottleneck of the program, but I'm ot entirely sure why.
+    mock surveys. This is currently the biggest bottleneck of the program, but I'm not entirely sure why.
+                  ^ That comment might be outdated. Since I wrote it, I've rearranged the code a lot for
+                  improved efficiency, including using the GPU for some otherwise expensive calculations.
     """
     #Set up variables
     rng = np.random.RandomState() #Make a process-safe random number generator

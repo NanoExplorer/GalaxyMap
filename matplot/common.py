@@ -521,6 +521,12 @@ class MillenniumFiles:
             posList = loadData(box,'millPos')
             positionList += posList
         return positionList
+
+    def readABox(self, filename):
+        return loadData(filename,'millPos')
+
+    def getFiles(self):
+        return self.files
         
         
 class MillenniumGalaxy:
@@ -548,6 +554,8 @@ class MillenniumGalaxy:
         #Maybe dynamically pull the field names from the comments at the beginning of the csv file.
         #The problem with that is it requires dynamic execution of arbitrary code, and I'm not quite
         #comfortable with that. I'm sure this will work just fine for now.
+        #Or it requires using a dictionary, but then you have to reference everything as ["name"] instead of
+        #just .name, and .name is SOOO much faster to type than ["name"]
         self.x = self.galaxList[0]
         self.y = self.galaxList[1]
         self.z = self.galaxList[2]
@@ -570,6 +578,12 @@ class MillenniumGalaxy:
         self.mag_rBulge = self.galaxList[19]
         self.mag_iBulge = self.galaxList[20]
         self.mag_kBulge = self.galaxList[21]
+    def toString(self):
+        string = ""
+        for data in self.galaxList:
+            string = string + data + ','
+        string.strip(',')
+        return string
 
         
 def crossProductMatrix(r):
