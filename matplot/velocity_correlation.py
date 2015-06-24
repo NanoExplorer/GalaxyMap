@@ -127,16 +127,16 @@ def correlation(pairs,galaxies,intervals):
     cosTheta2 = inner1d(r,g2norm)
 
     #The 'ind' stands for individual
-    indPsiOneNum = psiOneNumerator(g1vs,g2vs,cosdTheta)
-    indPsiOneDen = psiOneDenominator(cosdTheta)
-    indPsiTwoNum = psiTwoNumerator(g1vs,g2vs,cosTheta1,cosTheta2)
-    indPsiTwoDen = psiTwoDenominator(cosTheta1,cosTheta2,cosdTheta)
-    indANum = aNumerator(cosdTheta,g1dist,g2dist,distBetweenG1G2)
-    indADen = aDenominator(cosdTheta,distBetweenG1G2)
+    indPsiOneNum   = psiOneNumerator(g1vs,g2vs,cosdTheta)
+    indPsiOneDen   = psiOneDenominator(cosdTheta)
+    indPsiTwoNum   = psiTwoNumerator(g1vs,g2vs,cosTheta1,cosTheta2)
+    indPsiTwoDen   = psiTwoDenominator(cosTheta1,cosTheta2,cosdTheta)
+    indANum        = aNumerator(cosdTheta,g1dist,g2dist,distBetweenG1G2)
+    indADen        = aDenominator(cosdTheta,distBetweenG1G2)
     indAFeldmanNum = aFeldmanNumerator(cosTheta1,cosTheta2,cosdTheta)
     indAFeldmanDen = aFeldmanDenominator(cosdTheta)
-    indBNum = bNumerator(cosTheta1,cosTheta2)
-    indBDen = bDenominator(cosTheta1,cosTheta2,cosdTheta)
+    indBNum        = bNumerator(cosTheta1,cosTheta2)
+    indBDen        = bDenominator(cosTheta1,cosTheta2,cosdTheta)
 
     #The numpy histogram function returns a tuple of (stuff we want, the bins)
     #Since we already know the bins, we throw them out by taking the [0] element of the tuple.
@@ -156,37 +156,37 @@ def correlation(pairs,galaxies,intervals):
     a = aNum/aDen
     b = bNum/bDen
     af = afNum/afDen
-    for i,num in enumerate(distBetweenG1G2):
-        if abs(num) < 0.0000001:
-            print('********** BEGIN UH-OH REPORT *********** ')
-            print(galaxyPairs[i])
-            print(lGalaxies[i])
-            print(rGalaxies[i])
-            print('********** END UH-OH REPORT ************* ')
-            raise RuntimeError("TESTING and trapping nans")
-            
-            
-    if np.isnan(np.sum(psione)):
-        #if there is a nan in the array, the sum of the array will be nan as well.
-        print('psi 1 is NaN')
-        print(np.isnan(np.sum(indPsiOneNum)))
-        print(np.isnan(np.sum(indPsiOneDen)))
-    if np.isnan(np.sum(psitwo)):
-        print('psi 2 is NaN')
-        print(np.isnan(np.sum(indPsiTwoNum)))
-        print(np.isnan(np.sum(indPsiTwoDen)))
-    if np.isnan(np.sum(a)):
-        print('a is NaN')
-        print(np.isnan(np.sum(indANum)))
-        print(np.isnan(np.sum(indADen)))
-    if np.isnan(np.sum(b)):
-        print('b is NaN')
-        print(np.isnan(np.sum(indBNum)))
-        print(np.isnan(np.sum(indBDen)))
-    if np.isnan(np.sum(af)):
-        print('a feldman is NaN')
-        print(np.isnan(np.sum(indAFeldmanNum)))
-        print(np.isnan(np.sum(indAFeldmanDen)))
+    """ This is a pre-made NaN debugging scheme. I'm leaving it in in case it's useful in the future."""
+    # for i,num in enumerate(distBetweenG1G2):
+    #     if abs(num) < 0.0000001:
+    #         print('********** BEGIN UH-OH REPORT *********** ')
+    #         print(galaxyPairs[i])
+    #         print(lGalaxies[i])
+    #         print(rGalaxies[i])
+    #         print('********** END UH-OH REPORT ************* ')
+    #         raise RuntimeError("TESTING and trapping nans")
+    # if np.isnan(np.sum(psione)):
+    #     #if there is a nan in the array, the sum of the array will be nan as well.
+    #     print('psi 1 is NaN')
+    #     print(np.isnan(np.sum(indPsiOneNum)))
+    #     print(np.isnan(np.sum(indPsiOneDen)))
+    # if np.isnan(np.sum(psitwo)):
+    #     print('psi 2 is NaN')
+    #     print(np.isnan(np.sum(indPsiTwoNum)))
+    #     print(np.isnan(np.sum(indPsiTwoDen)))
+    # if np.isnan(np.sum(a)):
+    #     print('a is NaN')
+    #     print(np.isnan(np.sum(indANum)))
+    #     print(np.isnan(np.sum(indADen)))
+    # if np.isnan(np.sum(b)):
+    #     print('b is NaN')
+    #     print(np.isnan(np.sum(indBNum)))
+    #     print(np.isnan(np.sum(indBDen)))
+    # if np.isnan(np.sum(af)):
+    #     print('a feldman is NaN')
+    #     print(np.isnan(np.sum(indAFeldmanNum)))
+    #     print(np.isnan(np.sum(indAFeldmanDen)))
+    """END PRE-MADE NaN DEBUGGING SCHEME ---------------------------------------------------------"""
     return (psione,psitwo,a,b,af)
 
 # Old abandoned function. Does the same thing as above, but less efficiently
