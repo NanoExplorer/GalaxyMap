@@ -87,12 +87,11 @@ def singlePlot(infile,intervals):
     removePairs = kd.query_pairs(np.finfo(float).eps)
     pairs.difference_update(removePairs)
     try:
-        thingy = correlation(pairs,galaxyXYZV,intervals)
+        data = correlation(pairs,galaxyXYZV,intervals)
     except RuntimeError:
         print("Runtime Error encountered at {}.".format(infile))
         raise
-    return thingy
-
+    return data
 
 #@profile
 def correlation(pairs,galaxies,intervals):
@@ -282,11 +281,10 @@ def stats(args):
         psione = [x/10**4 for x in data['psione']]
         psitwo = [x/10**4 for x in data['psitwo']]
         
-
         fig = pylab.figure()
-        pylab.plot(xs,a,'-',label="$\cal A$")
+        pylab.plot(xs,a,'-',label="$\cal A$ (Borgani)")
         pylab.plot(xs,b,'k--',label="$\cal B$")
-        pylab.plot(xs,af,'-',label="$\cal A$ (alternate)")
+        pylab.plot(xs,af,'-',label="$\cal A + 0.3$ (new $\cal A$ formula)")
         pylab.title("Moment of the selection function")
         pylab.ylabel("$\cal A$")
         pylab.xlabel("Distance, Mpc/h")
@@ -305,7 +303,7 @@ def stats(args):
         pylab.legend()
 
         with pdfback.PdfPages(outfolder+outfile.format(n+settings['offset'])) as pdf:
-            pdf.savefig(fig2)
+            #pdf.savefig(fig2)
             pdf.savefig(fig)
         pylab.close('all')
 
