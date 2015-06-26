@@ -227,7 +227,7 @@ def psiTwoDenominator(costheta1,costheta2,cosdTheta):
     return costheta1*costheta2*cosdTheta
 
 def aNumerator(cosdTheta,g1d,g2d,r):
-    return (g1d*g2d*(cosdTheta-1)+(r**2)*cosdTheta)*cosdTheta
+    return (g1d*g2d*((cosdTheta**2)-1)+(r**2)*cosdTheta)*cosdTheta
 
 def aDenominator(cosdTheta,r):
     return (cosdTheta**2)*(r**2)
@@ -286,12 +286,13 @@ def stats(args):
         pylab.plot(xs,b,'k--',label="$\cal B$")
         pylab.plot(xs,af,'-',label="$\cal A + 0.3$ (new $\cal A$ formula)")
         pylab.title("Moment of the selection function")
-        pylab.ylabel("$\cal A$")
+        pylab.ylabel("Value (unitless)")
         pylab.xlabel("Distance, Mpc/h")
+        pylab.legend(loc=2)
         #pylab.yscale('log')
         #pylab.xscale('log')
         #pylab.axis((0,31,.62,.815))
-        pylab.legend()
+
 
         fig2 = pylab.figure()
         pylab.plot(xs,psione,'-',label="$\psi_1$")

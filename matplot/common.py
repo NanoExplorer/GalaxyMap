@@ -581,7 +581,7 @@ class MillenniumGalaxy:
     def toString(self):
         string = ""
         for data in self.galaxList:
-            string = string + data + ','
+            string = string + str(data) + ','
         string.strip(',')
         return string
 
