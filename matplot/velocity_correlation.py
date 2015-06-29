@@ -277,7 +277,7 @@ def stats(args):
         xs = data['xs']
         a = data['a']
         b = data['b']
-        af = [x + .3 for x in data['af']]
+        af = [x for x in data['af']]
         psione = [x/10**4 for x in data['psione']]
         psitwo = [x/10**4 for x in data['psitwo']]
         
@@ -308,16 +308,48 @@ def stats(args):
             pdf.savefig(fig)
         pylab.close('all')
 
+def standBackStats(args):
+    #Get settings
+    settings = common.getdict(args.settings)
+    outfolder = settings["output_data_folder"]
+    outfile   = settings["output_file_name"]
+    #XSrawInFile = settings["input_file"]
+    
+    if settings["many"]:
+        inFileList = [outfolder+outfile.format(x+settings['offset'])+'_rawdata.npy' for x in range(settings["num_files"])]
+    else:
+        raise RuntimeError("The averaging routines require multiple files to average.")
+        
+    allData = np.array(map(np.load, inFileList))
+    std = np.std(allData,axis=0)
+    avg = np.mean(allData,axis=0)
+    
+        
+
 if __name__ == "__main__":
-    arrrghs = common.parseCmdArgs([['settings'],['-c','--comp'],['-p','--plot']],
-                        ['Settings json file','only do computations, no plotting','only plot, no computations'],
-                                  [str,'bool','bool'])
-    if not arrrghs.plot:
+    arrrghs = common.parseCmdArgs([['settings'],
+                                   ['-c','--comp'],
+                                   ['-p','--plot'],
+                                   ['-s','--stats'],
+                                   ['-o','--onlystats']],
+                                  ['Settings json file',
+                                   'only do computations, no plotting',
+                                   'only plot, no computations',
+                                   'do the overview stats routine after computing',
+                                   'do only the overview stats routine'
+                                  ],
+                                   [str,'bool','bool','bool','bool'])
+    if not arrrghs.plot and not arrghs.onlystats:
         print("computing...")
         main(arrrghs)
-    if not arrrghs.comp:
+    if not arrrghs.comp and not arrghs.onlystats:
         print('plotting...')
         stats(arrrghs)
+    if arrghs.stats or arrghs.onlystats:
+        print('statting..?')
+        print('no, that doesn\'t sound right')
+        print('computing statistics...')
+        standBackStats(arrghs)
 
     
 
