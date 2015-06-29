@@ -3,7 +3,7 @@ from scipy.spatial import cKDTree
 import numpy as np
 from multiprocessing import Pool
 import itertools
-import pylab
+import matplotlib.pyplot as plt
 import matplotlib.backends.backend_pdf as pdfback
 #import pdb
 from numpy.core.umath_tests import inner1d #Note: this function has no documentation and could easily be deprecated.
@@ -47,15 +47,17 @@ def main(args):
         psitwo = [y for y in plot[1]]
         a = [z for z in plot[2]]
         b = [dataPoint for dataPoint in plot[3]]
-        af = [thing for thing in plot[4]]
+        psiParallel = [thing for thing in plot[4]]
+        psiPerpindicular = [pp for pp in plot[5]]
         common.writedict(outfolder+outfile.format(n+settings['offset'])+'_rawdata.json',{'psione':psione,
                                                                                          'psitwo':psitwo,
                                                                                          'a':a,
                                                                                          'b':b,
                                                                                          'xs':xs,
-                                                                                         'af':af
+                                                                                         'psi_parallel':psiParallel,
+                                                                                         'psi_perpindicular':psiPerpindicular
                                                                                      })
-        np.save(outfolder+outfile.format(n+settings['offset'])+'_rawdata.npy',np.array([psione,psitwo,a,b,af]))
+        np.save(outfolder+outfile.format(n+settings['offset'])+'_rawdata.npy',np.array([psione,psitwo,a,b,psiParallel,psiPerpindicular]))
         #End for loop
     if not hasattr(args,'plot'):
         #This function was called by the galaxy.py interface, and we should plot.
@@ -130,8 +132,9 @@ def correlation(pairs,galaxies,intervals):
     indPsiOneDen   = psiOneDenominator(cosdTheta)
     indPsiTwoNum   = psiTwoNumerator(g1vs,g2vs,cosTheta1,cosTheta2)
     indPsiTwoDen   = psiTwoDenominator(cosTheta1,cosTheta2,cosdTheta)
-    indANum        = aNumerator(cosdTheta,g1dist,g2dist,distBetweenG1G2)
-    indADen        = aDenominator(cosdTheta,distBetweenG1G2)
+    #Original A calculations removed in favor of new aFeldman calculations
+    #indANum        = aNumerator(cosdTheta,g1dist,g2dist,distBetweenG1G2)
+    #indADen        = aDenominator(cosdTheta,distBetweenG1G2)
     indAFeldmanNum = aFeldmanNumerator(cosTheta1,cosTheta2,cosdTheta)
     indAFeldmanDen = aFeldmanDenominator(cosdTheta)
     indBNum        = bNumerator(cosTheta1,cosTheta2)
@@ -143,10 +146,10 @@ def correlation(pairs,galaxies,intervals):
     psiOneDen = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiOneDen)[0]
     psiTwoNum = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiTwoNum)[0]
     psiTwoDen = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiTwoDen)[0]
-    aNum      = np.histogram(distBetweenG1G2,bins = intervals,weights = indANum)[0]
-    aDen      = np.histogram(distBetweenG1G2,bins = intervals,weights = indADen)[0]
-    afNum     = np.histogram(distBetweenG1G2,bins = intervals,weights = indAFeldmanNum)[0]
-    afDen     = np.histogram(distBetweenG1G2,bins = intervals,weights = indAFeldmanDen)[0]
+    aNum      = np.histogram(distBetweenG1G2,bins = intervals,weights = indAFeldmanNum)[0]
+    aDen      = np.histogram(distBetweenG1G2,bins = intervals,weights = indAFeldmanDen)[0]
+    #afNum     = np.histogram(distBetweenG1G2,bins = intervals,weights = indAFeldmanNum)[0]
+    #afDen     = np.histogram(distBetweenG1G2,bins = intervals,weights = indAFeldmanDen)[0]
     bNum      = np.histogram(distBetweenG1G2,bins = intervals,weights = indBNum)[0]
     bDen      = np.histogram(distBetweenG1G2,bins = intervals,weights = indBDen)[0]
     
@@ -154,7 +157,10 @@ def correlation(pairs,galaxies,intervals):
     psitwo = psiTwoNum/psiTwoDen
     a = aNum/aDen
     b = bNum/bDen
-    af = afNum/afDen
+    #af = afNum/afDen
+    aminusb = (a-b)
+    psiParallel = ((1-b)*psione-(1-a)*psitwo)/aminusb
+    psiPerpindicular = (a*psitwo-b*psione)/aminusb
     """ This is a pre-made NaN debugging scheme. I'm leaving it in in case it's useful in the future."""
     # for i,num in enumerate(distBetweenG1G2):
     #     if abs(num) < 0.0000001:
@@ -186,7 +192,7 @@ def correlation(pairs,galaxies,intervals):
     #     print(np.isnan(np.sum(indAFeldmanNum)))
     #     print(np.isnan(np.sum(indAFeldmanDen)))
     """END PRE-MADE NaN DEBUGGING SCHEME ---------------------------------------------------------"""
-    return (psione,psitwo,a,b,af)
+    return (psione,psitwo,a,b,psiParallel,psiPerpindicular)
 
 # Old abandoned function. Does the same thing as above, but less efficiently
 # def single_correlation(galaxy1,galaxy2):
@@ -225,12 +231,13 @@ def psiTwoNumerator(rv1,rv2,costheta1,costheta2):
 
 def psiTwoDenominator(costheta1,costheta2,cosdTheta):
     return costheta1*costheta2*cosdTheta
-
-def aNumerator(cosdTheta,g1d,g2d,r):
-    return (g1d*g2d*((cosdTheta**2)-1)+(r**2)*cosdTheta)*cosdTheta
-
-def aDenominator(cosdTheta,r):
-    return (cosdTheta**2)*(r**2)
+    
+"""These functions are more messy and stuff than the aFeldman functions, but produce the same
+results. """
+# def aNumerator(cosdTheta,g1d,g2d,r):
+#     return (g1d*g2d*((cosdTheta**2)-1)+(r**2)*cosdTheta)*cosdTheta
+# def aDenominator(cosdTheta,r):
+#     return (cosdTheta**2)*(r**2)
 
 def aFeldmanNumerator(costheta1,costheta2,cosdTheta):
     return costheta1*costheta2*cosdTheta
@@ -277,36 +284,46 @@ def stats(args):
         xs = data['xs']
         a = data['a']
         b = data['b']
-        af = [x for x in data['af']]
         psione = [x/10**4 for x in data['psione']]
         psitwo = [x/10**4 for x in data['psitwo']]
+
+        psipar = data['psi_parallel']
+        psiprp = data['psi_perpindicular']
         
-        fig = pylab.figure()
-        pylab.plot(xs,a,'-',label="$\cal A$ (Borgani)")
-        pylab.plot(xs,b,'k--',label="$\cal B$")
-        pylab.plot(xs,af,'-',label="$\cal A + 0.3$ (new $\cal A$ formula)")
-        pylab.title("Moment of the selection function")
-        pylab.ylabel("Value (unitless)")
-        pylab.xlabel("Distance, Mpc/h")
-        pylab.legend(loc=2)
-        #pylab.yscale('log')
-        #pylab.xscale('log')
-        #pylab.axis((0,31,.62,.815))
+        fig = plt.figure()
+        plt.plot(xs,a,'-',label="$\cal A$ (Borgani)")
+        plt.plot(xs,b,'k--',label="$\cal B$")
+        plt.title("Moment of the selection function")
+        plt.ylabel("Value (unitless)")
+        plt.xlabel("Distance, Mpc/h")
+        plt.legend(loc=2)
+        #plt.yscale('log')
+        #plt.xscale('log')
+        #plt.axis((0,31,.62,.815))
 
 
-        fig2 = pylab.figure()
-        pylab.plot(xs,psione,'-',label="$\psi_1$")
-        pylab.plot(xs,psitwo,'k--',label="$\psi_2$")
-        pylab.title("Velocity correlation function")
-        pylab.xlabel("Distance, Mpc/h")
-        pylab.ylabel("Correlation, $10^4 (km/s)^2$")
-        #pylab.axis((0,31,0,32))
-        pylab.legend()
+        fig2 = plt.figure()
+        plt.plot(xs,psione,'-',label="$\psi_1$")
+        plt.plot(xs,psitwo,'k--',label="$\psi_2$")
+        plt.title("Velocity correlation function")
+        plt.xlabel("Distance, Mpc/h")
+        plt.ylabel("Correlation, $10^4 (km/s)^2$")
+        #plt.axis((0,31,0,32))
+        plt.legend()
+
+        fig3 = plt.figure()
+        plt.plot(xs,psipar,'-',label='$\psi_{\parallel}')
+        plt.plot(xs,psiprp,'-',label='$\psi_{\perp}')
+        plt.title("Velocity correlation")
+        plt.xlabel("Distance, Mpc/h")
+        plt.ylabel("Correlation, $(km/s)^2$")
+        plt.legend()
 
         with pdfback.PdfPages(outfolder+outfile.format(n+settings['offset'])) as pdf:
-            #pdf.savefig(fig2)
+            pdf.savefig(fig3)
+            pdf.savefig(fig2)
             pdf.savefig(fig)
-        pylab.close('all')
+        plt.close('all')
 
 def standBackStats(args):
     #Get settings
@@ -321,11 +338,13 @@ def standBackStats(args):
         raise RuntimeError("The averaging routines require multiple files to average.")
         
     allData = np.array(map(np.load, inFileList))
+    #One inFile contains the following: [p1, p2, a, b, psiparallel, psiperpindicular]
+    
     std = np.std(allData,axis=0)
     avg = np.mean(allData,axis=0)
-    
-        
 
+    fig1 = plt.figure()
+    plt.errorbar(
 if __name__ == "__main__":
     arrrghs = common.parseCmdArgs([['settings'],
                                    ['-c','--comp'],
