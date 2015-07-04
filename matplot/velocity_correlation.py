@@ -13,7 +13,7 @@ from numpy.core.umath_tests import inner1d #Note: this function has no documenta
 # def inner1d(a,b):
 #     return (a*b).sum(axis=1)
 
-#@profile
+
 def main(args):
     np.seterr(divide='ignore',invalid='ignore')
     """ Compute the velocity correlations on one or many galaxy surveys. 
@@ -27,7 +27,7 @@ def main(args):
     outfile   = settings["output_file_name"]
     step_type = settings["step_type"]
     rawInFile = settings["input_file"]
-    pool = Pool()
+    #pool = Pool()              
     if settings["many"]:
         #If there are lots of files, set them up accordingly.
         inFileList = [rawInFile.format(x+settings['offset']) for x in range(settings["num_files"])]
@@ -36,7 +36,7 @@ def main(args):
 
     xs,intervals = common.genBins(min_r,numpoints,dr,step_type)
 
-    plots = pool.starmap(singlePlot,zip(inFileList, 
+    plots = itertools.starmap(singlePlot,zip(inFileList, 
                                         itertools.repeat(intervals)))
     #NOTE: If this line gives you trouble (e.g. 'pool doesn't have a member called starmap'), just replace
     #that line with this one:
@@ -57,7 +57,12 @@ def main(args):
                                                                                          'psi_parallel':psiParallel,
                                                                                          'psi_perpindicular':psiPerpindicular
                                                                                      })
-        np.save(outfolder+outfile.format(n+settings['offset'])+'_rawdata.npy',np.array([psione,psitwo,a,b,psiParallel,psiPerpindicular]))
+        np.save(outfolder+outfile.format(n+settings['offset'])+'_rawdata.npy',np.array([psione,
+                                                                                        psitwo,
+                                                                                        a,
+                                                                                        b,
+                                                                                        psiParallel,
+                                                                                        psiPerpindicular]))
         #End for loop
     if not hasattr(args,'plot'):
         #This function was called by the galaxy.py interface, and we should plot.
@@ -67,7 +72,7 @@ def main(args):
 def singlePlotStar(args):
     return singlePlot(*args)
     
-#@profile
+@profile
 def singlePlot(infile,intervals):
     #Load the survey
     galaxies = common.loadData(infile, dataType = "CF2")
@@ -95,19 +100,25 @@ def singlePlot(infile,intervals):
         raise
     return data
 
-#@profile
 def correlation(pairs,galaxies,intervals):
+     #There are lots of dels in this function because otherwise it tends to gobble up memory.
+    #I think there might be a better way to deal with the large amounts of memory usage, but I don't yet
+    #know what it is.
+
     # galaxies = [(galaxies[a],galaxies[b]) for a,b in interval_shell] 
     galaxyPairs = np.array(list(pairs)) #This line takes more time than all the others in this method combined...
+    del pairs
     lGalaxies = galaxies[galaxyPairs[:,0]]
     rGalaxies = galaxies[galaxyPairs[:,1]]
-
+    del galaxyPairs
+    
     #"Galaxy 1 VelocitieS"
     g1vs = lGalaxies[:,3]
     g2vs = rGalaxies[:,3]
     g1pos = lGalaxies[:,0:3]
     g2pos = rGalaxies[:,0:3]
-
+    del lGalaxies, rGalaxies
+    
     #Distances from galaxy to center
     g1dist = np.linalg.norm(g1pos,axis=1)
     g2dist = np.linalg.norm(g2pos,axis=1)
@@ -115,31 +126,34 @@ def correlation(pairs,galaxies,intervals):
     #Normalized galaxy position vectors
     #The extra [:,None] is there to make the denominator axis correct. See
     #http://stackoverflow.com/questions/19602187/numpy-divide-each-row-by-a-vector-element
-    g1norm = g1pos/g1dist[:,None] 
+    g1norm = g1pos/g1dist[:,None]
+    del g1dist
     g2norm = g2pos/g2dist[:,None]
+    del g2dist
     
     distBetweenG1G2 = np.linalg.norm(g2pos-g1pos,axis=1)
     
     #r is a unit vector pointing from g2 to g1
     r = (g2pos-g1pos) / distBetweenG1G2[:,None]
+    del g1pos, g2pos
 
     cosdTheta = inner1d(g1norm,g2norm)
     cosTheta1 = inner1d(r,g1norm)
     cosTheta2 = inner1d(r,g2norm)
-
+    del g1norm, g2norm
+    
     #The 'ind' stands for individual
     indPsiOneNum   = psiOneNumerator(g1vs,g2vs,cosdTheta)
     indPsiOneDen   = psiOneDenominator(cosdTheta)
     indPsiTwoNum   = psiTwoNumerator(g1vs,g2vs,cosTheta1,cosTheta2)
+    del g1vs, g2vs
     indPsiTwoDen   = psiTwoDenominator(cosTheta1,cosTheta2,cosdTheta)
-    #Original A calculations removed in favor of new aFeldman calculations
-    #indANum        = aNumerator(cosdTheta,g1dist,g2dist,distBetweenG1G2)
-    #indADen        = aDenominator(cosdTheta,distBetweenG1G2)
     indAFeldmanNum = aFeldmanNumerator(cosTheta1,cosTheta2,cosdTheta)
     indAFeldmanDen = aFeldmanDenominator(cosdTheta)
     indBNum        = bNumerator(cosTheta1,cosTheta2)
     indBDen        = bDenominator(cosTheta1,cosTheta2,cosdTheta)
-
+    del cosTheta1, cosTheta2, cosdTheta
+    
     #The numpy histogram function returns a tuple of (stuff we want, the bins)
     #Since we already know the bins, we throw them out by taking the [0] element of the tuple.
     psiOneNum = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiOneNum)[0]
@@ -148,72 +162,26 @@ def correlation(pairs,galaxies,intervals):
     psiTwoDen = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiTwoDen)[0]
     aNum      = np.histogram(distBetweenG1G2,bins = intervals,weights = indAFeldmanNum)[0]
     aDen      = np.histogram(distBetweenG1G2,bins = intervals,weights = indAFeldmanDen)[0]
-    #afNum     = np.histogram(distBetweenG1G2,bins = intervals,weights = indAFeldmanNum)[0]
-    #afDen     = np.histogram(distBetweenG1G2,bins = intervals,weights = indAFeldmanDen)[0]
     bNum      = np.histogram(distBetweenG1G2,bins = intervals,weights = indBNum)[0]
     bDen      = np.histogram(distBetweenG1G2,bins = intervals,weights = indBDen)[0]
+    del indPsiOneNum, indPsiOneDen, indPsiTwoNum, indPsiTwoDen
+    del indAFeldmanNum, indAFeldmanDen, indBNum, indBDen
     
     psione = psiOneNum/psiOneDen
     psitwo = psiTwoNum/psiTwoDen
+    del psiOneNum, psiOneDen, psiTwoNum, psiTwoDen
     a = aNum/aDen
     b = bNum/bDen
+    del aNum, aDen
+    
     #af = afNum/afDen
     aminusb = (a-b)
     psiParallel = ((1-b)*psione-(1-a)*psitwo)/aminusb
     psiPerpindicular = (a*psitwo-b*psione)/aminusb
-    """ This is a pre-made NaN debugging scheme. I'm leaving it in in case it's useful in the future."""
-    # for i,num in enumerate(distBetweenG1G2):
-    #     if abs(num) < 0.0000001:
-    #         print('********** BEGIN UH-OH REPORT *********** ')
-    #         print(galaxyPairs[i])
-    #         print(lGalaxies[i])
-    #         print(rGalaxies[i])
-    #         print('********** END UH-OH REPORT ************* ')
-    #         raise RuntimeError("TESTING and trapping nans")
-    # if np.isnan(np.sum(psione)):
-    #     #if there is a nan in the array, the sum of the array will be nan as well.
-    #     print('psi 1 is NaN')
-    #     print(np.isnan(np.sum(indPsiOneNum)))
-    #     print(np.isnan(np.sum(indPsiOneDen)))
-    # if np.isnan(np.sum(psitwo)):
-    #     print('psi 2 is NaN')
-    #     print(np.isnan(np.sum(indPsiTwoNum)))
-    #     print(np.isnan(np.sum(indPsiTwoDen)))
-    # if np.isnan(np.sum(a)):
-    #     print('a is NaN')
-    #     print(np.isnan(np.sum(indANum)))
-    #     print(np.isnan(np.sum(indADen)))
-    # if np.isnan(np.sum(b)):
-    #     print('b is NaN')
-    #     print(np.isnan(np.sum(indBNum)))
-    #     print(np.isnan(np.sum(indBDen)))
-    # if np.isnan(np.sum(af)):
-    #     print('a feldman is NaN')
-    #     print(np.isnan(np.sum(indAFeldmanNum)))
-    #     print(np.isnan(np.sum(indAFeldmanDen)))
-    """END PRE-MADE NaN DEBUGGING SCHEME ---------------------------------------------------------"""
+    del aminusb
+    
     return (psione,psitwo,a,b,psiParallel,psiPerpindicular)
 
-# Old abandoned function. Does the same thing as above, but less efficiently
-# def single_correlation(galaxy1,galaxy2):
-#     rv1 = galaxy1.v
-#     rv2 = galaxy2.v
-#     g1pos =np.array((galaxy1.x,galaxy1.y,galaxy1.z))
-#     g2pos =np.array((galaxy2.x,galaxy2.y,galaxy2.z))
-#     g1dist = length(g1pos)
-#     g2dist = length(g2pos)
-#     cosdTheta = np.dot(g1pos/g1dist,g2pos/g2dist)
-#     distBetweenG1G2 =length(g2pos-g1pos)
-#     r = (g2pos-g1pos) / distBetweenG1G2
-#     costheta1 = np.inner(r,g1pos/g1dist)
-#     costheta2 = np.inner(r,g2pos/g2dist)
-#     psiOneNum = psiOneNumerator(rv1,rv2,cosdTheta)
-#     psiOneDen = psiOneDenominator(cosdTheta)
-#     psiTwoNum = psiTwoNumerator(rv1,rv2,costheta1,costheta2)
-#     psiTwoDen = psiTwoDenominator(costheta1,costheta2,cosdTheta)
-#     aNum = aNumerator(cosdTheta,g1dist,g2dist,distBetweenG1G2)
-#     aDen = aDenominator(cosdTheta,distBetweenG1G2)
-#     return (psiOneNum,psiOneDen,psiTwoNum,psiTwoDen,aNum,aDen)
 
 def psiOneNumerator(rv1, rv2, cosdTheta):
     """
@@ -231,13 +199,6 @@ def psiTwoNumerator(rv1,rv2,costheta1,costheta2):
 
 def psiTwoDenominator(costheta1,costheta2,cosdTheta):
     return costheta1*costheta2*cosdTheta
-    
-"""These functions are more messy and stuff than the aFeldman functions, but produce the same
-results. """
-# def aNumerator(cosdTheta,g1d,g2d,r):
-#     return (g1d*g2d*((cosdTheta**2)-1)+(r**2)*cosdTheta)*cosdTheta
-# def aDenominator(cosdTheta,r):
-#     return (cosdTheta**2)*(r**2)
 
 def aFeldmanNumerator(costheta1,costheta2,cosdTheta):
     return costheta1*costheta2*cosdTheta
@@ -250,20 +211,6 @@ def bNumerator(costheta1,costheta2):
     
 def bDenominator(costheta1,costheta2,cosdTheta):
     return costheta1*costheta2*cosdTheta
-    
-#@profile
-# def kd_query(positions,interval):
-#     """Get all pairs of galaxies at distances inside the interval. 
-#     interval is a tuple of (upper,lower) bounds for the distance bin.
-#     """
-#     kd = cKDTree(positions)
-#     upper = kd.query_pairs(interval[0])
-#     lower = kd.query_pairs(interval[1])
-#     upper.difference_update(lower) #Get rid of pairs at separations less than the lower bound
-#     # Use this instead of one - two because of time complexity.
-#     #see: https://wiki.python.org/moin/TimeComplexity
-    
-#     return upper
 
 #@profile
 def stats(args):
