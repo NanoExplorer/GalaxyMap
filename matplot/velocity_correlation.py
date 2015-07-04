@@ -326,25 +326,79 @@ def stats(args):
         plt.close('all')
 
 def standBackStats(args):
+    """Do statistics over many input files, for example the three groups of 100 surveys. Average them, plot w/errorbars."""
     #Get settings
     settings = common.getdict(args.settings)
     outfolder = settings["output_data_folder"]
     outfile   = settings["output_file_name"]
     #XSrawInFile = settings["input_file"]
-    
+
+    xs = common.getdict(outfolder+outfile.format(settings['offset'])+'_rawdata.json')['xs']
     if settings["many"]:
         inFileList = [outfolder+outfile.format(x+settings['offset'])+'_rawdata.npy' for x in range(settings["num_files"])]
     else:
         raise RuntimeError("The averaging routines require multiple files to average.")
-        
-    allData = np.array(map(np.load, inFileList))
-    #One inFile contains the following: [p1, p2, a, b, psiparallel, psiperpindicular]
     
+    allData = np.array(list(map(np.load, inFileList)))
+    #One inFile contains the following: [p1, p2, a, b, psiparallel, psiperpindicular]
+    print(allData.shape)
     std = np.std(allData,axis=0)
     avg = np.mean(allData,axis=0)
 
+    correlationScale = (0,30,0,160000)
+    momentScale = (0,30,0.25,1.1)
+    plotName = "CF2 Group"
+
     fig1 = plt.figure()
-    plt.errorbar(
+    plt.errorbar(xs, avg[0], yerr=std[0], fmt = '-')
+    plt.title('$\psi_1$ Correlation for the {} Survey'.format(plotName))
+    plt.xlabel('Distance, Mpc/h')
+    plt.ylabel('Correlation, $(km/s)^2$')
+    plt.axis(correlationScale)
+    
+    fig2 = plt.figure()
+    plt.errorbar(xs, avg[1], yerr=std[1], fmt = '-')
+    plt.title('$\psi_2$ Correlation for the {} Survey'.format(plotName))
+    plt.xlabel('Distance, Mpc/h')
+    plt.ylabel('Correlation, $(km/s)^2$')
+    plt.axis(correlationScale)
+    
+    fig3 = plt.figure()
+    plt.errorbar(xs, avg[2], yerr=std[2], fmt = '-')
+    plt.title('Moment of the Selection Function, $\cal A$, {} Survey'.format(plotName))
+    plt.xlabel('Distance, Mpc/h')
+    plt.ylabel('Value (unitless)')
+    plt.axis(momentScale)
+    
+    fig4 = plt.figure()
+    plt.errorbar(xs, avg[3], yerr=std[3], fmt = '-')
+    plt.title('Moment of the Selection Function, $\cal B$, {} Survey'.format(plotName))
+    plt.xlabel('Distance, Mpc/h')
+    plt.ylabel('Value (unitless)')
+    plt.axis(momentScale)
+
+    fig5 = plt.figure()
+    plt.errorbar(xs, avg[4], yerr=std[4], fmt = '-')
+    plt.title('$\Psi_{{\parallel}}$ Correlation for the {} Survey'.format(plotName))
+    plt.xlabel('Distance, Mpc/h')
+    plt.ylabel('Correlation, $(km/s)^2$')
+    plt.axis(correlationScale)
+    
+    fig6 = plt.figure()
+    plt.errorbar(xs, avg[5], yerr=std[5], fmt = '-')
+    plt.title('$\Psi_{{\perp}}$ Correlation for the {} Survey'.format(plotName))
+    plt.xlabel('Distance, Mpc/h')
+    plt.ylabel('Correlation, $(km/s)^2$')
+    plt.axis(correlationScale)
+    
+    with pdfback.PdfPages(outfolder+outfile.format("MACRO")) as pdf:
+        pdf.savefig(fig1)
+        pdf.savefig(fig2)
+        pdf.savefig(fig3)
+        pdf.savefig(fig4)
+        pdf.savefig(fig5)
+        pdf.savefig(fig6)
+    
 if __name__ == "__main__":
     arrrghs = common.parseCmdArgs([['settings'],
                                    ['-c','--comp'],
@@ -358,17 +412,17 @@ if __name__ == "__main__":
                                    'do only the overview stats routine'
                                   ],
                                    [str,'bool','bool','bool','bool'])
-    if not arrrghs.plot and not arrghs.onlystats:
+    if not arrrghs.plot and not arrrghs.onlystats:
         print("computing...")
         main(arrrghs)
-    if not arrrghs.comp and not arrghs.onlystats:
+    if not arrrghs.comp and not arrrghs.onlystats:
         print('plotting...')
         stats(arrrghs)
-    if arrghs.stats or arrghs.onlystats:
+    if arrrghs.stats or arrrghs.onlystats:
         print('statting..?')
         print('no, that doesn\'t sound right')
         print('computing statistics...')
-        standBackStats(arrghs)
+        standBackStats(arrrghs)
 
     
 
