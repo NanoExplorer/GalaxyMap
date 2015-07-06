@@ -52,6 +52,8 @@ def correlate_box(boxinfo, intervals):
     actual_kd = space.cKDTree(actual_galaxies,3)
     random_kd = space.cKDTree(random_list,3)
     DDs = actual_kd.count_neighbors(actual_kd,intervals)
+    print("This is WRONG - each pair is duplicated, and pairs are created between a galaxy and itself. So, to get the actual number of pairs, take the count_neighbors, subtract len(actual_galaxies), and divide by two.")
+    exit()
     DRs = actual_kd.count_neighbors(random_kd,intervals)
     RRs = random_kd.count_neighbors(random_kd,intervals)
     #RDs = random_kd.count_neighbors(actual_kd,intervals)

@@ -1,0 +1,13 @@
+{
+    "dr": 1,
+    "input_file": "surveys/100s/CF2_gal{}.mil_cf2.txt",
+    "min_r": 0.5,
+    "numpoints": 30,
+    "output_data_folder": "output/",
+    "output_file_name":"CF2-gal-MOCK{}-observable.pdf",
+    "step_size": 1,
+    "step_type": "lin",
+    "many": true,
+    "num_files":100,
+    "offset":0
+}

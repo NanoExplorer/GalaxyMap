@@ -1,0 +1,25 @@
+;; This buffer is for notes you don't want to save, and for Lisp evaluation.
+;; If you want to create a file, visit that file with C-x C-f,
+;; then enter the text in that file's own buffer.
+
+The query pairs method is almost perfect for what I want to do. All I am responsible for is transposing the resulting set of pairs into a numpy array.
+But doing that takes *FOREVER.* I have no clue why, also. It seems reasonable enough to be able to quickly get all the items from a set and put them into a list,
+then make that list into a numpy array. 
+
+Thus, the query_ball_tree method might end up being faster to use. The problem with THAT method is that it returns a jagged array, which would have to be
+transformed into [(index1, index2)] format by me. And I can't think of a way to do that, without looping. And I don't want to loop because looping is stupid.
+
+Brainstorm time!
+map len() over the array. (Which might have to use the np vectorize, which might not have great performance....)
+Flatten it.
+Now you have two arrays, one that contains indices and the other that contains the number of indices per galaxy in the first list.
+So, if the lenlist = [0,2,1,4]
+and the indexlist = [2,5,0,0,5,7,4]
+then the following pairs are valid - (1,2) (1,5) (2,0) (3,0) (3,5) (3,7) (3,4)
+And one would hope that the resulting lists are more sane than the ones I'm thinking of off the top of my head. 
+
+But how would you transform from the len/list format to the pairs without iterating? Expand the lenlist maybe?
+so that [0,2,1,4] becomes [1,1,2,3,3,3,3], *then* map?
+then all you would have to do would be to make a new list like np.array([explenliest,indexlist]) and transpose it!
+
+But how would you expand the lenlist? again, all I can think of is looping. And looping definitely has to be a last resort.  

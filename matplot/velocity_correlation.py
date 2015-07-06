@@ -1,7 +1,7 @@
 import common
 from scipy.spatial import cKDTree
 import numpy as np
-from multiprocessing import Pool
+#from multiprocessing import Pool
 import itertools
 import matplotlib.pyplot as plt
 import matplotlib.backends.backend_pdf as pdfback
@@ -12,7 +12,7 @@ from numpy.core.umath_tests import inner1d #Note: this function has no documenta
 #Alternate definition:
 # def inner1d(a,b):
 #     return (a*b).sum(axis=1)
-
+import gc
 
 def main(args):
     np.seterr(divide='ignore',invalid='ignore')
@@ -72,7 +72,7 @@ def main(args):
 def singlePlotStar(args):
     return singlePlot(*args)
     
-@profile
+
 def singlePlot(infile,intervals):
     #Load the survey
     galaxies = common.loadData(infile, dataType = "CF2")
@@ -82,35 +82,90 @@ def singlePlot(infile,intervals):
 
     #Put just the galaxy positions into one array
     positions = galaxyXYZV[:,0:3] # [(x,y,z),...]
-
-    kd = cKDTree(positions)
-    #Get the galaxy pairs in each bin
-    pairs = kd.query_pairs(max(intervals))
-    #list(pool.starmap(kd_query,zip(itertools.repeat(positions),
-             #                                      interval_shells)))
-    #Calculate the actual correlations
-
-    #Find zero-distance pairs
-    removePairs = kd.query_pairs(np.finfo(float).eps)
-    pairs.difference_update(removePairs)
     try:
-        data = correlation(pairs,galaxyXYZV,intervals)
+        data = correlation(positions,galaxyXYZV,intervals)
     except RuntimeError:
         print("Runtime Error encountered at {}.".format(infile))
         raise
     return data
 
-def correlation(pairs,galaxies,intervals):
+@profile
+def _kd_query(positions,intervals):
+    """Returns a np array of pairs of galaxies."""
+    kd = cKDTree(positions)
+    
+    pairs = kd.query_pairs(max(intervals))
+    print(len(pairs))
+    print((kd.count_neighbors(kd,max(intervals))-len(positions))/2)
+    #Find zero-distance pairs
+    removePairs = kd.query_pairs(np.finfo(float).eps)
+    pairs.difference_update(removePairs)
+    listOfPairs = list(pairs)
+    pairarray = np.array(listOfPairs) #The np array creation takes a LOT of time. I am still wondering why.
+    del pairs, removePairs, kd #This also takes forever.
+    gc.collect()
+    return pairarray
+    
+@profile
+def _kd_query_prime(positions,intervals):
+    kd = cKDTree(positions)
+    pairs = np.array(list(kd.query_pairs(max(intervals))))
+    del kd
+    gc.collect()
+    return pairs
+
+def _elijahs_advanced_kd_query(positions,intervals):
+    #Get number of pairs
+    #Ask to find that number of pairs
+    kd = cKDTree(positions)
+    numPairs = kd.count_neighbors(kd,max(intervals))
+    
+
+#@profile
+def _kd_query_new(positions,intervals):
+    """The new kd query method attempts to improve upon the old one by using a different method from the
+    kd tree class. Instead of using a python set, which leads to pain and harship, the kd tree will return
+    lists. Since the most time-consuming part of the old mehtod was transforming the set into a numpy array,
+    maybe this will be faster."""
+    kd = cKDTree(positions)
+    
+    tree = kd.query_ball_tree(kd,0.1)#max(intervals))
+    same = kd.query_ball_tree(kd,np.finfo(float).eps)
+    #Warning: Naive for loops to follow. The performance of this will be evaluated soon
+    print(tree)
+    for n,item in enumerate(tree):
+        item[n] = [i for i in item if i < n]
+    print(tree)
+    for n,item in enumerate(same):
+        if len(item) > 0:
+            for thing in item:
+                tree[n].remove(thing)
+    pairs = []
+    
+    
+    
+
+def ss(numpyarray):
+    print(numpyarray.nbytes)
+
+def gs(numpyarray):
+    return numpyarray.nbytes
+
+@profile
+def correlation(positions,galaxies,intervals):
+
      #There are lots of dels in this function because otherwise it tends to gobble up memory.
     #I think there might be a better way to deal with the large amounts of memory usage, but I don't yet
     #know what it is.
 
-    # galaxies = [(galaxies[a],galaxies[b]) for a,b in interval_shell] 
-    galaxyPairs = np.array(list(pairs)) #This line takes more time than all the others in this method combined...
-    del pairs
+    # galaxies = [(galaxies[a],galaxies[b]) for a,b in interval_shell]
+    
+    galaxyPairs = _kd_query(positions,intervals)
+    print("Done! (with the thing)")
     lGalaxies = galaxies[galaxyPairs[:,0]]
     rGalaxies = galaxies[galaxyPairs[:,1]]
     del galaxyPairs
+
     
     #"Galaxy 1 VelocitieS"
     g1vs = lGalaxies[:,3]
@@ -140,7 +195,9 @@ def correlation(pairs,galaxies,intervals):
     cosdTheta = inner1d(g1norm,g2norm)
     cosTheta1 = inner1d(r,g1norm)
     cosTheta2 = inner1d(r,g2norm)
-    del g1norm, g2norm
+    ss(r)
+    print(gs(g1vs)+gs(g2vs)+gs(g1norm)+gs(g2norm)+gs(distBetweenG1G2)+gs(r)+gs(cosdTheta)+gs(cosTheta1)+gs(cosTheta2))
+    del g1norm, g2norm, r
     
     #The 'ind' stands for individual
     indPsiOneNum   = psiOneNumerator(g1vs,g2vs,cosdTheta)
@@ -179,7 +236,6 @@ def correlation(pairs,galaxies,intervals):
     psiParallel = ((1-b)*psione-(1-a)*psitwo)/aminusb
     psiPerpindicular = (a*psitwo-b*psione)/aminusb
     del aminusb
-    
     return (psione,psitwo,a,b,psiParallel,psiPerpindicular)
 
 
