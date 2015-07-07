@@ -87,9 +87,9 @@ def singlePlot(infile,intervals,units):
     galaxies = common.loadData(infile, dataType = "CF2")
 
     #Make an array of just the x,y,z coordinate and radial component of peculiar velocity (v)
-    if units == 'km/s':
+    if units == 'Mpc/h':
         galaxyXYZV = np.array([(a.x,a.y,a.z,a.v) for a in galaxies])
-    elif units == 'Mpc':
+    elif units == 'km/s':
         galaxyXYZV = np.array([a.getRedshiftXYZ() + (a.v,) for a in galaxies])
         #You can concatenate tuples. getRedshiftXYZ returnes a tuple, and I just append a.v to it.
     #Put just the galaxy positions into one array
@@ -101,7 +101,7 @@ def singlePlot(infile,intervals,units):
         raise
     return data
 
-@profile 
+#@profile 
 def _kd_query(positions,intervals):
     """Returns a np array of pairs of galaxies."""
     #This is still the best function, despite all of my scheming.
@@ -215,7 +215,16 @@ def correlation(positions,galaxies,intervals):
     indBNum        = bNumerator(cosTheta1,cosTheta2)
     indBDen        = bDenominator(cosTheta1,cosTheta2,cosdTheta)
     del cosTheta1, cosTheta2, cosdTheta
-    
+    np.savez_compressed('tmp/plotData_{}.npz'.format(hashlib.md5(str(positions).encode('utf-8')).hexdigest()),
+                        p1n = indPsiOneNum,
+                        p1d = indPsiOneDen,
+                        p2n = indPsiTwoNum,
+                        p2d = indPsiTwoDen,
+                        an  = indAFeldmanNum,
+                        ad  = indAFeldmanNum,
+                        bn  = indBNum,
+                        bd  = indBDen
+    )
     #The numpy histogram function returns a tuple of (stuff we want, the bins)
     #Since we already know the bins, we throw them out by taking the [0] element of the tuple.
     psiOneNum = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiOneNum)[0]
@@ -280,6 +289,7 @@ def stats(args):
     settings = common.getdict(args.settings)
     outfolder = settings["output_data_folder"]
     outfile   = settings["output_file_name"]
+    units = settings["binunits"]
     #XSrawInFile = settings["input_file"]
     
     if settings["many"]:
@@ -303,7 +313,7 @@ def stats(args):
         plt.plot(xs,b,'k--',label="$\cal B$")
         plt.title("Moment of the selection function")
         plt.ylabel("Value (unitless)")
-        plt.xlabel("Distance, Mpc/h")
+        plt.xlabel("Distance, {}".format(units))
         plt.legend(loc=2)
         #plt.yscale('log')
         #plt.xscale('log')
@@ -314,7 +324,7 @@ def stats(args):
         plt.plot(xs,psione,'-',label="$\psi_1$")
         plt.plot(xs,psitwo,'k--',label="$\psi_2$")
         plt.title("Velocity correlation function")
-        plt.xlabel("Distance, Mpc/h")
+        plt.xlabel("Distance, {}".format(units))
         plt.ylabel("Correlation, $10^4 (km/s)^2$")
         #plt.axis((0,31,0,32))
         plt.legend()
@@ -323,7 +333,7 @@ def stats(args):
         plt.plot(xs,psipar,'-',label='$\psi_{\parallel}')
         plt.plot(xs,psiprp,'-',label='$\psi_{\perp}')
         plt.title("Velocity correlation")
-        plt.xlabel("Distance, Mpc/h")
+        plt.xlabel("Distance, {}".format(units))
         plt.ylabel("Correlation, $(km/s)^2$")
         plt.legend()
 
@@ -339,6 +349,8 @@ def standBackStats(args):
     settings = common.getdict(args.settings)
     outfolder = settings["output_data_folder"]
     outfile   = settings["output_file_name"]
+    units     = settings["binunits"]
+    name =      settings["readable_name"]
     #XSrawInFile = settings["input_file"]
 
     xs = common.getdict(outfolder+outfile.format(settings['offset'])+'_rawdata.json')['xs']
@@ -359,7 +371,7 @@ def standBackStats(args):
 
     #correlationScale = (0,30,0,160000)
     #momentScale = (0,30,0.25,1.1)
-    plotName = "CF2 Group"
+    plotName = name
 
     matplotlib.rc('font',size=10)
     
@@ -420,7 +432,7 @@ def standBackStats(args):
     ax5.fill_between(xs,low68[4]/10**4,hi68[4]/10**4,facecolor='black',alpha=0.25)
     ax5.fill_between(xs,low95[4]/10**4,hi95[4]/10**4,facecolor='black',alpha=0.25)
     ax5.set_title('$\Psi_{{\parallel}}$ Correlation')
-    ax5.set_xlabel('Distance, Mpc/h')
+    ax5.set_xlabel('Distance, {}'.format(units))
     ax5.set_ylabel('Correlation, $10^4 (km/s)^2$')
     #plt.axis(correlationScale)
     
@@ -431,7 +443,7 @@ def standBackStats(args):
     ax6.fill_between(xs,low68[5]/10**4,hi68[5]/10**4,facecolor='black',alpha=0.25)
     ax6.fill_between(xs,low95[5]/10**4,hi95[5]/10**4,facecolor='black',alpha=0.25)
     ax6.set_title('$\Psi_{{\perp}}$ Correlation')
-    ax6.set_xlabel('Distance, Mpc/h')
+    ax6.set_xlabel('Distance, {}'.format(units))
     #plt.ylabel('Correlation, $(km/s)^2$')
     #ax6.axis(correlationScale)
     
