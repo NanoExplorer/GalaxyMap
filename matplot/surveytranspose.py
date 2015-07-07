@@ -4,12 +4,14 @@ import scipy.spatial as space
 import math
 
 def transpose(args):
-    hubble_constant = 74.4
+    hubble_constant = 100
     survey_info = common.getdict(args.survey_file)
     for survey in survey_info:
         outCF2String = "" 
         with open(survey['name'],'r') as csvFile:
             for line in csvFile:
+                if line[0] == '#':
+                    continue
                 galaxy=common.MillenniumGalaxy(line)
                 center = survey['center']
                 rotationMatrix = np.matrix(survey['rot'])

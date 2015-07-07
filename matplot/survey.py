@@ -236,7 +236,6 @@ def surveyBins(distanceFile,binsize,boxMaxDistance):
     Takes in the survey centerpoints and calculates bins for each of the surveys
     By that I mean it counts the number of galaxies in each bin up to 'chop' using the same method
     as surveystats.
-
     The distance file MUST exist before this method is called.
     """
     distances = np.load(distanceFile)
