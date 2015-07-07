@@ -422,6 +422,11 @@ class CF2:
         outstr += "with peculiar velocity {} km/s.\n".format(self.v)
         outstr += "This galaxy is in the sky at galactic latitude {} and longitude {} (deg)".format(self.lat,self.lon)
         return outstr
+    def getRedshiftXYZ(self):
+        redx = self.cz*math.sin(self.phi)*math.cos(self.theta)
+        redy = self.cz*math.sin(self.phi)*math.sin(self.theta)
+        redz = self.cz*math.cos(self.phi)
+        return(redx,redy,redz)
         
 class MillenniumFiles:
     """
@@ -538,16 +543,15 @@ class MillenniumGalaxy:
         """
         #If we get the entire csv line as a string, we can just split it and make sure everything's a float.
         if type(galaxy) is str:
-            self.galaxList = [float(x) for x in galaxy.strip().split(',')]
+            self.galaxList = [float(x) for x in galaxy.strip().split(',')[0:22]]
+            #the 0:22 is there to prevent hanging commas from destroying everything
         elif type(galaxy) is list:
             #If we get a list, we assume it is already full of floats.
             self.galaxList = list(galaxy)
             #The list() function is used to make sure we have a copy of the galaxy list and not the original.
         else:
             raise TypeError("Millennium Galaxies can only be constructed with lists or csv strings.")
-
-        assert(len(self.galaxList) == 22)
-
+            
         #This next part is really ugly. I apologize.
         #If you think of a better way to do this, email me at christopher@rooneyworks.com
         #I'm thinking I could use a dictionary or something like that...
