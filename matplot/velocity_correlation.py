@@ -51,32 +51,6 @@ def main(args):
     #that line with this one:
     #plots = pool.map(singlePlotStar,zip(inFileList,
     
-    for n,plot in enumerate(plots):
-        psione = [x for x in plot[0]]
-        psitwo = [y for y in plot[1]]
-        a = [z for z in plot[2]]
-        b = [dataPoint for dataPoint in plot[3]]
-        psiParallel = [thing for thing in plot[4]]
-        psiPerpindicular = [pp for pp in plot[5]]
-        common.writedict(outfolder+outfile.format(n+settings['offset'])+'_rawdata.json',{'psione':psione,
-                                                                                         'psitwo':psitwo,
-                                                                                         'a':a,
-                                                                                         'b':b,
-                                                                                         'xs':xs,
-                                                                                         'psi_parallel':psiParallel,
-                                                                                         'psi_perpindicular':psiPerpindicular
-                                                                                     })
-        np.save(outfolder+outfile.format(n+settings['offset'])+'_rawdata.npy',np.array([psione,
-                                                                                        psitwo,
-                                                                                        a,
-                                                                                        b,
-                                                                                        psiParallel,
-                                                                                        psiPerpindicular]))
-        #End for loop
-    if not hasattr(args,'plot'):
-        #This function was called by the galaxy.py interface, and we should plot.
-        #If the attribute exists, then the if __name__=='__main__': thingy will take care of everything.
-        stats(args)
 
 def singlePlotStar(args):
     return singlePlot(*args)
@@ -93,9 +67,8 @@ def singlePlot(infile,intervals,units):
         galaxyXYZV = np.array([a.getRedshiftXYZ() + (a.v,) for a in galaxies])
         #You can concatenate tuples. getRedshiftXYZ returnes a tuple, and I just append a.v to it.
     #Put just the galaxy positions into one array
-    positions = galaxyXYZV[:,0:3] # [(x,y,z),...]
     try:
-        data = correlation(positions,galaxyXYZV,intervals)
+        data = correlation(galaxyXYZV,intervals)
     except RuntimeError:
         print("Runtime Error encountered at {}.".format(infile))
         raise
@@ -126,30 +99,6 @@ def _kd_query(positions,intervals):
         np.save(tmpfilename,pairarray)
         return pairarray
     
-#@profile
-# def _kd_query_new(positions,intervals):
-#     """The new kd query method attempts to improve upon the old one by using a different method from the
-#     kd tree class. Instead of using a python set, which leads to pain and harship, the kd tree will return
-#     lists. Since the most time-consuming part of the old mehtod was transforming the set into a numpy array,
-#     maybe this will be faster."""
-#     #So far this implementation is not complete, and it's much more complicated than the original kd query.
-#     #Occam's razor is telling me the best way to solve my problem is to use custom pyx code to implement a
-#     #special type of pairs query.
-#     kd = cKDTree(positions)
-    
-#     tree = kd.query_ball_tree(kd,0.1)#max(intervals))
-#     same = kd.query_ball_tree(kd,np.finfo(float).eps)
-#     #Warning: Naive for loops to follow. The performance of this will be evaluated soon
-#     print(tree)
-#     for n,item in enumerate(tree):
-#         item[n] = [i for i in item if i < n]
-#     print(tree)
-#     for n,item in enumerate(same):
-#         if len(item) > 0:
-#             for thing in item:
-#                 tree[n].remove(thing)
-#     pairs = []
-    
 
 # def ss(numpyarray):
 #     print(numpyarray.nbytes)
@@ -158,7 +107,7 @@ def _kd_query(positions,intervals):
 #     return numpyarray.nbytes
 
 #@profile
-def correlation(positions,galaxies,intervals):
+def correlation(galaxies,intervals):
     
     #There are lots of dels in this function because otherwise it tends to gobble up memory.
     #I think there might be a better way to deal with the large amounts of memory usage, but I don't yet
@@ -166,15 +115,15 @@ def correlation(positions,galaxies,intervals):
     
     # galaxies = [(galaxies[a],galaxies[b]) for a,b in interval_shell]
 
-    galaxyPairs = _kd_query(positions,intervals)
+    galaxyPairs = _kd_query(galaxies[:,0:3],intervals)
     #print("Done! (with the thing)")
     lGalaxies = galaxies[galaxyPairs[:,0]]
     rGalaxies = galaxies[galaxyPairs[:,1]]
     del galaxyPairs
     
     #"Galaxy 1 VelocitieS"
-    g1vs = lGalaxies[:,3]
-    g2vs = rGalaxies[:,3]
+    g1vs  = lGalaxies[:,3]
+    g2vs  = rGalaxies[:,3]
     g1pos = lGalaxies[:,0:3]
     g2pos = rGalaxies[:,0:3]
     del lGalaxies, rGalaxies
@@ -223,8 +172,46 @@ def correlation(positions,galaxies,intervals):
                         an  = indAFeldmanNum,
                         ad  = indAFeldmanNum,
                         bn  = indBNum,
-                        bd  = indBDen
+                        bd  = indBDen,
+                        dist= distBetweenG1G2
     )
+
+def histograminator(args):
+    settings = common.getdict(args.settings)
+    rawInFile = settings["input_file"]
+    if settings["many"]:
+        #If there are lots of files, set them up accordingly.
+        inFileList = [rawInFile.format(x+settings['offset']) for x in range(settings["num_files"])]
+    else:
+        inFileList = [rawInFile]
+    min_r =     settings["min_r"]
+    numpoints = settings["numpoints"]
+    dr =        settings["dr"]
+    step_type = settings["step_type"]
+    xs,intervals = common.genBins(min_r,numpoints,dr,step_type)
+
+    pool = Pool()
+    units = settings['binunits']
+    strings = pool.starmap(strload, zip(inFileList,itertools.repeat(units)))
+    pool.starmap(singleHistogram,zip(strings,itertools.repeat(intervals)))
+
+def strload(filename,units):
+    if units = 'Mpc/h':
+        return str(np.array([(a.x,a.y,a.z,a.v) for a in galaxies]))
+    elif units = 'km/s':
+        return str(np.array([a.getRedshiftXYZ() + (a.v,) for a in galaxies]))
+
+def singleHistogram(positionsStr,intervals):
+    with np.load('tmp/plotData_{}.npz'.format(hashlib.md5(positionsStr.encode('utf-8')).hexdigest())) as data: 
+        psiOneNum = data['p1n']
+        psiOneDen = data['p1d']
+        psiTwoNum = data['p2n']
+        psiTwoDen = data['p2d']
+        aNum = data['an']
+        aDen = data['ad']
+        bNum = data['an']
+        bDen = data['bd']
+        distBetweenG1G2 = data['dist']
     #The numpy histogram function returns a tuple of (stuff we want, the bins)
     #Since we already know the bins, we throw them out by taking the [0] element of the tuple.
     psiOneNum = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiOneNum)[0]
@@ -235,23 +222,34 @@ def correlation(positions,galaxies,intervals):
     aDen      = np.histogram(distBetweenG1G2,bins = intervals,weights = indAFeldmanDen)[0]
     bNum      = np.histogram(distBetweenG1G2,bins = intervals,weights = indBNum)[0]
     bDen      = np.histogram(distBetweenG1G2,bins = intervals,weights = indBDen)[0]
-    del indPsiOneNum, indPsiOneDen, indPsiTwoNum, indPsiTwoDen
-    del indAFeldmanNum, indAFeldmanDen, indBNum, indBDen
     
     psione = psiOneNum/psiOneDen
     psitwo = psiTwoNum/psiTwoDen
     del psiOneNum, psiOneDen, psiTwoNum, psiTwoDen
     a = aNum/aDen
     b = bNum/bDen
-    del aNum, aDen
+    del aNum, aDen, bNum, bDen
     
-    #af = afNum/afDen
     aminusb = (a-b)
     psiParallel = ((1-b)*psione-(1-a)*psitwo)/aminusb
     psiPerpindicular = (a*psitwo-b*psione)/aminusb
     del aminusb
-    return (psione,psitwo,a,b,psiParallel,psiPerpindicular)
 
+    #I should probably get rid of one of these, because otherwise it's just wasted space.
+    common.writedict(outfolder+outfile.format(n+settings['offset'])+'_rawdata.json',{'psione':psione,
+                                                                                     'psitwo':psitwo,
+                                                                                     'a':a,
+                                                                                     'b':b,
+                                                                                     'xs':xs,
+                                                                                     'psi_parallel':psiParallel,
+                                                                                     'psi_perpindicular':psiPerpindicular
+                                                                                 })
+    np.save(outfolder+outfile.format(n+settings['offset'])+'_rawdata.npy',np.array([psione,
+                                                                                    psitwo,
+                                                                                    a,
+                                                                                    b,
+                                                                                    psiParallel,
+                                                                                    psiPerpindicular]))
 
 def psiOneNumerator(rv1, rv2, cosdTheta):
     """
@@ -449,27 +447,30 @@ def standBackStats(args):
     
     with pdfback.PdfPages(outfolder+outfile.format("MACRO")) as pdf:
         pdf.savefig(f)
-    
+        
 if __name__ == "__main__":
     arrrghs = common.parseCmdArgs([['settings'],
                                    ['-c','--comp'],
-                                   ['-p','--plot'],
-                                   ['-s','--stats'],
-                                   ['-o','--onlystats']],
+                                   ['-H','--hist'],
+                                   ['-p','--plots'],
+                                   ['-s','--stats']],
                                   ['Settings json file',
-                                   'only do computations, no plotting',
-                                   'only plot, no computations',
-                                   'do the overview stats routine after computing',
-                                   'do only the overview stats routine'
+                                   'Compute values for individual galaxies',
+                                   'Compute histograms (requires a prior or concurrent -c run)',
+                                   'Make a plot for every input survey (requires a prior or concurrent -H run)',
+                                   'Do the overview stats routine, one plot for all surveys (requires a prior or concurrent -H run)'
                                   ],
                                    [str,'bool','bool','bool','bool'])
-    if not arrrghs.plot and not arrrghs.onlystats:
+    if arrrghs.comp:
         print("computing...")
         main(arrrghs)
-    if not arrrghs.comp and not arrrghs.onlystats:
+    if arrrghs.hist:
+        print("Histogramming...")
+        histograminator(arrrghs)
+    if arrrghs.plots:
         print('plotting...')
         stats(arrrghs)
-    if arrrghs.stats or arrrghs.onlystats:
+    if arrrghs.stats:
         print('statting..?')
         print('no, that doesn\'t sound right')
         print('computing statistics...')
