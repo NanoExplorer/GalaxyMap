@@ -17,48 +17,97 @@ from numpy.core.umath_tests import inner1d #Note: this function has no documenta
 #     return (a*b).sum(axis=1)
 import gc
 
+TEMP_DIRECTORY = "/media/christopher/2TB/Christopher/code/Physics/GalaxyMap/tmp"
+
+
 def main(args):
     np.seterr(divide='ignore',invalid='ignore')
     """ Compute the velocity correlations on one or many galaxy surveys. 
     """
     #Get setup information from the settings file
     settings = common.getdict(args.settings)
-    numpoints = settings["numpoints"]
-    dr =        settings["dr"]
-    min_r =     settings["min_r"]
-    outfolder = settings["output_data_folder"]
-    outfile   = settings["output_file_name"]
-    step_type = settings["step_type"]
-    rawInFile = settings["input_file"]
-    try:
-        units = settings['binunits']
-    except:
-        units = 'Mpc' #Backwards compatibility
+    numpoints = settings['numpoints']
+    dr =        settings['dr']
+    min_r =     settings['min_r']
+    outfile   = settings['output_file_name']
+    step_type = settings['step_type']
+    rawInFile = settings['input_file']
+    units =     settings['binunits']
+
     pool = Pool()              
-    if settings["many"]:
+    if settings['many']:
         #If there are lots of files, set them up accordingly.
-        inFileList = [rawInFile.format(x+settings['offset']) for x in range(settings["num_files"])]
+        inFileList = [rawInFile.format(x+settings['offset']) for x in range(settings['num_files'])]
+        histogramFiles = [TEMP_DIRECTORY + 'histogram_binsize-{}_{}.npy'.format(dr,
+                                                                   hashlib.md5(infile.encode('utf-8')).hexdigest()
+                                                                  ) for infile in inFileList]
+        #Warning: This assumes that the infiles don't ever change. Make sure to clean your cache regularly!
+        #HistogramFiles are the places where histograms from the singleHistogram function are stored.
+        outfiles = [outfile.format(x+settings['offset']) + '.pdf' for x in range(settings['num_files'])]
     else:
         inFileList = [rawInFile]
 
     xs,intervals = common.genBins(min_r,numpoints,dr,step_type)
+    
+    if args.comp:
+        print('computing...')
+        nothing = pool.starmap(compute,zip(inFileList, #See comment lines below for error fixes
+                                 itertools.repeat(intervals),
+                                 itertools.repeat(units)
+        )) #see comment lines below for error fixes
+        #NOTE: If this line gives you trouble (e.g. 'pool doesn't have a member called starmap'), just replace
+        #that line with this one:
+        #pool.map(computeStar,zip(inFileList,
+        list(nothing) #stupid lazy functions. I tell ya...
 
-    plots = pool.starmap(singlePlot,zip(inFileList, #See comment lines below for error fixes
-                                        itertools.repeat(intervals),
-                                        itertools.repeat(units)
-                                    )) #see comment lines below for error fixes
-    #NOTE: If this line gives you trouble (e.g. 'pool doesn't have a member called starmap'), just replace
-    #that line with this one:
-    #plots = pool.map(singlePlotStar,zip(inFileList,
+    if args.hist:
+        print('Histogramming...')
+        strings = pool.starmap(strload, zip(inFileList,
+                                            itertools.repeat(units)))
+
+        #There's a HUGE performance gain for not multithreading this part. Go figure
+        nothing = itertools.starmap(singleHistogram,zip(strings,
+                                                        itertools.repeat(xs),
+                                                        itertools.repeat(intervals),
+                                                        histogramFiles
+        ))
+        list(nothing) #because itertools starmap is LAZY
+    if args.plots:
+        print('plotting...')
+        pool.starmap(stats,zip(outfiles,
+                               histogramFiles,
+                               itertools.repeat(units)))
+    if args.stats:
+        print('statting..?')
+        print('no, that doesn\'t sound right')
+        print('computing statistics...')
+        standBackStats(histogramFiles,settings['readable_name'],units,outfile.format('') + '.pdf')
+
+
+def computeStar(args):
+    """Helper function for older systems that do not have the pool.starmap() function available"""
+    return compute(*args)
     
 
-def singlePlotStar(args):
-    return singlePlot(*args)
-    
+def compute(infile,intervals,units):
+    """Formerly called 'singlePlot,' this function computes all pair-pair galaxy information,
+    including figuring out the list of pairs.
+    Input - cf2 file to read from.
+          - Intervals (to determine maximum value to find pairs to).
+          - units (km/s or Mpc/h) to determine which quantities from input data we should use
+    Output - None
+    Side effects - writes a file in the /tmp directory containing raw pair-pair information
+         This file is called plotData_<HASH>.npz, where the hash is an md5 hash of the str output of the
+         'galaxyXYZV' np array.
+                 - writes a file in the /tmp directory containing a list of pairs.
+         This file is called rawkd_<LENGTH-WE-VISITED-TO>_<HASH>.npy where the hash is determined in the same way
+         as above.
 
-def singlePlot(infile,intervals,units):
+    Future improvements - Maybe return the hash instead of nothing, so we don't have to rebuild the hashes later?
+    Maybe index all hashes into a helpful file in the tmp directory?
+    """
     #Load the survey
-    galaxies = common.loadData(infile, dataType = "CF2")
+    galaxies = common.loadData(infile, dataType = 'CF2')
 
     #Make an array of just the x,y,z coordinate and radial component of peculiar velocity (v)
     if units == 'Mpc/h':
@@ -67,10 +116,11 @@ def singlePlot(infile,intervals,units):
         galaxyXYZV = np.array([a.getRedshiftXYZ() + (a.v,) for a in galaxies])
         #You can concatenate tuples. getRedshiftXYZ returnes a tuple, and I just append a.v to it.
     #Put just the galaxy positions into one array
+
     try:
         data = correlation(galaxyXYZV,intervals)
     except RuntimeError:
-        print("Runtime Error encountered at {}.".format(infile))
+        print('Runtime Error encountered at {}.'.format(infile))
         raise
     return data
 
@@ -78,13 +128,14 @@ def singlePlot(infile,intervals,units):
 def _kd_query(positions,intervals):
     """Returns a np array of pairs of galaxies."""
     #This is still the best function, despite all of my scheming.
-    tmpfilename = 'tmp/rawkd_{}_{}.npy'.format(max(intervals),
+    tmpfilename = TEMP_DIRECTORY + 'rawkd_{}_{}.npy'.format(max(intervals),
                                                hashlib.md5(str(positions).encode('utf-8')).hexdigest())
     #Warning: There might be more hash collisions because of this string ^ conversion. Hopefully not.
     if os.path.exists(tmpfilename):
-        print("You should see this line either 'num_files' times or zero times.")
+        print("!",end="",flush=True)
         return np.load(tmpfilename)
     else:
+        print(".",end="",flush=True)
         kd = cKDTree(positions)
         pairs = kd.query_pairs(max(intervals))
         #print(len(pairs))
@@ -106,15 +157,14 @@ def _kd_query(positions,intervals):
 # def gs(numpyarray):
 #     return numpyarray.nbytes
 
-#@profile
+
 def correlation(galaxies,intervals):
-    
+    """ Computes the raw galaxy-galaxy correlation information on a per-galaxy basis, and saves it to file"""
     #There are lots of dels in this function because otherwise it tends to gobble up memory.
     #I think there might be a better way to deal with the large amounts of memory usage, but I don't yet
     #know what it is.
     
     # galaxies = [(galaxies[a],galaxies[b]) for a,b in interval_shell]
-
     galaxyPairs = _kd_query(galaxies[:,0:3],intervals)
     #print("Done! (with the thing)")
     lGalaxies = galaxies[galaxyPairs[:,0]]
@@ -164,62 +214,79 @@ def correlation(galaxies,intervals):
     indBNum        = bNumerator(cosTheta1,cosTheta2)
     indBDen        = bDenominator(cosTheta1,cosTheta2,cosdTheta)
     del cosTheta1, cosTheta2, cosdTheta
-    np.savez_compressed('tmp/plotData_{}.npz'.format(hashlib.md5(str(positions).encode('utf-8')).hexdigest()),
-                        p1n = indPsiOneNum,
-                        p1d = indPsiOneDen,
-                        p2n = indPsiTwoNum,
-                        p2d = indPsiTwoDen,
-                        an  = indAFeldmanNum,
-                        ad  = indAFeldmanNum,
-                        bn  = indBNum,
-                        bd  = indBDen,
-                        dist= distBetweenG1G2
+    # np.savez_compressed(TEMP_DIRECTORY+'plotData_{}.npz'.format(hashlib.md5(str(galaxies).encode('utf-8')).hexdigest()),
+    #                     p1n = indPsiOneNum,
+    #                     p1d = indPsiOneDen,
+    #                     p2n = indPsiTwoNum,
+    #                     p2d = indPsiTwoDen,
+    #                     an  = indAFeldmanNum,
+    #                     ad  = indAFeldmanDen,
+    #                     bn  = indBNum,
+    #                     bd  = indBDen,
+    #                     dist= distBetweenG1G2
+    # )
+    np.save(TEMP_DIRECTORY+'plotData_{}.npy'.format(hashlib.md5(str(galaxies).encode('utf-8')).hexdigest()),
+            np.array([indPsiOneNum,
+                     indPsiOneDen,
+                     indPsiTwoNum,
+                     indPsiTwoDen,
+                     indAFeldmanNum,
+                     indAFeldmanDen,
+                     indBNum,
+                     indBDen,
+                     distBetweenG1G2
+            ])
     )
-
-def histograminator(args):
-    settings = common.getdict(args.settings)
-    rawInFile = settings["input_file"]
-    if settings["many"]:
-        #If there are lots of files, set them up accordingly.
-        inFileList = [rawInFile.format(x+settings['offset']) for x in range(settings["num_files"])]
-    else:
-        inFileList = [rawInFile]
-    min_r =     settings["min_r"]
-    numpoints = settings["numpoints"]
-    dr =        settings["dr"]
-    step_type = settings["step_type"]
-    xs,intervals = common.genBins(min_r,numpoints,dr,step_type)
-
-    pool = Pool()
-    units = settings['binunits']
-    strings = pool.starmap(strload, zip(inFileList,itertools.repeat(units)))
-    pool.starmap(singleHistogram,zip(strings,itertools.repeat(intervals)))
+    
 
 def strload(filename,units):
-    if units = 'Mpc/h':
+    """Loads up CF2 files and uses them to rebuild the hash database.
+    Returns a list of strings. The strings should be hashed with hashlib.md5(string.encode('utf-8')).hexdigest()"""
+    galaxies = common.loadData(filename, dataType = 'CF2')
+    if units == 'Mpc/h':
         return str(np.array([(a.x,a.y,a.z,a.v) for a in galaxies]))
-    elif units = 'km/s':
+    elif units == 'km/s':
         return str(np.array([a.getRedshiftXYZ() + (a.v,) for a in galaxies]))
+    else:
+        raise ValueError("Value of 'units' must be 'Mpc/h' or 'km/s'. Other unit schemes do not exist at present")
 
-def singleHistogram(positionsStr,intervals):
-    with np.load('tmp/plotData_{}.npz'.format(hashlib.md5(positionsStr.encode('utf-8')).hexdigest())) as data: 
-        psiOneNum = data['p1n']
-        psiOneDen = data['p1d']
-        psiTwoNum = data['p2n']
-        psiTwoDen = data['p2d']
-        aNum = data['an']
-        aDen = data['ad']
-        bNum = data['an']
-        bDen = data['bd']
-        distBetweenG1G2 = data['dist']
+
+def singleHistogram(positionsStr,xs,intervals,writeOut):
+    """Bins individual galaxy-pair data by distance, and writes the results to a np array file."""
+    try:
+        data =np.load(TEMP_DIRECTORY+'plotData_{}.npy'.format(hashlib.md5(positionsStr.encode('utf-8')).hexdigest()))
+        indPsiOneNum = data[0]#['p1n']
+        indPsiOneDen = data[1]#['p1d']
+        indPsiTwoNum = data[2]#['p2n']
+        indPsiTwoDen = data[3]#['p2d']
+        indANum = data[4]#['an']
+        indADen = data[5]#['ad']
+        indBNum = data[6]#['bn']
+        indBDen = data[7]#['bd']
+        distBetweenG1G2 = data[8]#['dist']
+        del data
+        print("y",end="",flush=True)
+    except FileNotFoundError:
+        with np.load(TEMP_DIRECTORY+'plotData_{}.npz'.format(hashlib.md5(positionsStr.encode('utf-8')).hexdigest())) as data: 
+        
+            indPsiOneNum = data['p1n']
+            indPsiOneDen = data['p1d']
+            indPsiTwoNum = data['p2n']
+            indPsiTwoDen = data['p2d']
+            indANum = data['an']
+            indADen = data['ad']
+            indBNum = data['bn']
+            indBDen = data['bd']
+            distBetweenG1G2 = data['dist']
+            print("z",end="",flush=True)
     #The numpy histogram function returns a tuple of (stuff we want, the bins)
     #Since we already know the bins, we throw them out by taking the [0] element of the tuple.
     psiOneNum = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiOneNum)[0]
     psiOneDen = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiOneDen)[0]
     psiTwoNum = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiTwoNum)[0]
     psiTwoDen = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiTwoDen)[0]
-    aNum      = np.histogram(distBetweenG1G2,bins = intervals,weights = indAFeldmanNum)[0]
-    aDen      = np.histogram(distBetweenG1G2,bins = intervals,weights = indAFeldmanDen)[0]
+    aNum      = np.histogram(distBetweenG1G2,bins = intervals,weights = indANum)[0]
+    aDen      = np.histogram(distBetweenG1G2,bins = intervals,weights = indADen)[0]
     bNum      = np.histogram(distBetweenG1G2,bins = intervals,weights = indBNum)[0]
     bDen      = np.histogram(distBetweenG1G2,bins = intervals,weights = indBDen)[0]
     
@@ -234,22 +301,8 @@ def singleHistogram(positionsStr,intervals):
     psiParallel = ((1-b)*psione-(1-a)*psitwo)/aminusb
     psiPerpindicular = (a*psitwo-b*psione)/aminusb
     del aminusb
-
-    #I should probably get rid of one of these, because otherwise it's just wasted space.
-    common.writedict(outfolder+outfile.format(n+settings['offset'])+'_rawdata.json',{'psione':psione,
-                                                                                     'psitwo':psitwo,
-                                                                                     'a':a,
-                                                                                     'b':b,
-                                                                                     'xs':xs,
-                                                                                     'psi_parallel':psiParallel,
-                                                                                     'psi_perpindicular':psiPerpindicular
-                                                                                 })
-    np.save(outfolder+outfile.format(n+settings['offset'])+'_rawdata.npy',np.array([psione,
-                                                                                    psitwo,
-                                                                                    a,
-                                                                                    b,
-                                                                                    psiParallel,
-                                                                                    psiPerpindicular]))
+    finalResults = np.array( (psione,psitwo,a,b,psiParallel,psiPerpindicular,xs) )
+    np.save(writeOut,finalResults)
 
 def psiOneNumerator(rv1, rv2, cosdTheta):
     """
@@ -281,85 +334,64 @@ def bDenominator(costheta1,costheta2,cosdTheta):
     return costheta1*costheta2*cosdTheta
 
 #@profile
-def stats(args):
-    """Make plots of the data output by the main function"""
+def stats(writeOut,readIn,units):
+    """Make plots of the data output by the main function
+    """
+    Y_SCALE_FACTOR = 10**4
     #Get settings
-    settings = common.getdict(args.settings)
-    outfolder = settings["output_data_folder"]
-    outfile   = settings["output_file_name"]
-    units = settings["binunits"]
-    #XSrawInFile = settings["input_file"]
-    
-    if settings["many"]:
-        inFileList = [outfolder+outfile.format(x+settings['offset'])+'_rawdata.json' for x in range(settings["num_files"])]
-    else:
-        inFileList = [outfolder+outfile+'_rawdata.json']
+    data = np.load(readIn)
+    xs = data[6]
+    a = data[2]
+    b = data[3]
+    psione = data[0]/Y_SCALE_FACTOR
+    psitwo = data[1]/Y_SCALE_FACTOR
+    psipar = data[4]/Y_SCALE_FACTOR
+    psiprp = data[5]/Y_SCALE_FACTOR
 
-    for n,infile in enumerate(inFileList):
-        data = common.getdict(infile)
-        xs = data['xs']
-        a = data['a']
-        b = data['b']
-        psione = [x/10**4 for x in data['psione']]
-        psitwo = [x/10**4 for x in data['psitwo']]
-
-        psipar = data['psi_parallel']
-        psiprp = data['psi_perpindicular']
-
-        fig = plt.figure()
-        plt.plot(xs,a,'-',label="$\cal A$ (Borgani)")
-        plt.plot(xs,b,'k--',label="$\cal B$")
-        plt.title("Moment of the selection function")
-        plt.ylabel("Value (unitless)")
-        plt.xlabel("Distance, {}".format(units))
-        plt.legend(loc=2)
-        #plt.yscale('log')
-        #plt.xscale('log')
-        #plt.axis((0,31,.62,.815))
+    fig = plt.figure()
+    plt.plot(xs,a,'-',label='$\cal A$ (Borgani)')
+    plt.plot(xs,b,'k--',label='$\cal B$')
+    plt.title('Moment of the selection function')
+    plt.ylabel('Value (unitless)')
+    plt.xlabel('Distance, {}'.format(units))
+    plt.legend(loc=2)
+    #plt.yscale('log')
+    #plt.xscale('log')
+    #plt.axis((0,31,.62,.815))
 
 
-        fig2 = plt.figure()
-        plt.plot(xs,psione,'-',label="$\psi_1$")
-        plt.plot(xs,psitwo,'k--',label="$\psi_2$")
-        plt.title("Velocity correlation function")
-        plt.xlabel("Distance, {}".format(units))
-        plt.ylabel("Correlation, $10^4 (km/s)^2$")
-        #plt.axis((0,31,0,32))
-        plt.legend()
+    fig2 = plt.figure()
+    plt.plot(xs,psione,'-',label='$\psi_1$')
+    plt.plot(xs,psitwo,'k--',label="$\psi_2$")
+    plt.title('Velocity correlation function')
+    plt.xlabel('Distance, {}'.format(units))
+    plt.ylabel('Correlation, $10^4 (km/s)^2$')
+    #plt.axis((0,31,0,32))
+    plt.legend()
 
-        fig3 = plt.figure()
-        plt.plot(xs,psipar,'-',label='$\psi_{\parallel}')
-        plt.plot(xs,psiprp,'-',label='$\psi_{\perp}')
-        plt.title("Velocity correlation")
-        plt.xlabel("Distance, {}".format(units))
-        plt.ylabel("Correlation, $(km/s)^2$")
-        plt.legend()
+    fig3 = plt.figure()
+    plt.plot(xs,psipar,'-',label='$\psi_{\parallel}')
+    plt.plot(xs,psiprp,'-',label='$\psi_{\perp}')
+    plt.title('Velocity correlation')
+    plt.xlabel('Distance, {}'.format(units))
+    plt.ylabel('Correlation, $(km/s)^2$')
+    plt.legend()
 
-        with pdfback.PdfPages(outfolder+outfile.format(n+settings['offset'])) as pdf:
-            pdf.savefig(fig3)
-            pdf.savefig(fig2)
-            pdf.savefig(fig)
-        plt.close('all')
+    with pdfback.PdfPages(writeOut) as pdf:
+        pdf.savefig(fig3)
+        pdf.savefig(fig2)
+        pdf.savefig(fig)
+    plt.close(fig)
+    plt.close(fig2)
+    plt.close(fig3)
 
-def standBackStats(args):
+def standBackStats(inFileList,name,units,writeOut):
     """Do statistics over many input files, for example the three groups of 100 surveys. Average them, plot w/errorbars."""
-    #Get settings
-    settings = common.getdict(args.settings)
-    outfolder = settings["output_data_folder"]
-    outfile   = settings["output_file_name"]
-    units     = settings["binunits"]
-    name =      settings["readable_name"]
-    #XSrawInFile = settings["input_file"]
-
-    xs = common.getdict(outfolder+outfile.format(settings['offset'])+'_rawdata.json')['xs']
-    if settings["many"]:
-        inFileList = [outfolder+outfile.format(x+settings['offset'])+'_rawdata.npy' for x in range(settings["num_files"])]
-    else:
-        raise RuntimeError("The averaging routines require multiple files to average.")
-    
-    allData = np.array(list(map(np.load, inFileList)))
+    print("Actually statting...?")
+    pool = Pool()
+    allData = np.array(list(pool.map(np.load, inFileList)))
     #One inFile contains the following: [p1, p2, a, b, psiparallel, psiperpindicular]
-    print(allData.shape)
+    xs = allData[0][6]
     std = np.std(allData,axis=0)
     avg = np.mean(allData,axis=0)
     low68 = np.percentile(allData,16,axis=0)
@@ -374,7 +406,7 @@ def standBackStats(args):
     matplotlib.rc('font',size=10)
     
     f, ((ax1,ax2),(ax3,ax4),(ax5,ax6)) = plt.subplots(3,2,sharex='col',sharey='row',figsize=(8.5,11))
-    f.suptitle("Statistics of the {} Survey Mocks".format(plotName))
+    f.suptitle('Statistics of the {} Survey Mocks'.format(plotName))
     ax1.errorbar(xs,
                  avg[0]/10**4,
                  yerr=std[0]/10**4,
@@ -433,7 +465,7 @@ def standBackStats(args):
     ax5.set_xlabel('Distance, {}'.format(units))
     ax5.set_ylabel('Correlation, $10^4 (km/s)^2$')
     #plt.axis(correlationScale)
-    
+
     ax6.errorbar(xs,avg[5]/10**4, yerr=std[5]/10**4, fmt = 'k-',
                  elinewidth=0.5,
                  capsize=2,
@@ -444,8 +476,15 @@ def standBackStats(args):
     ax6.set_xlabel('Distance, {}'.format(units))
     #plt.ylabel('Correlation, $(km/s)^2$')
     #ax6.axis(correlationScale)
+
+    if units == 'km/s':
+        ax5.set_xbound(0,100*100)
+        ax6.set_xbound(0,100*100)
+    else:
+        ax5.set_xbound(0,100)
+        ax6.set_xbound(0,100)
     
-    with pdfback.PdfPages(outfolder+outfile.format("MACRO")) as pdf:
+    with pdfback.PdfPages(writeOut) as pdf:
         pdf.savefig(f)
         
 if __name__ == "__main__":
@@ -461,21 +500,7 @@ if __name__ == "__main__":
                                    'Do the overview stats routine, one plot for all surveys (requires a prior or concurrent -H run)'
                                   ],
                                    [str,'bool','bool','bool','bool'])
-    if arrrghs.comp:
-        print("computing...")
-        main(arrrghs)
-    if arrrghs.hist:
-        print("Histogramming...")
-        histograminator(arrrghs)
-    if arrrghs.plots:
-        print('plotting...')
-        stats(arrrghs)
-    if arrrghs.stats:
-        print('statting..?')
-        print('no, that doesn\'t sound right')
-        print('computing statistics...')
-        standBackStats(arrrghs)
-
+    main(arrrghs)
     
 
 
