@@ -17,7 +17,7 @@ from numpy.core.umath_tests import inner1d #Note: this function has no documenta
 #     return (a*b).sum(axis=1)
 import gc
 
-TEMP_DIRECTORY = "/media/christopher/2TB/Christopher/code/Physics/GalaxyMap/tmp"
+TEMP_DIRECTORY = "/media/christopher/2TB/Christopher/code/Physics/GalaxyMap/tmp/"
 
 
 def main(args):
@@ -25,71 +25,112 @@ def main(args):
     """ Compute the velocity correlations on one or many galaxy surveys. 
     """
     #Get setup information from the settings file
-    settings = common.getdict(args.settings)
-    numpoints = settings['numpoints']
-    dr =        settings['dr']
-    min_r =     settings['min_r']
-    outfile   = settings['output_file_name']
-    step_type = settings['step_type']
-    rawInFile = settings['input_file']
-    units =     settings['binunits']
-
-    pool = Pool()              
-    if settings['many']:
-        #If there are lots of files, set them up accordingly.
-        inFileList = [rawInFile.format(x+settings['offset']) for x in range(settings['num_files'])]
-        histogramFiles = [TEMP_DIRECTORY + 'histogram_binsize-{}_{}.npy'.format(dr,
-                                                                   hashlib.md5(infile.encode('utf-8')).hexdigest()
-                                                                  ) for infile in inFileList]
-        #Warning: This assumes that the infiles don't ever change. Make sure to clean your cache regularly!
-        #HistogramFiles are the places where histograms from the singleHistogram function are stored.
-        outfiles = [outfile.format(x+settings['offset']) + '.pdf' for x in range(settings['num_files'])]
+    settings =   common.getdict(args.settings)
+    numpoints =    settings['numpoints']
+    dr =           settings['dr']
+    min_r =        settings['min_r']
+    orig_outfile = settings['output_file_name']
+    step_type =    settings['step_type']
+    infile =       settings['input_file']
+    unitslist =    settings['binunits']
+    maxd_master =  settings['max_distance']
+    pool = Pool()
+    if settings['many_squared']:
+        distance_args_master = list(zip(dr,min_r,numpoints))
+        file_schemes  = list(zip(infile,orig_outfile,settings['readable_name']))
+        xintervals = [common.genBins(x[1],x[2],x[0],step_type) for x in distance_args_master]
+        xs_master = [a[0] for a in xintervals]
+        intervals_master = [a[1] for a in xintervals]
     else:
-        inFileList = [rawInFile]
+        #Everything is build around lists now, so we just build lists of length one!
+        distance_args_master = [(dr,min_r,numpoints)]
+        file_schemes = [(infile,orig_outfile,settings['readable_name'])]
+        xs_master,intervals_master = common.genBins(min_r,numpoints,dr,step_type)
+        xs_master = [xs_master]
+        intervals_master = [intervals_master]
+    infileindices = [x + settings['offset'] for x in range(settings['num_files'])]
+    for rawInFile, outfile, readName in file_schemes:
+        for units in unitslist:
+            if units == 'km/s':
+                xs = [[x * 100 for x in y] for y in xs_master]
+                intervals = [[x * 100 for x in y] for y in intervals_master]
+                distance_args = [(x[0]*100,x[1]*100,x[2]) for x in distance_args_master]
+                maxd = maxd_master * 100
+            else:
+                xs = xs_master
+                intervals = intervals_master
+                distance_args = distance_args_master
+                maxd = maxd_master
+            if settings['many']:
+                #If there are lots of files, set them up accordingly.
+                inFileList = [rawInFile.format(x) for x in infileindices]
+                histogramFiles = [[TEMP_DIRECTORY + 'histogram_binsize-{}_{}.npy'.format(distargs[0],
+                                                                                         formatHash(oneInFile))
+                                   for distargs in distance_args]
+                                  for oneInFile in inFileList]
+                #Warning: This assumes that the infiles don't ever change. Make sure to clean your cache regularly!
+                #HistogramFiles are the places where histograms from the singleHistogram function are stored.
+            else:
+                inFileList = [rawInFile]
 
-    xs,intervals = common.genBins(min_r,numpoints,dr,step_type)
-    
-    if args.comp:
-        print('computing...')
-        nothing = pool.starmap(compute,zip(inFileList, #See comment lines below for error fixes
-                                 itertools.repeat(intervals),
-                                 itertools.repeat(units)
-        )) #see comment lines below for error fixes
-        #NOTE: If this line gives you trouble (e.g. 'pool doesn't have a member called starmap'), just replace
-        #that line with this one:
-        #pool.map(computeStar,zip(inFileList,
-        list(nothing) #stupid lazy functions. I tell ya...
+            if args.comp:
+                print('computing...')
+                nothing = pool.starmap(compute,zip(inFileList, #See comment lines below for error fixes
+                                                   itertools.repeat(maxd),
+                                                   itertools.repeat(units)
+                )) #see comment lines below for error fixes
+                #If this line gives you trouble (e.g. 'pool doesn't have a member called starmap'), just replace
+                #that line with this one:
+                #pool.map(computeStar,zip(inFileList,
 
-    if args.hist:
-        print('Histogramming...')
-        strings = pool.starmap(strload, zip(inFileList,
-                                            itertools.repeat(units)))
+                #list(nothing) #stupid lazy functions. I tell ya... Back in my day, functions HAD A WORK ETHIC!
+                 #They did WHAT they were told WHEN they were told to do it!
+                #This line is only required for using itertools starmap with the compute function
+                print(" - Done!")
+            if args.hist:
+                print('Histogramming...')
+                hashes = pool.starmap(getHash, zip(inFileList,
+                                                   itertools.repeat(units)))
 
-        #There's a HUGE performance gain for not multithreading this part. Go figure
-        nothing = itertools.starmap(singleHistogram,zip(strings,
-                                                        itertools.repeat(xs),
-                                                        itertools.repeat(intervals),
-                                                        histogramFiles
-        ))
-        list(nothing) #because itertools starmap is LAZY
-    if args.plots:
-        print('plotting...')
-        pool.starmap(stats,zip(outfiles,
-                               histogramFiles,
-                               itertools.repeat(units)))
-    if args.stats:
-        print('statting..?')
-        print('no, that doesn\'t sound right')
-        print('computing statistics...')
-        standBackStats(histogramFiles,settings['readable_name'],units,outfile.format('') + '.pdf')
+                nothing = itertools.starmap(histogram,zip(hashes,
+                                                          itertools.repeat(xs),
+                                                          itertools.repeat(intervals),
+                                                          histogramFiles,
+                                                          itertools.repeat(settings['many_squared'])
+                ))
+                list(nothing) #because itertools starmap is LAZY
+                print(" - Done!")
+            if args.plots:
+                print('plotting...')
+                params = list(itertools.product(infileindices, [dist_arg[0] for dist_arg in distance_args]))
+                hists = [TEMP_DIRECTORY + 'histogram_binsize-{}_{}.npy'.format(param[1],
+                                                                               formatHash(rawInFile,param[0]))
+                         for param in params]
+                
+                outfiles = [outfile.format(param[0],param[1],units) for param in params]
+                
+                pool.starmap(stats,zip(outfiles,
+                                       hists,
+                                       itertools.repeat(units)))
+            if args.stats:
+                print('statting..?')
+                print('no, that doesn\'t sound right')
+                print('computing statistics...')
+                for histogramFilesList,distanceParameters in zip(map(list, zip(*histogramFiles)),distance_args):
+                    standBackStats(histogramFilesList,
+                                   settings['readable_name'],
+                                   units,
+                                   outfile.format('',distanceParameters[0],units.replace('/','')) + '.pdf'
+                    )
 
-
+def formatHash(string,*args):
+    return hashlib.md5(string.format(*args).encode('utf-8')).hexdigest()
 def computeStar(args):
     """Helper function for older systems that do not have the pool.starmap() function available"""
     return compute(*args)
     
 
-def compute(infile,intervals,units):
+def compute(infile,maxd,units):
     """Formerly called 'singlePlot,' this function computes all pair-pair galaxy information,
     including figuring out the list of pairs.
     Input - cf2 file to read from.
@@ -115,20 +156,19 @@ def compute(infile,intervals,units):
     elif units == 'km/s':
         galaxyXYZV = np.array([a.getRedshiftXYZ() + (a.v,) for a in galaxies])
         #You can concatenate tuples. getRedshiftXYZ returnes a tuple, and I just append a.v to it.
-    #Put just the galaxy positions into one array
 
     try:
-        data = correlation(galaxyXYZV,intervals)
+        data = correlation(galaxyXYZV,maxd)
     except RuntimeError:
         print('Runtime Error encountered at {}.'.format(infile))
         raise
     return data
 
 #@profile 
-def _kd_query(positions,intervals):
+def _kd_query(positions,maxd):
     """Returns a np array of pairs of galaxies."""
     #This is still the best function, despite all of my scheming.
-    tmpfilename = TEMP_DIRECTORY + 'rawkd_{}_{}.npy'.format(max(intervals),
+    tmpfilename = TEMP_DIRECTORY + 'rawkd_{}_{}.npy'.format(maxd,
                                                hashlib.md5(str(positions).encode('utf-8')).hexdigest())
     #Warning: There might be more hash collisions because of this string ^ conversion. Hopefully not.
     if os.path.exists(tmpfilename):
@@ -137,7 +177,7 @@ def _kd_query(positions,intervals):
     else:
         print(".",end="",flush=True)
         kd = cKDTree(positions)
-        pairs = kd.query_pairs(max(intervals))
+        pairs = kd.query_pairs(maxd)
         #print(len(pairs))
         #print((kd.count_neighbors(kd,max(intervals))-len(positions))/2)
         #Find zero-distance pairs
@@ -158,14 +198,14 @@ def _kd_query(positions,intervals):
 #     return numpyarray.nbytes
 
 
-def correlation(galaxies,intervals):
+def correlation(galaxies,maxd):
     """ Computes the raw galaxy-galaxy correlation information on a per-galaxy basis, and saves it to file"""
     #There are lots of dels in this function because otherwise it tends to gobble up memory.
     #I think there might be a better way to deal with the large amounts of memory usage, but I don't yet
     #know what it is.
     
     # galaxies = [(galaxies[a],galaxies[b]) for a,b in interval_shell]
-    galaxyPairs = _kd_query(galaxies[:,0:3],intervals)
+    galaxyPairs = _kd_query(galaxies[:,0:3],maxd)
     #print("Done! (with the thing)")
     lGalaxies = galaxies[galaxyPairs[:,0]]
     rGalaxies = galaxies[galaxyPairs[:,1]]
@@ -239,51 +279,66 @@ def correlation(galaxies,intervals):
     )
     
 
-def strload(filename,units):
+def getHash(filename,units):
     """Loads up CF2 files and uses them to rebuild the hash database.
     Returns a list of strings. The strings should be hashed with hashlib.md5(string.encode('utf-8')).hexdigest()"""
     galaxies = common.loadData(filename, dataType = 'CF2')
     if units == 'Mpc/h':
-        return str(np.array([(a.x,a.y,a.z,a.v) for a in galaxies]))
+        return hashlib.md5(str(np.array([(a.x,a.y,a.z,a.v) for a in galaxies])).encode('utf-8')).hexdigest()
     elif units == 'km/s':
-        return str(np.array([a.getRedshiftXYZ() + (a.v,) for a in galaxies]))
+        return hashlib.md5(str(np.array([a.getRedshiftXYZ() + (a.v,) for a in galaxies])).encode('utf-8')).hexdigest()
     else:
         raise ValueError("Value of 'units' must be 'Mpc/h' or 'km/s'. Other unit schemes do not exist at present")
 
+def histogram(theHash,xs,intervals,writeOut,manysq):
+    """Bins individual galaxy-pair data by distance, and writes the results to a np array file.
+    Loading the data is pretty slow, so now we do that only once, then do a histogram on it a bunch of times.
 
-def singleHistogram(positionsStr,xs,intervals,writeOut):
-    """Bins individual galaxy-pair data by distance, and writes the results to a np array file."""
+    Previously, we had to load the file and do one histogram, then load the file and do one histogram...
+    We'll save 18 * 100 load cycles this way!
+    """
     try:
-        data =np.load(TEMP_DIRECTORY+'plotData_{}.npy'.format(hashlib.md5(positionsStr.encode('utf-8')).hexdigest()))
-        indPsiOneNum = data[0]#['p1n']
-        indPsiOneDen = data[1]#['p1d']
-        indPsiTwoNum = data[2]#['p2n']
-        indPsiTwoDen = data[3]#['p2d']
-        indANum = data[4]#['an']
-        indADen = data[5]#['ad']
-        indBNum = data[6]#['bn']
-        indBDen = data[7]#['bd']
-        distBetweenG1G2 = data[8]#['dist']
-        del data
+        data =np.load(TEMP_DIRECTORY+'plotData_{}.npy'.format(theHash))
         print("y",end="",flush=True)
     except FileNotFoundError:
-        with np.load(TEMP_DIRECTORY+'plotData_{}.npz'.format(hashlib.md5(positionsStr.encode('utf-8')).hexdigest())) as data: 
+        #Then the file is saved in the old, klunky npz format. Let's go ahead and load it, then save it to an npy
+        #for waaay faster loading next time.
+        with np.load(TEMP_DIRECTORY+'plotData_{}.npz'.format(theHash)) as tdata: #T is for temporary. 
         
-            indPsiOneNum = data['p1n']
-            indPsiOneDen = data['p1d']
-            indPsiTwoNum = data['p2n']
-            indPsiTwoDen = data['p2d']
-            indANum = data['an']
-            indADen = data['ad']
-            indBNum = data['bn']
-            indBDen = data['bd']
-            distBetweenG1G2 = data['dist']
+            data = np.array([tdata['p1n'],
+                             tdata['p1d'],
+                             tdata['p2n'],
+                             tdata['p2d'],
+                             tdata['an'],
+                             tdata['ad'],
+                             tdata['bn'],
+                             tdata['bd'],
+                             tdata['dist']
+                         ])
             print("z",end="",flush=True)
-    #The numpy histogram function returns a tuple of (stuff we want, the bins)
-    #Since we already know the bins, we throw them out by taking the [0] element of the tuple.
+        np.save(TEMP_DIRECTORY + 'plotData_{}.npy'.format(theHash),data) #npy files are SO MUCH faster than npz
+    if not manysq:
+        xs = [xs]
+        intervals = [intervals]
+        writeOut = [writeOut]
+    parameters = list(zip(itertools.repeat(data),xs,intervals,writeOut))
+    nothing = itertools.starmap(singleHistogram,parameters)
+    list(nothing) #I HATE LAZY FUNCTIONS most of the time
+
+def singleHistogram(data,xs,intervals,writeOut):
+    indPsiOneNum = data[0]
+    indPsiOneDen = data[1]
+    indPsiTwoNum = data[2]
+    indPsiTwoDen = data[3]
+    indANum = data[4]
+    indADen = data[5]
+    indBNum = data[6]
+    indBDen = data[7]
+    distBetweenG1G2 = data[8]
+    
     psiOneNum = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiOneNum)[0]
-    psiOneDen = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiOneDen)[0]
-    psiTwoNum = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiTwoNum)[0]
+    psiOneDen = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiOneDen)[0] 
+    psiTwoNum = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiTwoNum)[0] 
     psiTwoDen = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiTwoDen)[0]
     aNum      = np.histogram(distBetweenG1G2,bins = intervals,weights = indANum)[0]
     aDen      = np.histogram(distBetweenG1G2,bins = intervals,weights = indADen)[0]
@@ -387,9 +442,11 @@ def stats(writeOut,readIn,units):
 
 def standBackStats(inFileList,name,units,writeOut):
     """Do statistics over many input files, for example the three groups of 100 surveys. Average them, plot w/errorbars."""
-    print("Actually statting...?")
-    pool = Pool()
-    allData = np.array(list(pool.map(np.load, inFileList)))
+    assert(len(inFileList) == 100) #Not true in all cases, but sufficient for debugging.
+    theMap = map(np.load, inFileList)
+    theList = list(theMap)
+    allData = np.array(theList)
+    #allData = np.array(list(map(np.load, inFileList)))
     #One inFile contains the following: [p1, p2, a, b, psiparallel, psiperpindicular]
     xs = allData[0][6]
     std = np.std(allData,axis=0)
@@ -398,7 +455,7 @@ def standBackStats(inFileList,name,units,writeOut):
     hi68  = np.percentile(allData,100-16,axis=0)
     low95 = np.percentile(allData,2.5,axis=0)
     hi95  = np.percentile(allData,100-2.5,axis=0)
-
+    
     #correlationScale = (0,30,0,160000)
     #momentScale = (0,30,0.25,1.1)
     plotName = name
@@ -486,6 +543,13 @@ def standBackStats(inFileList,name,units,writeOut):
     
     with pdfback.PdfPages(writeOut) as pdf:
         pdf.savefig(f)
+    plt.close(f)
+    np.save(writeOut,np.array([xs,avg[0],std[0],low68[0],hi68[0],low95[0],hi95[0],
+                               avg[1],std[1],low68[1],hi68[1],low95[1],hi95[1],
+                               avg[2],std[2],low68[2],hi68[2],low95[2],hi95[2],
+                               avg[3],std[3],low68[3],hi68[3],low95[3],hi95[3],
+                               avg[4],std[4],low68[4],hi68[4],low95[4],hi95[4],
+                               avg[5],std[5],low68[5],hi68[5],low95[5],hi95[5]]))
         
 if __name__ == "__main__":
     arrrghs = common.parseCmdArgs([['settings'],
