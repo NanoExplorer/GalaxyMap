@@ -42,7 +42,7 @@ def main(args):
         xs_master = [a[0] for a in xintervals]
         intervals_master = [a[1] for a in xintervals]
     else:
-        #Everything is build around lists now, so we just build lists of length one!
+        #Everything is built around lists now, so we just build lists of length one!
         distance_args_master = [(dr,min_r,numpoints)]
         file_schemes = [(infile,orig_outfile,settings['readable_name'])]
         xs_master,intervals_master = common.genBins(min_r,numpoints,dr,step_type)
@@ -61,6 +61,7 @@ def main(args):
                 intervals = intervals_master
                 distance_args = distance_args_master
                 maxd = maxd_master
+                
             if settings['many']:
                 #If there are lots of files, set them up accordingly.
                 inFileList = [rawInFile.format(x) for x in infileindices]
@@ -550,7 +551,145 @@ def standBackStats(inFileList,name,units,writeOut):
                                avg[3],std[3],low68[3],hi68[3],low95[3],hi95[3],
                                avg[4],std[4],low68[4],hi68[4],low95[4],hi95[4],
                                avg[5],std[5],low68[5],hi68[5],low95[5],hi95[5]]))
-        
+
+
+
+def standBackStats_yuyu(inFileList,name,units,writeOut,min_r,numpoints,dr):
+    """Do statistics over many input files, for example the three groups of 100 surveys. Average them, plot w/errorbars."""
+    assert(len(inFileList) == 100) #Not true in all cases, but sufficient for debugging.
+    theMap = map(np.load, inFileList)
+    theList = list(theMap)
+    theList2 = []
+    
+    
+    #One inFile contains the following: [p1, p2, a, b]
+    xs,intervals = common.genBins(min_r,numpoints,dr,'lin')
+    
+    for array in theList:
+        p1 = array[:,0]
+        p2 = array[:,1]
+        a = array[:,2]
+        b = array[:,3]
+        aminusb = (a-b)
+        ppar = ((1-b)*p1-(1-a)*p2)/aminusb
+        pprp = (a*p2-b*p1)/aminusb
+    
+        thing = np.concatenate((np.atleast_2d(p1).T,
+                                np.atleast_2d(p2).T,
+                                np.atleast_2d(a).T,
+                                np.atleast_2d(b).T,
+                                np.atleast_2d(ppar).T,
+                                np.atleast_2d(pprp).T),axis=1).T
+ 
+        theList2.append(thing)
+
+    allData = np.array(theList2)
+    print(allData[0])
+ 
+    std = np.std(allData,axis=0)
+    avg = np.mean(allData,axis=0)
+    low68 = np.percentile(allData,16,axis=0)
+    hi68  = np.percentile(allData,100-16,axis=0)
+    low95 = np.percentile(allData,2.5,axis=0)
+    hi95  = np.percentile(allData,100-2.5,axis=0)
+    print(len(xs), avg[0].shape)   
+    #correlationScale = (0,30,0,160000)
+    #momentScale = (0,30,0.25,1.1)
+    plotName = name
+
+    matplotlib.rc('font',size=10)
+    
+    f, ((ax1,ax2),(ax3,ax4),(ax5,ax6)) = plt.subplots(3,2,sharex='col',sharey='row',figsize=(8.5,11))
+    f.suptitle('Statistics of the {} Survey Mocks'.format(plotName))
+    ax1.errorbar(xs,
+                 avg[0]/10**4,
+                 yerr=std[0]/10**4,
+                 fmt = 'k-',
+                 elinewidth=0.5,
+                 capsize=2,
+                 capthick=0.5
+    )
+    ax1.fill_between(xs,low68[0]/10**4,hi68[0]/10**4,facecolor='black',alpha=0.25)
+    ax1.fill_between(xs,low95[0]/10**4,hi95[0]/10**4,facecolor='black',alpha=0.25)
+    ax1.set_title('$\psi_1$ Correlation')
+    #ax1.set_xlabel('Distance, Mpc/h')
+    ax1.set_ylabel('Correlation, $10^4 (km/s)^2$')
+    #ax1.axis(correlationScale)
+    
+    ax2.errorbar(xs, avg[1]/10**4, yerr=std[1]/10**4, fmt = 'k-',
+                 elinewidth=0.5,
+                 capsize=2,
+                 capthick=0.5)
+    ax2.set_title('$\psi_2$ Correlation')
+    ax2.fill_between(xs,low68[1]/10**4,hi68[1]/10**4,facecolor='black',alpha=0.25)
+    ax2.fill_between(xs,low95[1]/10**4,hi95[1]/10**4,facecolor='black',alpha=0.25)
+    #plt.xlabel('Distance, Mpc/h')
+    #plt.ylabel('Correlation, $(km/s)^2$')
+    #plt.axis(correlationScale)
+    
+    ax3.errorbar(xs, avg[2], yerr=std[2], fmt = 'k-',
+                 elinewidth=0.5,
+                 capsize=2,
+                 capthick=0.5)
+    ax3.set_title('Moment of the Selection Function, $\cal A$')
+    ax3.fill_between(xs,low68[2],hi68[2],facecolor='black',alpha=0.25)
+    ax3.fill_between(xs,low95[2],hi95[2],facecolor='black',alpha=0.25)
+    #plt.xlabel('Distance, Mpc/h')
+    ax3.set_ylabel('Value (unitless)')
+    #plt.axis(momentScale)
+    
+    ax4.errorbar(xs, avg[3], yerr=std[3], fmt = 'k-',
+                 elinewidth=0.5,
+                 capsize=2,
+                 capthick=0.5)
+    ax4.set_title('Moment of the Selection Function, $\cal B$')
+    ax4.fill_between(xs,low68[3],hi68[3],facecolor='black',alpha=0.25)
+    ax4.fill_between(xs,low95[3],hi95[3],facecolor='black',alpha=0.25)
+    #plt.xlabel('Distance, Mpc/h')
+    #plt.ylabel('Value (unitless)')
+    #plt.axis(momentScale)
+
+    ax5.errorbar(xs, avg[4]/10**4, yerr=std[4]/10**4, fmt = 'k-',
+                 elinewidth=0.5,
+                 capsize=2,
+                 capthick=0.5)
+    ax5.fill_between(xs,low68[4]/10**4,hi68[4]/10**4,facecolor='black',alpha=0.25)
+    ax5.fill_between(xs,low95[4]/10**4,hi95[4]/10**4,facecolor='black',alpha=0.25)
+    ax5.set_title('$\Psi_{{\parallel}}$ Correlation')
+    ax5.set_xlabel('Distance, {}'.format(units))
+    ax5.set_ylabel('Correlation, $10^4 (km/s)^2$')
+    #plt.axis(correlationScale)
+
+    ax6.errorbar(xs,avg[5]/10**4, yerr=std[5]/10**4, fmt = 'k-',
+                 elinewidth=0.5,
+                 capsize=2,
+                 capthick=0.5)
+    ax6.fill_between(xs,low68[5]/10**4,hi68[5]/10**4,facecolor='black',alpha=0.25)
+    ax6.fill_between(xs,low95[5]/10**4,hi95[5]/10**4,facecolor='black',alpha=0.25)
+    ax6.set_title('$\Psi_{{\perp}}$ Correlation')
+    ax6.set_xlabel('Distance, {}'.format(units))
+    #plt.ylabel('Correlation, $(km/s)^2$')
+    #ax6.axis(correlationScale)
+
+    if units == 'km/s':
+        ax5.set_xbound(0,100*100)
+        ax6.set_xbound(0,100*100)
+    else:
+        ax5.set_xbound(0,100)
+        ax6.set_xbound(0,100)
+    
+    with pdfback.PdfPages(writeOut) as pdf:
+        pdf.savefig(f)
+    plt.close(f)
+    np.save(writeOut,np.array([xs,avg[0],std[0],low68[0],hi68[0],low95[0],hi95[0],
+                               avg[1],std[1],low68[1],hi68[1],low95[1],hi95[1],
+                               avg[2],std[2],low68[2],hi68[2],low95[2],hi95[2],
+                               avg[3],std[3],low68[3],hi68[3],low95[3],hi95[3],
+                               avg[4],std[4],low68[4],hi68[4],low95[4],hi95[4],
+                               avg[5],std[5],low68[5],hi68[5],low95[5],hi95[5]]))
+
+
+    
 if __name__ == "__main__":
     arrrghs = common.parseCmdArgs([['settings'],
                                    ['-c','--comp'],
