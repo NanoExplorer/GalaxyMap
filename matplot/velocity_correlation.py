@@ -1,5 +1,5 @@
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
+#from __future__ import (absolute_import, division,
+#                        print_function, unicode_literals)
 import common
 from scipy.spatial import cKDTree
 import numpy as np
@@ -18,7 +18,7 @@ from numpy.core.umath_tests import inner1d #Note: this function has no documenta
 # def inner1d(a,b):
 #     return (a*b).sum(axis=1)
 import gc
-import sys
+#import sys
 
 TEMP_DIRECTORY = "/media/christopher/2TB/Christopher/code/Physics/GalaxyMap/tmp/"
 
@@ -192,11 +192,11 @@ def _kd_query(positions,maxd):
                                                hashlib.md5(str(positions).encode('utf-8')).hexdigest())
     #Warning: There might be more hash collisions because of this string ^ conversion. Hopefully not.
     if os.path.exists(tmpfilename):
-        print("!",end="")
+        print("!",end="",flush=True)
         return np.load(tmpfilename)
     else:
-        print(".",end="")
-        sys.stdout.flush()
+        print(".",end="",flush=True)
+        #sys.stdout.flush()
         kd = cKDTree(positions)
         pairs = kd.query_pairs(maxd)
         #print(len(pairs))
@@ -322,8 +322,8 @@ def histogram(theHash,xs,intervals,writeOut,manysq):
     """
     try:
         data =np.load(TEMP_DIRECTORY+'plotData_{}.npy'.format(theHash))
-        print("y",end="")
-        sys.stdout.flush()
+        print("y",end="",flush=True)
+        #sys.stdout.flush()
     except IOError:
         #Then the file is saved in the old, klunky npz format. Let's go ahead and load it, then save it to an npy
         #for waaay faster loading next time.
@@ -339,8 +339,8 @@ def histogram(theHash,xs,intervals,writeOut,manysq):
                              tdata['bd'],
                              tdata['dist']
                          ])
-            print("z",end="")
-            sys.stdout.flush()
+            print("z",end="",flush=True)
+            #sys.stdout.flush()
         np.save(TEMP_DIRECTORY + 'plotData_{}.npy'.format(theHash),data) #npy files are SO MUCH faster than npz
     if not manysq:
         xs = [xs]
