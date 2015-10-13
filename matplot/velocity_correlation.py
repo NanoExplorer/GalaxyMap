@@ -1,3 +1,5 @@
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
 import common
 from scipy.spatial import cKDTree
 import numpy as np
@@ -16,6 +18,7 @@ from numpy.core.umath_tests import inner1d #Note: this function has no documenta
 # def inner1d(a,b):
 #     return (a*b).sum(axis=1)
 import gc
+import sys
 
 TEMP_DIRECTORY = "/media/christopher/2TB/Christopher/code/Physics/GalaxyMap/tmp/"
 
@@ -76,23 +79,30 @@ def main(args):
 
             if args.comp:
                 print('computing...')
-                nothing = pool.starmap(compute,zip(inFileList, #See comment lines below for error fixes
-                                                   itertools.repeat(maxd),
-                                                   itertools.repeat(units)
-                )) #see comment lines below for error fixes
-                #If this line gives you trouble (e.g. 'pool doesn't have a member called starmap'), just replace
-                #that line with this one:
-                #pool.map(computeStar,zip(inFileList,
-
-                #list(nothing) #stupid lazy functions. I tell ya... Back in my day, functions HAD A WORK ETHIC!
+                try:
+                    nothing = pool.starmap(compute,zip(inFileList,
+                                                       itertools.repeat(maxd),
+                                                       itertools.repeat(units)
+                                                   )) 
+                except AttributeError:
+                    nothing = pool.map(starCompute,zip(inFileList, 
+                                                       itertools.repeat(maxd),
+                                                       itertools.repeat(units)
+                                                   ))
+                    list(nothing) #stupid lazy functions. I tell ya... Back in my day, functions HAD A WORK ETHIC!
                  #They did WHAT they were told WHEN they were told to do it!
                 #This line is only required for using itertools starmap with the compute function
                 print(" - Done!")
             if args.hist:
                 print('Histogramming...')
-                hashes = pool.starmap(getHash, zip(inFileList,
-                                                   itertools.repeat(units)))
-
+                try:
+                    
+                    hashes = pool.starmap(getHash, zip(inFileList,
+                                                       itertools.repeat(units)))
+                except AttributeError:
+                    hashes = pool.map(starGetHash,zip(inFileList,itertools.repeat(units)))
+                    #the lazy idiom works for me here!
+                    
                 nothing = itertools.starmap(histogram,zip(hashes,
                                                           itertools.repeat(xs),
                                                           itertools.repeat(intervals),
@@ -110,9 +120,14 @@ def main(args):
                 
                 outfiles = [outfile.format(param[0],param[1],units) for param in params]
                 
-                pool.starmap(stats,zip(outfiles,
-                                       hists,
-                                       itertools.repeat(units)))
+                try:
+                    pool.starmap(stats,zip(outfiles,
+                                           hists,
+                                           itertools.repeat(units)))
+                except AttributeError:
+                    pool.map(starStats,zip(outfiles,
+                                                     hists,
+                                                     itertools.repeat(units)))
             if args.stats:
                 print('statting..?')
                 print('no, that doesn\'t sound right')
@@ -123,13 +138,17 @@ def main(args):
                                    units,
                                    outfile.format('',distanceParameters[0],units.replace('/','')) + '.pdf'
                     )
+def starGetHash(x):
+    return getHash(*x)
 
-def formatHash(string,*args):
-    return hashlib.md5(string.format(*args).encode('utf-8')).hexdigest()
-def computeStar(args):
-    """Helper function for older systems that do not have the pool.starmap() function available"""
-    return compute(*args)
+def starCompute(x):
+    return compute(*x)
+
+def starStats(x):
+    return stats(*x)
     
+def formatHash(string,*args):
+    return hashlib.md5(string.format(*args).encode('utf-8')).hexdigest()   
 
 def compute(infile,maxd,units):
     """Formerly called 'singlePlot,' this function computes all pair-pair galaxy information,
@@ -153,9 +172,9 @@ def compute(infile,maxd,units):
 
     #Make an array of just the x,y,z coordinate and radial component of peculiar velocity (v)
     if units == 'Mpc/h':
-        galaxyXYZV = np.array([(a.x,a.y,a.z,a.v) for a in galaxies])
+        galaxyXYZV = np.array([(a.x,a.y,a.z,a.v,a.dv) for a in galaxies])
     elif units == 'km/s':
-        galaxyXYZV = np.array([a.getRedshiftXYZ() + (a.v,) for a in galaxies])
+        galaxyXYZV = np.array([a.getRedshiftXYZ() + (a.v,a.dv) for a in galaxies])
         #You can concatenate tuples. getRedshiftXYZ returnes a tuple, and I just append a.v to it.
 
     try:
@@ -173,10 +192,11 @@ def _kd_query(positions,maxd):
                                                hashlib.md5(str(positions).encode('utf-8')).hexdigest())
     #Warning: There might be more hash collisions because of this string ^ conversion. Hopefully not.
     if os.path.exists(tmpfilename):
-        print("!",end="",flush=True)
+        print("!",end="")
         return np.load(tmpfilename)
     else:
-        print(".",end="",flush=True)
+        print(".",end="")
+        sys.stdout.flush()
         kd = cKDTree(positions)
         pairs = kd.query_pairs(maxd)
         #print(len(pairs))
@@ -215,6 +235,8 @@ def correlation(galaxies,maxd):
     #"Galaxy 1 VelocitieS"
     g1vs  = lGalaxies[:,3]
     g2vs  = rGalaxies[:,3]
+    g1dvs = lGalaxies[:,4]
+    g2dvs = rGalaxies[:,4]
     g1pos = lGalaxies[:,0:3]
     g2pos = rGalaxies[:,0:3]
     del lGalaxies, rGalaxies
@@ -300,8 +322,9 @@ def histogram(theHash,xs,intervals,writeOut,manysq):
     """
     try:
         data =np.load(TEMP_DIRECTORY+'plotData_{}.npy'.format(theHash))
-        print("y",end="",flush=True)
-    except FileNotFoundError:
+        print("y",end="")
+        sys.stdout.flush()
+    except IOError:
         #Then the file is saved in the old, klunky npz format. Let's go ahead and load it, then save it to an npy
         #for waaay faster loading next time.
         with np.load(TEMP_DIRECTORY+'plotData_{}.npz'.format(theHash)) as tdata: #T is for temporary. 
@@ -316,7 +339,8 @@ def histogram(theHash,xs,intervals,writeOut,manysq):
                              tdata['bd'],
                              tdata['dist']
                          ])
-            print("z",end="",flush=True)
+            print("z",end="")
+            sys.stdout.flush()
         np.save(TEMP_DIRECTORY + 'plotData_{}.npy'.format(theHash),data) #npy files are SO MUCH faster than npz
     if not manysq:
         xs = [xs]

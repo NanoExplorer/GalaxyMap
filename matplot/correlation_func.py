@@ -59,7 +59,7 @@ def correlate_box(boxinfo, intervals):
     #RDs = random_kd.count_neighbors(actual_kd,intervals)
     #Turns out that RDs == DRs always
     #Just think about it.
-    print('.',end='',flush=True)
+#    print('.',end='',flush=True)
     return((DDs,DRs,RRs))
     
 

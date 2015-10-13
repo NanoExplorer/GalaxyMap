@@ -1,4 +1,3 @@
-import scipy.optimize
 import matplotlib
 matplotlib.use("TkAgg")
 import common
@@ -6,7 +5,7 @@ import numpy as np
 import matplotlib.backends.backend_pdf as pdfback
 import math
 import matplotlib.pyplot as plt
-
+import scipy.optimize
 
 def updateMinMax(curmin, curmax, values):
     for x in values:

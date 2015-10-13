@@ -29,7 +29,7 @@ def transpose(args):
                 cf2row = [rho*hubble_constant+peculiarVel,#cz
                           rho,#distance (mpc/h)
                           peculiarVel,#peculiar velocity km/sec
-                          0,#dv
+                          peculiarVel*0.1,#dv - currently 10%
                           theta,#longitude degrees - 0 - 360
                           phi]#latitude degrees - -90 - 90
                 outCF2String = outCF2String + '{}  {}  {}  {}  {}  {}\n'.format(*cf2row)
