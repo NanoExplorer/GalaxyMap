@@ -51,6 +51,7 @@ def main(args):
         xs_master,intervals_master = common.genBins(min_r,numpoints,dr,step_type)
         xs_master = [xs_master]
         intervals_master = [intervals_master]
+        
     infileindices = [x + settings['offset'] for x in range(settings['num_files'])]
     for rawInFile, outfile, readName in file_schemes:
         for units in unitslist:
@@ -68,14 +69,15 @@ def main(args):
             if settings['many']:
                 #If there are lots of files, set them up accordingly.
                 inFileList = [rawInFile.format(x) for x in infileindices]
-                histogramFiles = [[TEMP_DIRECTORY + 'histogram_binsize-{}_{}.npy'.format(distargs[0],
-                                                                                         formatHash(oneInFile))
-                                   for distargs in distance_args]
-                                  for oneInFile in inFileList]
+
                 #Warning: This assumes that the infiles don't ever change. Make sure to clean your cache regularly!
                 #HistogramFiles are the places where histograms from the singleHistogram function are stored.
             else:
                 inFileList = [rawInFile]
+            histogramFiles = [[TEMP_DIRECTORY + 'histogram_binsize-{}_{}.npy'.format(distargs[0],
+                                                                                     formatHash(oneInFile))
+                               for distargs in distance_args]
+                              for oneInFile in inFileList]
 
             if args.comp:
                 print('computing...')
@@ -102,13 +104,11 @@ def main(args):
                 except AttributeError:
                     hashes = pool.map(starGetHash,zip(inFileList,itertools.repeat(units)))
                     #the lazy idiom works for me here!
-                    
+                
                 nothing = itertools.starmap(histogram,zip(hashes,
                                                           itertools.repeat(xs),
                                                           itertools.repeat(intervals),
-                                                          histogramFiles,
-                                                          itertools.repeat(settings['many_squared'])
-                ))
+                                                          histogramFiles))
                 list(nothing) #because itertools starmap is LAZY
                 print(" - Done!")
             if args.plots:
@@ -235,8 +235,7 @@ def correlation(galaxies,maxd):
     #"Galaxy 1 VelocitieS"
     g1vs  = lGalaxies[:,3]
     g2vs  = rGalaxies[:,3]
-    g1dvs = lGalaxies[:,4]
-    g2dvs = rGalaxies[:,4]
+    wt = 1/((lGalaxies[:,4]**2 + 150**2)*(rGalaxies[:,4]**2 + 150**2))
     g1pos = lGalaxies[:,0:3]
     g2pos = rGalaxies[:,0:3]
     del lGalaxies, rGalaxies
@@ -267,16 +266,16 @@ def correlation(galaxies,maxd):
     cosdTheta = inner1d(g1norm,g2norm)
     del g1norm, g2norm
     #The 'ind' stands for individual
-    indPsiOneNum   = psiOneNumerator(g1vs,g2vs,cosdTheta)
-    indPsiOneDen   = psiOneDenominator(cosdTheta)
-    indPsiTwoNum   = psiTwoNumerator(g1vs,g2vs,cosTheta1,cosTheta2)
+    indPsiOneNum   = wt*psiOneNumerator(g1vs,g2vs,cosdTheta)
+    indPsiOneDen   = wt*psiOneDenominator(cosdTheta)
+    indPsiTwoNum   = wt*psiTwoNumerator(g1vs,g2vs,cosTheta1,cosTheta2)
     del g1vs, g2vs
-    indPsiTwoDen   = psiTwoDenominator(cosTheta1,cosTheta2,cosdTheta)
-    indAFeldmanNum = aFeldmanNumerator(cosTheta1,cosTheta2,cosdTheta)
-    indAFeldmanDen = aFeldmanDenominator(cosdTheta)
-    indBNum        = bNumerator(cosTheta1,cosTheta2)
-    indBDen        = bDenominator(cosTheta1,cosTheta2,cosdTheta)
-    del cosTheta1, cosTheta2, cosdTheta
+    indPsiTwoDen   = wt*psiTwoDenominator(cosTheta1,cosTheta2,cosdTheta)
+    indAFeldmanNum = wt*aFeldmanNumerator(cosTheta1,cosTheta2,cosdTheta)
+    indAFeldmanDen = wt*aFeldmanDenominator(cosdTheta)
+    indBNum        = wt*bNumerator(cosTheta1,cosTheta2)
+    indBDen        = wt*bDenominator(cosTheta1,cosTheta2,cosdTheta)
+    del cosTheta1, cosTheta2, cosdTheta,wt
     # np.savez_compressed(TEMP_DIRECTORY+'plotData_{}.npz'.format(hashlib.md5(str(galaxies).encode('utf-8')).hexdigest()),
     #                     p1n = indPsiOneNum,
     #                     p1d = indPsiOneDen,
@@ -307,13 +306,13 @@ def getHash(filename,units):
     Returns a list of strings. The strings should be hashed with hashlib.md5(string.encode('utf-8')).hexdigest()"""
     galaxies = common.loadData(filename, dataType = 'CF2')
     if units == 'Mpc/h':
-        return hashlib.md5(str(np.array([(a.x,a.y,a.z,a.v) for a in galaxies])).encode('utf-8')).hexdigest()
+        return hashlib.md5(str(np.array([(a.x,a.y,a.z,a.v,a.dv) for a in galaxies])).encode('utf-8')).hexdigest()
     elif units == 'km/s':
-        return hashlib.md5(str(np.array([a.getRedshiftXYZ() + (a.v,) for a in galaxies])).encode('utf-8')).hexdigest()
+        return hashlib.md5(str(np.array([a.getRedshiftXYZ() + (a.v,a.dv) for a in galaxies])).encode('utf-8')).hexdigest()
     else:
         raise ValueError("Value of 'units' must be 'Mpc/h' or 'km/s'. Other unit schemes do not exist at present")
 
-def histogram(theHash,xs,intervals,writeOut,manysq):
+def histogram(theHash,xs,intervals,writeOut):
     """Bins individual galaxy-pair data by distance, and writes the results to a np array file.
     Loading the data is pretty slow, so now we do that only once, then do a histogram on it a bunch of times.
 
@@ -342,10 +341,11 @@ def histogram(theHash,xs,intervals,writeOut,manysq):
             print("z",end="",flush=True)
             #sys.stdout.flush()
         np.save(TEMP_DIRECTORY + 'plotData_{}.npy'.format(theHash),data) #npy files are SO MUCH faster than npz
-    if not manysq:
-        xs = [xs]
-        intervals = [intervals]
-        writeOut = [writeOut]
+    #if not manysq:
+    #    xs = [xs]
+    #    intervals = [intervals]
+    #    writeOut = [writeOut]
+    #print(xs, intervals, writeOut)
     parameters = list(zip(itertools.repeat(data),xs,intervals,writeOut))
     nothing = itertools.starmap(singleHistogram,parameters)
     list(nothing) #I HATE LAZY FUNCTIONS most of the time
@@ -360,7 +360,7 @@ def singleHistogram(data,xs,intervals,writeOut):
     indBNum = data[6]
     indBDen = data[7]
     distBetweenG1G2 = data[8]
-    
+
     psiOneNum = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiOneNum)[0]
     psiOneDen = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiOneDen)[0] 
     psiTwoNum = np.histogram(distBetweenG1G2,bins = intervals,weights = indPsiTwoNum)[0] 
@@ -450,8 +450,8 @@ def stats(writeOut,readIn,units):
     plt.legend()
 
     fig3 = plt.figure()
-    plt.plot(xs,psipar,'-',label='$\psi_{\parallel}')
-    plt.plot(xs,psiprp,'-',label='$\psi_{\perp}')
+    plt.plot(xs,psipar,'-',label='$\psi_{\parallel}$')
+    plt.plot(xs,psiprp,'-',label='$\psi_{\perp}$')
     plt.title('Velocity correlation')
     plt.xlabel('Distance, {}'.format(units))
     plt.ylabel('Correlation, $(km/s)^2$')
