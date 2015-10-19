@@ -454,7 +454,7 @@ def stats(writeOut,readIn,units):
     plt.plot(xs,psiprp,'-',label='$\psi_{\perp}$')
     plt.title('Velocity correlation')
     plt.xlabel('Distance, {}'.format(units))
-    plt.ylabel('Correlation, $(km/s)^2$')
+    plt.ylabel('Correlation, $10^4 (km/s)^2$')
     plt.legend()
 
     with pdfback.PdfPages(writeOut) as pdf:
