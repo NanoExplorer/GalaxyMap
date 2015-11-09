@@ -1,5 +1,8 @@
 #from __future__ import (absolute_import, division,
 #                        print_function, unicode_literals)
+#STERN WARNING: Running this code on python 2 is not recommended, for many reasons. First, Garbage Collection
+#seems greatly improved in python 3, resulting in *much* reduced memory usage. Second, everything runs much faster
+#under python 3 for whatever reason.
 import common
 from scipy.spatial import cKDTree
 import numpy as np
@@ -19,6 +22,8 @@ from numpy.core.umath_tests import inner1d #Note: this function has no documenta
 #     return (a*b).sum(axis=1)
 import gc
 #import sys
+
+
 
 TEMP_DIRECTORY = "/media/christopher/2TB/Christopher/code/Physics/GalaxyMap/tmp/"
 
@@ -219,7 +224,7 @@ def _kd_query(positions,maxd):
 #     return numpyarray.nbytes
 
 
-def correlation(galaxies,maxd):
+def correlation(galaxies,maxd,usewt=False):
     """ Computes the raw galaxy-galaxy correlation information on a per-galaxy basis, and saves it to file"""
     #There are lots of dels in this function because otherwise it tends to gobble up memory.
     #I think there might be a better way to deal with the large amounts of memory usage, but I don't yet
@@ -235,7 +240,10 @@ def correlation(galaxies,maxd):
     #"Galaxy 1 VelocitieS"
     g1vs  = lGalaxies[:,3]
     g2vs  = rGalaxies[:,3]
-    wt = 1/((lGalaxies[:,4]**2 + 150**2)*(rGalaxies[:,4]**2 + 150**2))
+    if usewt:
+        wt = 1/((lGalaxies[:,4]**2 + 150**2)*(rGalaxies[:,4]**2 + 150**2))
+    else:
+        wt = 1
     g1pos = lGalaxies[:,0:3]
     g2pos = rGalaxies[:,0:3]
     del lGalaxies, rGalaxies
@@ -300,7 +308,7 @@ def correlation(galaxies,maxd):
             ])
     )
     
-
+#NOTE: If the information passed as 'galaxies' to "correlation" changes, you have to update this getHash function too!
 def getHash(filename,units):
     """Loads up CF2 files and uses them to rebuild the hash database.
     Returns a list of strings. The strings should be hashed with hashlib.md5(string.encode('utf-8')).hexdigest()"""
@@ -319,28 +327,28 @@ def histogram(theHash,xs,intervals,writeOut):
     Previously, we had to load the file and do one histogram, then load the file and do one histogram...
     We'll save 18 * 100 load cycles this way!
     """
-    try:
-        data =np.load(TEMP_DIRECTORY+'plotData_{}.npy'.format(theHash))
-        print("y",end="",flush=True)
+    # try:
+    data =np.load(TEMP_DIRECTORY+'plotData_{}.npy'.format(theHash))
+    print("y",end="",flush=True)
         #sys.stdout.flush()
-    except IOError:
-        #Then the file is saved in the old, klunky npz format. Let's go ahead and load it, then save it to an npy
-        #for waaay faster loading next time.
-        with np.load(TEMP_DIRECTORY+'plotData_{}.npz'.format(theHash)) as tdata: #T is for temporary. 
+    # except IOError:
+    #     #Then the file is saved in the old, klunky npz format. Let's go ahead and load it, then save it to an npy
+    #     #for waaay faster loading next time.
+    #     with np.load(TEMP_DIRECTORY+'plotData_{}.npz'.format(theHash)) as tdata: #T is for temporary. 
         
-            data = np.array([tdata['p1n'],
-                             tdata['p1d'],
-                             tdata['p2n'],
-                             tdata['p2d'],
-                             tdata['an'],
-                             tdata['ad'],
-                             tdata['bn'],
-                             tdata['bd'],
-                             tdata['dist']
-                         ])
-            print("z",end="",flush=True)
-            #sys.stdout.flush()
-        np.save(TEMP_DIRECTORY + 'plotData_{}.npy'.format(theHash),data) #npy files are SO MUCH faster than npz
+    #         data = np.array([tdata['p1n'],
+    #                          tdata['p1d'],
+    #                          tdata['p2n'],
+    #                          tdata['p2d'],
+    #                          tdata['an'],
+    #                          tdata['ad'],
+    #                          tdata['bn'],
+    #                          tdata['bd'],
+    #                          tdata['dist']
+    #                      ])
+    #         print("z",end="",flush=True)
+    #         #sys.stdout.flush()
+    #     np.save(TEMP_DIRECTORY + 'plotData_{}.npy'.format(theHash),data) #npy files are SO MUCH faster than npz
     #if not manysq:
     #    xs = [xs]
     #    intervals = [intervals]

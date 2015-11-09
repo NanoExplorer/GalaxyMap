@@ -411,6 +411,7 @@ class CF2:
                     "dv": "km/sec",
                     "lon":"degrees",
                     "lat":"degrees"}
+        self.scatteredVelocities = data[6:]
     
         self.theta = math.radians(self.lon-180)
         self.phi = math.radians(self.lat+90)
