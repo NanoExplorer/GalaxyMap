@@ -360,13 +360,14 @@ def _loadCF2Data(filename):
     """
     Loads galaxy data from a TXT file. Assumes that the data is in the same format
     as the CF2 and COMPOSITE surveys:
-    two-space-delimited, with columns
+    whitespace-delimited, with columns
             cz (km/s)
             distance (Mpc/h)
             radial velocity(km/s)
             error in radial velocity(km/s)
             Galactic Longitude (degrees)
             Galactic Latitude (degrees)
+          All extra columns (if any) are treated as perturbed velocities
     """
 
     galaxies = [] 

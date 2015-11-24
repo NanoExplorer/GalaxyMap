@@ -5,7 +5,10 @@ import math
 
 def transpose(args):
     hubble_constant = 100
+    fractional_error = 0.1
+    use_dvs = True;
     survey_info = common.getdict(args.survey_file)
+    print(survey_info)
     for survey in survey_info:
         outCF2String = "" 
         with open(survey['name'],'r') as csvFile:
@@ -29,9 +32,21 @@ def transpose(args):
                 cf2row = [rho*hubble_constant+peculiarVel,#cz
                           rho,#distance (mpc/h)
                           peculiarVel,#peculiar velocity km/sec
-                          peculiarVel*0.1,#dv - currently 10%
+                          rho*hubble_constant*0.2,#dv
                           theta,#longitude degrees - 0 - 360
                           phi]#latitude degrees - -90 - 90
-                outCF2String = outCF2String + '{}  {}  {}  {}  {}  {}\n'.format(*cf2row)
+                outCF2String = outCF2String + '{}  {}  {}  {}  {}  {}'.format(*cf2row)
+                if use_dvs:
+                    dvs = np.random.normal(peculiarVel,rho*hubble_constant*0.2,20)
+                    for x in dvs:
+                        outCF2String = outCF2String + '  {}'.format(x)
+                outCF2String = outCF2String + '\n'
+ 
         with open(survey['name'] + '_cf2.txt', 'w') as cf2outfile:
             cf2outfile.write(outCF2String)
+
+
+if __name__ == "__main__":
+    print("RUN WItH GALAXY.PY STUPID")
+    print('note: if your name is not Christopher Rooney, I\'m not calling you stupid')
+    print("I have just made this mistake too many times and am calling myself names")

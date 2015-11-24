@@ -180,7 +180,7 @@ def compute(infile,maxd,units):
         galaxyXYZV = np.array([(a.x,a.y,a.z,a.v,a.dv) for a in galaxies])
     elif units == 'km/s':
         galaxyXYZV = np.array([a.getRedshiftXYZ() + (a.v,a.dv) for a in galaxies])
-        #You can concatenate tuples. getRedshiftXYZ returnes a tuple, and I just append a.v to it.
+        #You can concatenate tuples. getRedshiftXYZ returnes a tuple, and I just append a.v (and dv) to it.
 
     try:
         data = correlation(galaxyXYZV,maxd)
