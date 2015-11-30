@@ -1,0 +1,180 @@
+%% A brief test of different estimators of galaxy peculiar velocity
+%% Sun Nov 29, 2015
+%% Christopher Rooney
+
+\documentclass[letterpaper]{article}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% This section is called the preamble, where we can specify which
+%% latex packages we required.  Most (but not of all) of the packages
+%% below should be fairly standard in most latex documents.  The
+%% exception is xspace and the new \latex command, which you probably
+%% do not need.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Bibliography style:
+\usepackage{mathptmx}           % Use the Times font.
+\usepackage{graphicx}           % Needed for including graphics.
+\usepackage{url}                % Facility for activating URLs.
+\usepackage{verbatim}           % For verbatiminput command.
+\usepackage{booktabs}
+%% Set the paper size to be letter, with a 2cm margin 
+%% all around the page.
+\usepackage[margin=1in]{geometry}
+\usepackage{gensymb}
+%% Natbib is a popular style for formatting references.
+\usepackage{subcaption}
+%% bibpunct sets the punctuation used for formatting citations.
+
+\newcommand{\iu}{{i\mkern1mu}}
+\newcommand{\e}{{\mathrm e}}
+\usepackage{xspace}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Start of the document.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+\author{Christopher Rooney}
+\date{\today}
+\title{Peculiar Velocity Estimators}
+\maketitle
+
+\begin{abstract}
+In this document, the usual formula for peculiar velocity is compared with the alternative estimator proposed in Feldman 2015. The usual formula is found to be heavily biased and non-gaussian, in comparison with the new estimator which has significantly better gaussian results.
+\end{abstract}
+
+\section{Introduction}
+I refer to the ``Usual Formula'' as the well known formula for cosmological redshift:
+\[
+v = cz + H_0 \cdot r
+\]
+In this formula, $v$ is the peculiar velocity of the galaxy, $cz$ is the measured cosmological redshift, and $r$ is the measured distance to the galaxy. 
+
+The proposed alternative formula is as follows.
+\[
+v_e = cz * log \(\frac{cz}{H_0\cdot r_e}\)
+\]
+This formula does break down for extremely large redshifts and for velocities that are comparable in size to the redshift, but (for now) we're restricting our sample to only deal with galaxies that have nice velocities much smaller than the redshift, and galaxies that aren't too far away.
+
+The reason that the proposed alternative is expected to work better is that it uses the log of the distance to the galaxy, just like the actual measured quantity.
+
+\section{Procedure}
+To test this estimator, a theoretical galaxy was ``created'' at $r_{actual} = 25 Mpc/h$ and $v_{actual} = 325 km/s$. In Python, the log of the distance was taken and stored. Then, a normal distribution was created with a mean equal to the log of the distance, and a standard deviation equal to $0.1 \cdot \ln\(r_{actual}\)$. This distribution could be considered the distribution that you would see if you could measure the distance to that galaxy over and over again. 
+
+Five hundred samples were taken of the normal distribution. The number $\e$ was then raised to the power of each sample to convert the sample of distance moduli to a sample of distances. This sample was then fed into each of the estimators to obtain two different samples of peculiar velocities. The cosmological redshift was not perturbed because we have much better measurements of redshift, and so redshift errors can be made arbitrarily small compared to distance errors.
+
+\section{Diagram}
+Figures~\ref{fig:single} and~\ref{fig:double} show the single- and double-slit diffraction setups used in this experiment. In this experiment, the diffraction angle can be measured directly using the angle reading on the center pivot. Figure~\ref{fig:interferometer} shows a simple interferometer for the two extreme cases of constructive and destructive interference. For every change $\Delta x$ in the position of the reflector, the path length of the light changes by $2\cdot\Delta x$. Figure~\ref{fig:Michaelson} shows the geometry of a Michelson interferometer, with its two separate arms.
+\begin{figure}
+\centering
+\begin{subfigure}{0.475\textwidth}
+  \centering
+  \includegraphics{singleslit}
+  \caption{The geometry behind single-slit interference.}
+  \label{fig:single}
+\end{subfigure}
+\hfill
+\begin{subfigure}{0.475\textwidth}
+  \centering
+  \includegraphics{doubleslit}
+  \caption{The geometry of interference when using a double-slit diffraction grating.}
+  \label{fig:double}
+\end{subfigure}
+\vskip\baselineskip
+\begin{subfigure}{0.475\textwidth}
+  \centering
+  \includegraphics{interferometer}
+  \caption{A simple interferometer. On the top is the diagram for constructive interference, and below is destructive interference.}
+  \label{fig:interferometer}
+\end{subfigure}
+\begin{subfigure}{0.475\textwidth}
+  \centering
+  \includegraphics{Michaelson}
+  \caption{A Michelson interferometer.}
+  \label{fig:Michaelson}
+\end{subfigure}
+\label{fig:allfigures}
+\caption{Microwave optics setups used in this experiment.}
+\end{figure}
+
+
+\section{Data}
+For this experiment, instrument error of every position was taken to be 1 mm, since most of the meter sticks were very worn and the millimeter scales were sometimes hard to read. Instrument error in the signal was taken to be 0.005 mA, and instrument error in measuring slit size was taken to be 0.5 cm. The error in angle measurements is one degree.
+
+To find the relationship between signal and intensity, the signal was plotted against distance in figure~\ref{fig:calibration}, and was found to fall off as $x^{-1.42}$. It is well known that the intensity of a point source falls off as $x^{-2}$, so the data had to be rescaled. To accomplish this, the signal values were raised to the power $2/1.42$ to normalize the signal. A power-law fit to the new intensity values returned the expected exponent of $-2$.
+
+With the calibration curve for intensity, the effects of polarization can be measured. Malus' Law provides a theoretical basis for polarization. This law is as follows:
+\[
+I = I_0\cos^2\left(\theta\right)
+\]
+Where $I$ is the measured intensity, $I_0$ is the maximum intensity, and $\theta$ is the rotation difference between the polarized source and the polarized receiver. As expected, when $\theta = 0$, $\cos(\theta) = 1$, and $I = I_0$. Figure~\ref{fig:polarize} shows the measured intensity and the theoretical intensity given by Malus' law.
+\begin{figure}
+\centering
+\begin{subfigure}{0.475\textwidth}
+  \centering
+  \includegraphics{signal}
+  \caption{Calibration curve for the signal.}
+  \label{fig:calibration}
+\end{subfigure}
+\begin{subfigure}{0.475\textwidth}
+  \centering
+  \includegraphics{polarize}
+  \caption{Theoretical and measured values for the intensity of polarized microwaves at differing receiver angles.}
+  \label{fig:polarize}
+\end{subfigure}
+\label{fig:allfigurestwo}
+\caption{Calibration curve for the receiver and intensity of polarized microwaves.}
+\end{figure}
+
+The next step in the experiment was to measure the diffraction of the microwaves through a single slit. As discussed in the last lab, the angular deviation of the first minimum from the principle maximum is:
+\[
+\lambda = a\sin\theta
+\]
+Where $\lambda$ is the wavelength and $a$ is the slit size. For the single slit, the positional information is given in table~\ref{tab:single}. For our slit size of 10 cm, the wavelength can be easily calculated. Table~\ref{tab:single} includes this data as well. Error propagation comes from the total differential:
+\[
+\delta\lambda=\sqrt{
+  \left(\delta a\cdot\sin\theta\right)^2+
+  \left(\delta\theta\cdot a\cos\theta\right)^2
+} 
+\]
+The error in slit width is taken to be 0.5 cm, and the error in theta is taken to be one degree, based on the resolution of the instruments and the ease of changing these quantities without noticing. 
+
+\input{diffraction.tex}
+
+Frequency is given by the following well-known relation:
+\[
+\nu = \frac{c}{\lambda}
+\]
+And by the total differential:
+\[
+\frac{\delta\nu}{\nu} = \frac{\delta\lambda}{\lambda}
+\]
+The measurement of distance between the two slits in the double slit experiment was missing, so lambda could not be calculated accurately.
+
+To calculate wavelength from the interferometers, it has been mentioned that $\lambda = 2\cdot\Delta x$. $\Delta x$ is calculated from the many measurements of position using the method of successive differences, as described in the lab manual. The results are given in table~\ref{tab:interfere}.
+
+\input{interfere.tex}
+
+
+\section{Discussion and Conclusions}
+The principal source of error in this experiment was the size of the slit. Because the slit setup was only loosely connected to the base, it could easily be bumped and changed. Also, the double-slit distance measurement invalidated all subsequent double-slit diffraction measurements.
+
+The second-most important source of error was the microwave detector. When using the interferometers and diffraction setups, it is difficult to exactly determine the position of the minimums or maximums. However, this made little difference in the end, especially for the interferometers where the successive differences method was used.
+
+The least important source of error was the distance measurements. The only reason the distance measurement error is significant is that the millimeter scale is almost completely worn off in places, making it extremely difficult to obtain even millimeter accuracy.
+
+The results obtained by using single-slit diffraction (table~\ref{tab:single}) were almost consistent with the accepted value of the microwaves, but they also had relatively large error. In contrast, the results calculated using interferometry (table~\ref{tab:interfere}) were much more accurate, and had a much greater precision. The frequency calculated using simple interferometry was not quite consistent with the accepted value, but was very close.
+
+It could be argued that these measurements are precise enough, but in order to further improve the values of frequency of these microwaves, more measurements could be taken using a larger interferometer. Doing the experiment in an extremely large open space (such as outdoors) could also improve the data by reducing (or eliminating) standing waves created by doing the experiment in a room. Finally, using a digital or computer controlled microwave sensor could improve the measurements of maximum and minimum signal positions.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Finally we specify the format required for our references and the
+%% name of the bibtex file where our references should be taken from.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\end{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% The end.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
