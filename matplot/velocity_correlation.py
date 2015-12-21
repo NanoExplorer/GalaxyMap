@@ -22,11 +22,14 @@ from numpy.core.umath_tests import inner1d #Note: this function has no documenta
 #     return (a*b).sum(axis=1)
 import gc
 #import sys
+import smtplib
+import signal
+
 
 
 
 TEMP_DIRECTORY = "/media/christopher/2TB/Christopher/code/Physics/GalaxyMap/tmp/"
-
+NeedToExit = False
 
 def main(args):
     np.seterr(divide='ignore',invalid='ignore')
@@ -100,6 +103,8 @@ def main(args):
                  #They did WHAT they were told WHEN they were told to do it!
                 #This line is only required for using itertools starmap with the compute function
                 print(" - Done!")
+                if NeedToExit:
+                    break
             if args.hist:
                 print('Histogramming...')
                 try:
@@ -116,6 +121,8 @@ def main(args):
                                                           histogramFiles))
                 list(nothing) #because itertools starmap is LAZY
                 print(" - Done!")
+                if NeedToExit:
+                    break
             if args.plots:
                 print('plotting...')
                 params = list(itertools.product(infileindices, [dist_arg[0] for dist_arg in distance_args]))
@@ -133,6 +140,8 @@ def main(args):
                     pool.map(starStats,zip(outfiles,
                                                      hists,
                                                      itertools.repeat(units)))
+                if NeedToExit:
+                    break
             if args.stats:
                 print('statting..?')
                 print('no, that doesn\'t sound right')
@@ -143,6 +152,9 @@ def main(args):
                                    units,
                                    outfile.format('',distanceParameters[0],units.replace('/','')) + '.pdf'
                     )
+                print('stats saved in {}.pdf.'.format(outfile.format('','<dist>','<units>')) )
+                if NeedToExit:
+                    break
 def starGetHash(x):
     return getHash(*x)
 
@@ -720,22 +732,45 @@ def standBackStats_yuyu(inFileList,name,units,writeOut,min_r,numpoints,dr):
                                avg[4],std[4],low68[4],hi68[4],low95[4],hi95[4],
                                avg[5],std[5],low68[5],hi68[5],low95[5],hi95[5]]))
 
+def sendMessage(message):
+    server = smtplib.SMTP( "smtp.gmail.com", 587 )
+    login = common.getdict('mail.json')
+    server.starttls()
+    server.login(*(login[0]))
+    print(server.sendmail("",login[1],message))
+    server.quit()
 
+def signal_handler(signal,frame):
+    print("Thanks for choosing RooneyWorks! We'll start wrapping up and exit when we can.")
+    print("Press CTRL-C again to exit immediately. NOTE: Data processing will not be complete.")
+    if NeedToExit:
+        exit()
+    NeedToExit = True
+    
+                      
     
 if __name__ == "__main__":
     arrrghs = common.parseCmdArgs([['settings'],
                                    ['-c','--comp'],
                                    ['-H','--hist'],
                                    ['-p','--plots'],
-                                   ['-s','--stats']],
+                                   ['-s','--stats'],
+                                   ['-n','--notify']],
                                   ['Settings json file',
                                    'Compute values for individual galaxies',
                                    'Compute histograms (requires a prior or concurrent -c run)',
                                    'Make a plot for every input survey (requires a prior or concurrent -H run)',
-                                   'Do the overview stats routine, one plot for all surveys (requires a prior or concurrent -H run)'
+                                   'Do the overview stats routine, one plot for all surveys (requires a prior or concurrent -H run)',
+                                   'Notify me via text message when the job is done running'
                                   ],
-                                   [str,'bool','bool','bool','bool'])
-    main(arrrghs)
-    
+                                   [str,'bool','bool','bool','bool','bool'])
+    try:
+        main(arrrghs)
+        if arrrghs.notify:
+            sendMessage("Job Finished")
+    except:
+        if arrrghs.notify:
+            sendMessage("Job Failed")
+
 
 

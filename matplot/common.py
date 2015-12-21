@@ -413,7 +413,7 @@ class CF2:
                     "lon":"degrees",
                     "lat":"degrees"}
         self.scatteredVelocities = data[6:]
-    
+        self.data = data
         self.theta = math.radians(self.lon-180)
         self.phi = math.radians(self.lat+90)
         self.x = self.d*math.sin(self.phi)*math.cos(self.theta)
@@ -429,6 +429,8 @@ class CF2:
         redy = self.cz*math.sin(self.phi)*math.sin(self.theta)
         redz = self.cz*math.cos(self.phi)
         return(redx,redy,redz)
+    def toList(self):
+        return self.data
         
 class MillenniumFiles:
     """
