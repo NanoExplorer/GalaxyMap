@@ -1,5 +1,5 @@
 *~
-*#*#
+*#*
 100mb box all at once.png
 Borgani velocity correlations.pdf
 CF2-gal-new-survey.txt
@@ -42,4 +42,19 @@ standalone/common.py
 standalone/grabMillennium.sh
 standalone/grabMillennium_recovered.sh
 tully-fisher.csv
+standalone/cf2colors.py
+standalone/out.pdf
+standalone/out2.pdf
+*.aux
+*.log
+reports/bibtex_test/
+1538-3881_119_1_102.pdf
+1989ApJ___344____1G.pdf
+MNRAS-2015-Watkins-1868-73.pdf
+matplot/pip_oldversions.txt
+matplot/timing.6.7.2015.1.txt
+matplot/velocity_correlation.py.orig
+matplot/velocity_correlation_structure_summary
+
+
 
