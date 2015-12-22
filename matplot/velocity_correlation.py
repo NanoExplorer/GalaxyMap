@@ -244,7 +244,10 @@ def correlation(galaxies,maxd,usewt=False):
     #There are lots of dels in this function because otherwise it tends to gobble up memory.
     #I think there might be a better way to deal with the large amounts of memory usage, but I don't yet
     #know what it is.
-    
+    tmpfilename = TEMP_DIRECTORY+'plotData_{}.npy'.format(hashlib.md5(str(galaxies).encode('utf-8')).hexdigest())
+    if os.path.exists(tmpfilename):
+        return
+                                                          
     # galaxies = [(galaxies[a],galaxies[b]) for a,b in interval_shell]
     galaxyPairs = _kd_query(galaxies[:,0:3],maxd)
     #print("Done! (with the thing)")
@@ -310,7 +313,7 @@ def correlation(galaxies,maxd,usewt=False):
     #                     bd  = indBDen,
     #                     dist= distBetweenG1G2
     # )
-    np.save(TEMP_DIRECTORY+'plotData_{}.npy'.format(hashlib.md5(str(galaxies).encode('utf-8')).hexdigest()),
+    np.save(tmpfilename,
             np.array([indPsiOneNum,
                      indPsiOneDen,
                      indPsiTwoNum,
@@ -374,6 +377,8 @@ def histogram(theHash,xs,intervals,writeOut):
     list(nothing) #I HATE LAZY FUNCTIONS most of the time
 
 def singleHistogram(data,xs,intervals,writeOut):
+    if os.path.exists(writeOut):
+        return
     indPsiOneNum = data[0]
     indPsiOneDen = data[1]
     indPsiTwoNum = data[2]
