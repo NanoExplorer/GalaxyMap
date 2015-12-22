@@ -23,7 +23,6 @@ from numpy.core.umath_tests import inner1d #Note: this function has no documenta
 import gc
 #import sys
 import smtplib
-import signal
 
 
 
@@ -245,6 +244,7 @@ def correlation(galaxies,maxd,usewt=False):
     #know what it is.
     tmpfilename = TEMP_DIRECTORY+'plotData_{}.npy'.format(myNpHash(galaxies))
     if os.path.exists(tmpfilename):
+        print("*",end="",flush=True)
         return
                                                           
     # galaxies = [(galaxies[a],galaxies[b]) for a,b in interval_shell]
@@ -350,7 +350,6 @@ def histogram(theHash,xs,intervals,writeOut):
     """
     # try:
     data =np.load(TEMP_DIRECTORY+'plotData_{}.npy'.format(theHash))
-    print("y",end="",flush=True)
         #sys.stdout.flush()
     # except IOError:
     #     #Then the file is saved in the old, klunky npz format. Let's go ahead and load it, then save it to an npy
@@ -381,7 +380,9 @@ def histogram(theHash,xs,intervals,writeOut):
 
 def singleHistogram(data,xs,intervals,writeOut):
     if os.path.exists(writeOut):
+        print("*",end="",flush=True)
         return
+    print("y",end="",flush=True)
     indPsiOneNum = data[0]
     indPsiOneDen = data[1]
     indPsiTwoNum = data[2]
@@ -751,13 +752,7 @@ def sendMessage(message):
     print(server.sendmail("",login[1],message))
     server.quit()
 
-def signal_handler(signal,frame):
-    print("Thanks for choosing RooneyWorks! We'll start wrapping up and exit when we can.")
-    print("Press CTRL-C again to exit immediately. NOTE: Data processing will not be complete.")
-    if NeedToExit:
-        exit()
-    NeedToExit = True
-    
+
                       
     
 if __name__ == "__main__":
