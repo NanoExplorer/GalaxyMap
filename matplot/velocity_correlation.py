@@ -23,7 +23,6 @@ from numpy.core.umath_tests import inner1d #Note: this function has no documenta
 import gc
 #import sys
 import smtplib
-import signal
 
 
 
@@ -205,9 +204,11 @@ def compute(infile,maxd,units):
 def _kd_query(positions,maxd):
     """Returns a np array of pairs of galaxies."""
     #This is still the best function, despite all of my scheming.
-    tmpfilename = TEMP_DIRECTORY + 'rawkd_{}_{}.npy'.format(maxd,
-                                               hashlib.md5(str(positions).encode('utf-8')).hexdigest())
+    tmpfilename = TEMP_DIRECTORY + 'rawkd_{}_{}.npy'.format(maxd,myNpHash(positions))
     #Warning: There might be more hash collisions because of this string ^ conversion. Hopefully not.
+    #THERE WERE. Thanks for just leaving a warning instead of fixing it :P
+    #The warning still stands, but it's a bit better now.
+    
     if os.path.exists(tmpfilename):
         print("!",end="",flush=True)
         return np.load(tmpfilename)
@@ -241,7 +242,11 @@ def correlation(galaxies,maxd,usewt=False):
     #There are lots of dels in this function because otherwise it tends to gobble up memory.
     #I think there might be a better way to deal with the large amounts of memory usage, but I don't yet
     #know what it is.
-    
+    tmpfilename = TEMP_DIRECTORY+'plotData_{}.npy'.format(myNpHash(galaxies))
+    if os.path.exists(tmpfilename):
+        print("*",end="",flush=True)
+        return
+                                                          
     # galaxies = [(galaxies[a],galaxies[b]) for a,b in interval_shell]
     galaxyPairs = _kd_query(galaxies[:,0:3],maxd)
     #print("Done! (with the thing)")
@@ -307,7 +312,7 @@ def correlation(galaxies,maxd,usewt=False):
     #                     bd  = indBDen,
     #                     dist= distBetweenG1G2
     # )
-    np.save(TEMP_DIRECTORY+'plotData_{}.npy'.format(hashlib.md5(str(galaxies).encode('utf-8')).hexdigest()),
+    np.save(tmpfilename,
             np.array([indPsiOneNum,
                      indPsiOneDen,
                      indPsiTwoNum,
@@ -321,14 +326,18 @@ def correlation(galaxies,maxd,usewt=False):
     )
     
 #NOTE: If the information passed as 'galaxies' to "correlation" changes, you have to update this getHash function too!
+def myNpHash(data):
+    return hashlib.md5((str(data)+str(len(data))).encode('utf-8')).hexdigest()
+
 def getHash(filename,units):
     """Loads up CF2 files and uses them to rebuild the hash database.
-    Returns a list of strings. The strings should be hashed with hashlib.md5(string.encode('utf-8')).hexdigest()"""
+    Returns a list of strings. The strings should be hashed with hashlib.md5(string.encode('utf-8')).hexdigest()
+    I'm not sure what I meant when I put that second line there..."""
     galaxies = common.loadData(filename, dataType = 'CF2')
     if units == 'Mpc/h':
-        return hashlib.md5(str(np.array([(a.x,a.y,a.z,a.v,a.dv) for a in galaxies])).encode('utf-8')).hexdigest()
+        return myNpHash(np.array([(a.x,a.y,a.z,a.v,a.dv) for a in galaxies]))
     elif units == 'km/s':
-        return hashlib.md5(str(np.array([a.getRedshiftXYZ() + (a.v,a.dv) for a in galaxies])).encode('utf-8')).hexdigest()
+        return myNpHash(np.array([a.getRedshiftXYZ() + (a.v,a.dv) for a in galaxies]))
     else:
         raise ValueError("Value of 'units' must be 'Mpc/h' or 'km/s'. Other unit schemes do not exist at present")
 
@@ -341,7 +350,6 @@ def histogram(theHash,xs,intervals,writeOut):
     """
     # try:
     data =np.load(TEMP_DIRECTORY+'plotData_{}.npy'.format(theHash))
-    print("y",end="",flush=True)
         #sys.stdout.flush()
     # except IOError:
     #     #Then the file is saved in the old, klunky npz format. Let's go ahead and load it, then save it to an npy
@@ -371,6 +379,10 @@ def histogram(theHash,xs,intervals,writeOut):
     list(nothing) #I HATE LAZY FUNCTIONS most of the time
 
 def singleHistogram(data,xs,intervals,writeOut):
+    if os.path.exists(writeOut):
+        print("*",end="",flush=True)
+        return
+    print("y",end="",flush=True)
     indPsiOneNum = data[0]
     indPsiOneDen = data[1]
     indPsiTwoNum = data[2]
@@ -740,13 +752,7 @@ def sendMessage(message):
     print(server.sendmail("",login[1],message))
     server.quit()
 
-def signal_handler(signal,frame):
-    print("Thanks for choosing RooneyWorks! We'll start wrapping up and exit when we can.")
-    print("Press CTRL-C again to exit immediately. NOTE: Data processing will not be complete.")
-    if NeedToExit:
-        exit()
-    NeedToExit = True
-    
+
                       
     
 if __name__ == "__main__":
@@ -771,6 +777,7 @@ if __name__ == "__main__":
     except:
         if arrrghs.notify:
             sendMessage("Job Failed")
+        raise
 
 
 
