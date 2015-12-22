@@ -206,8 +206,11 @@ def _kd_query(positions,maxd):
     """Returns a np array of pairs of galaxies."""
     #This is still the best function, despite all of my scheming.
     tmpfilename = TEMP_DIRECTORY + 'rawkd_{}_{}.npy'.format(maxd,
-                                               hashlib.md5(str(positions).encode('utf-8')).hexdigest())
+                                                            hashlib.md5((str(positions)+str(len(positions))).encode('utf-8')).hexdigest())
     #Warning: There might be more hash collisions because of this string ^ conversion. Hopefully not.
+    #THERE WERE. Thanks for just leaving a warning instead of fixing it :P
+    #The warning still stands, but it's a bit better now.
+    
     if os.path.exists(tmpfilename):
         print("!",end="",flush=True)
         return np.load(tmpfilename)
@@ -771,6 +774,7 @@ if __name__ == "__main__":
     except:
         if arrrghs.notify:
             sendMessage("Job Failed")
+        raise
 
 
 
