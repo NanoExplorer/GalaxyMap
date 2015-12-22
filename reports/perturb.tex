@@ -1,0 +1,130 @@
+%% A brief test of different estimators of galaxy peculiar velocity
+%% Sun Nov 29, 2015
+%% Christopher Rooney
+
+\documentclass[usenatbib]{mn2e}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% This section is called the preamble, where we can specify which
+%% latex packages we required.  Most (but not of all) of the packages
+%% below should be fairly standard in most latex documents.  The
+%% exception is xspace and the new \latex command, which you probably
+%% do not need.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Bibliography style:
+\usepackage{mathptmx}           % Use the Times font.
+\usepackage{graphicx}           % Needed for including graphics.
+\usepackage{url}                % Facility for activating URLs.
+\usepackage{verbatim}           % For verbatiminput command.
+\usepackage{booktabs}
+%% Set the paper size to be letter, with a 2cm margin 
+%% all around the page.
+\usepackage{gensymb}
+
+\newcommand{\iu}{{i\mkern1mu}}
+\newcommand{\e}{{\mathrm e}}
+\usepackage{xspace}
+ 
+
+\voffset=-0.5truein
+\textheight=9.5truein
+\textwidth=6.5truein
+\voffset=-0.55in
+\hoffset=0.06in
+\textwidth=6.4in
+\textheight=9in
+%
+\def\gtwid{\mathrel{\raise.3ex\hbox{$>$\kern-.75em\lower1ex\hbox{$\sim$}}}}
+\def\ltwid{\mathrel{\raise.3ex\hbox{$<$\kern-.75em\lower1ex\hbox{$\sim$}}}}
+\def\lessim{\mathrel{\raise.3ex\hbox{$<$\kern-.75em\lower1ex\hbox{$\sim$}}}}
+\def\\{\hfil\break}
+\def\ie{{\it i.e.\ }}
+\def\eg{{\it e.g.\ }}
+\def\etal{{\it et al.\ }}
+%\newcommand{\apj}{ApJ}
+
+%Astro Stuff
+%some units
+\newcommand{\km}{\unit{km}}
+\newcommand{\kms}{\unit{km~s\mone}}
+\newcommand{\kpc}{\unit{kpc}}
+\newcommand{\mpc}{\unit{Mpc}}
+\newcommand{\hkpc}{\mamo{h\mone}\kpc}
+\newcommand{\hmpc}{\mamo{h\mone}\mpc}
+\newcommand{\parsec}{\unit{pc}}
+\newcommand{\chisq}{\mamo{\chi^2}}
+%
+\newcommand{\hr}{\mamo{^{\rm h}}}
+\newcommand{\m}{\mamo{^{\rm m}}}
+%
+\newcommand{\lb}[2]{\mamo{l = #1\arcdeg}, \mamo{b = #2\arcdeg}}
+\newcommand{\dlb}[4]{\mamo{l = #1\fdg#2}, \mamo{b = #3\fdg#4}}
+\newcommand{\lbapr}[2]{\mamo{l \approx #1\arcdeg}, \mamo{b \approx #2\arcdeg}}
+%
+\newcommand{\rightascen}{\mbox{R.A.}}
+\newcommand{\declin}{\mbox{Dec.}}
+\newcommand{\radec}[2]{\mamo{\alpha = #1^{\rm h}}, \mamo{\delta = #2\arcdeg}}
+\newcommand{\dradec}[4]{\mamo{\alpha = #1\fh#2}, \mamo{\delta = #2\fdg#4}}
+%
+\newcommand{\xyz}[3]{($#1$, $#2$, $#3$)}
+%
+% useful abbreviations
+\newcommand{\wrt}{with respect to}
+\newcommand{\ebv}{\mbox{$E(B-V)$}}
+\renewcommand{\lg}{\mamo{\sb{LG}}}
+\newcommand{\cmb}{\mamo{\sb{CMB}}}
+\newcommand{\rhat}{\mamo{\hat{\bfv{r}}}}
+%
+\newcommand{\secref}[1]{Section~\ref{sec:#1}}
+\newcommand{\brref}[1]{(equation~\ref{eq:#1})}
+%\newcommand{\eqref}[1]{equation~(\ref{eq:#1})}
+\newcommand{\Eqref}[1]{Equation~(\ref{eq:#1})}
+\newcommand{\figref}[1]{Fig.~\ref{fig:#1}}
+\newcommand{\tabref}[1]{Table~\ref{tab:#1}}
+
+\newcommand{\bt}{\mamo{B/T}}
+\newcommand{\br}{\mamo{B-R}}
+\newcommand{\del}{\mbox{d}}
+
+\newcommand{\aap}{A\&A}
+\newcommand{\apj}{ApJ}
+\newcommand{\apjl}{ApJL}
+\newcommand{\apjs}{ApJ Supp}
+\newcommand{\aj}{AJ}
+\newcommand{\mnras}{MNRAS}
+\newcommand{\pasp}{PASP}
+\newcommand{\prd}{Phys Rev D}
+\begin{document}
+
+\author{Christopher Rooney}
+\date{\today}
+\title{Peculiar Velocity Estimators}
+\maketitle
+
+\begin{abstract}
+In previous studies, the velocity correlation functions have been computed over known galaxy surveys. Usually, these surveys have large errors in the velocity, and few galaxies ($\approx 4000$). In this paper, we will begin building confidence that velocity correlation information computed with data from the CosmicFlows-2 catalogs are reliable (not error-dominated). To accomplish this, 300 CF2-like surveys are collected from Millennium Simulation galaxies. Several of these surveys are selected and perturbed to resemble real-life data. The perturbed catalogs can be compared with the perfect catalogs to establish the effects of such large errors on the analysis of the data.
+\end{abstract}
+
+\section{Introduction}
+
+
+\section{Procedure}
+Galaxies were selected from the DeLucia2006a catalog to match the radial distribution of galaxies found in each of the COMPOSITE, CF2-gal and CF2-group catalogs. In each of these surveys, the position, redshift, and peculiar velocities of the galaxies are known with perfect accuracy. Using 100 of these catalogs, the velocity correlation was computed as described by Gorski (YEAR). Then two catalogs were selected from each category (CF2-gal, CF2-group, Composite) at random. The distances to galaxies in all of the selected catalogs were perturbed at random one hundred times (with two different error sizes), producing 1200 additional catalogs. 
+
+To perturb the catalogs, the following method was used. The perfectly-known distance data was converted to a distance modulus. The distance modulus was perturbed by a normal distribution with standard-deviations equal to either 0.1 or 0.2 times the distance modulus. The new distance was computed simply by taking the exponential function of the perturbed distance modulus, and the new peculiar velocity was computed using the unbiased estimator described in Feldman (2015).
+
+Each group of 100 catalogs were fed into the velocity correlation function, and the results await analysis.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Finally we specify the format required for our references and the
+%% name of the bibtex file where our references should be taken from.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\bibliographystyle{mn2e}
+\bibliography{paper}
+\end{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% The end.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
