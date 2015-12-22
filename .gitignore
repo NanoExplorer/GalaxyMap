@@ -1,0 +1,60 @@
+*~
+*#*
+100mb box all at once.png
+Borgani velocity correlations.pdf
+CF2-gal-new-survey.txt
+CF2-group-new-survey.dat.txt
+COMPOSITE-new-survey.dat.txt
+Gorski Velocity Correlations.pdf
+Millennium10.box
+abstract.odt
+matplot/Yuyu data/
+matplot/__pycache__/
+matplot/boxes/
+matplot/common.pyc
+matplot/database/
+matplot/galaxy.py.lprof
+matplot/lasdamas-2001.dat
+matplot/mail.json
+matplot/matplot_misc/
+matplot/output/
+matplot/settings/
+matplot/settings_surveyselect.json
+matplot/surveys/
+matplot/tmp/
+matplot/velocity_correlation.py.lprof
+mayavi/galax_scatter.py
+more_notes
+notes
+paper/
+possible improvements
+results
+standalone/BoxOfGalaxies.csv
+standalone/SIM_0.pdf
+standalone/SIM_1.pdf
+standalone/SIM_2.pdf
+standalone/SIM_3.pdf
+standalone/SIM_4.pdf
+standalone/SIM_Yuyu.pdf
+standalone/__pycache__/
+standalone/cf2group.pdf
+standalone/common.py
+standalone/grabMillennium.sh
+standalone/grabMillennium_recovered.sh
+tully-fisher.csv
+standalone/cf2colors.py
+standalone/out.pdf
+standalone/out2.pdf
+*.aux
+*.log
+reports/bibtex_test/
+1538-3881_119_1_102.pdf
+1989ApJ___344____1G.pdf
+MNRAS-2015-Watkins-1868-73.pdf
+matplot/pip_oldversions.txt
+matplot/timing.6.7.2015.1.txt
+matplot/velocity_correlation.py.orig
+matplot/velocity_correlation_structure_summary
+
+
+

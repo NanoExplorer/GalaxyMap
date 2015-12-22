@@ -1,0 +1,7 @@
+\begin{thebibliography}{34}
+\expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
+
+\bibitem[{{Watkins} \& {Feldman}(2015)}]{WatFel15}
+{Watkins} R., {Feldman} H.~A., 2015, \mnras, 450, 1868
+
+\end{thebibliography}

@@ -122,7 +122,7 @@ class chi_sq_solver:
                 E = self.function(self.centerbins[i], *args)
             except FloatingPointError:
                 print("Oh no! There was a floating point error.")
-                print(self.centerbins[i],*args)
+                #print(self.centerbins[i],*args)
                 exit()
             sum += (self.ys[i]-E)**2/E
         return sum

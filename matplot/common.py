@@ -360,13 +360,14 @@ def _loadCF2Data(filename):
     """
     Loads galaxy data from a TXT file. Assumes that the data is in the same format
     as the CF2 and COMPOSITE surveys:
-    two-space-delimited, with columns
+    whitespace-delimited, with columns
             cz (km/s)
             distance (Mpc/h)
             radial velocity(km/s)
             error in radial velocity(km/s)
             Galactic Longitude (degrees)
             Galactic Latitude (degrees)
+          All extra columns (if any) are treated as perturbed velocities
     """
 
     galaxies = [] 
@@ -411,7 +412,8 @@ class CF2:
                     "dv": "km/sec",
                     "lon":"degrees",
                     "lat":"degrees"}
-    
+        self.scatteredVelocities = data[6:]
+        self.data = data
         self.theta = math.radians(self.lon-180)
         self.phi = math.radians(self.lat+90)
         self.x = self.d*math.sin(self.phi)*math.cos(self.theta)
@@ -427,6 +429,8 @@ class CF2:
         redy = self.cz*math.sin(self.phi)*math.sin(self.theta)
         redz = self.cz*math.cos(self.phi)
         return(redx,redy,redz)
+    def toList(self):
+        return self.data
         
 class MillenniumFiles:
     """

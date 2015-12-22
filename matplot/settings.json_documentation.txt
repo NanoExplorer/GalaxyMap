@@ -1,0 +1,11 @@
+When step_type is linear, the correlation values do basically what you would expect.
+each point is 'step_size' away from the last, starting at 'min_r'. The range for the bins goes from 
+'r_value - dr' to 'r_value + dr'.
+
+However, when using the logarithmic step type, everything changes meaning. Now, each point is 
+(10^(step_size*n))*(10^(step_size)-1) away from the next point, and 
+10^(step_size*n)*(1-10^(-step_size)) away from the last point.
+dr becomes the percentage of the distance between the point in question and each neighboring point to use in the bin.
+If dr is 1, then the n=2 point would have a bin from the n=1 point to the n=3 point. dr=0.5 would result in 
+the n=2 point's bin stretching from halfway between n=1 and n=2 to halfway between n=2 and n=3.
+
