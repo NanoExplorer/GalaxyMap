@@ -1,0 +1,45 @@
+*~
+*#*#
+100mb box all at once.png
+Borgani velocity correlations.pdf
+CF2-gal-new-survey.txt
+CF2-group-new-survey.dat.txt
+COMPOSITE-new-survey.dat.txt
+Gorski Velocity Correlations.pdf
+Millennium10.box
+abstract.odt
+matplot/Yuyu data/
+matplot/__pycache__/
+matplot/boxes/
+matplot/common.pyc
+matplot/database/
+matplot/galaxy.py.lprof
+matplot/lasdamas-2001.dat
+matplot/mail.json
+matplot/matplot_misc/
+matplot/output/
+matplot/settings/
+matplot/settings_surveyselect.json
+matplot/surveys/
+matplot/tmp/
+matplot/velocity_correlation.py.lprof
+mayavi/galax_scatter.py
+more_notes
+notes
+paper/
+possible improvements
+results
+standalone/BoxOfGalaxies.csv
+standalone/SIM_0.pdf
+standalone/SIM_1.pdf
+standalone/SIM_2.pdf
+standalone/SIM_3.pdf
+standalone/SIM_4.pdf
+standalone/SIM_Yuyu.pdf
+standalone/__pycache__/
+standalone/cf2group.pdf
+standalone/common.py
+standalone/grabMillennium.sh
+standalone/grabMillennium_recovered.sh
+tully-fisher.csv
+
