@@ -205,8 +205,7 @@ def compute(infile,maxd,units):
 def _kd_query(positions,maxd):
     """Returns a np array of pairs of galaxies."""
     #This is still the best function, despite all of my scheming.
-    tmpfilename = TEMP_DIRECTORY + 'rawkd_{}_{}.npy'.format(maxd,
-                                                            hashlib.md5((str(positions)+str(len(positions))).encode('utf-8')).hexdigest())
+    tmpfilename = TEMP_DIRECTORY + 'rawkd_{}_{}.npy'.format(maxd,myNpHash(galaxies))
     #Warning: There might be more hash collisions because of this string ^ conversion. Hopefully not.
     #THERE WERE. Thanks for just leaving a warning instead of fixing it :P
     #The warning still stands, but it's a bit better now.
@@ -244,7 +243,7 @@ def correlation(galaxies,maxd,usewt=False):
     #There are lots of dels in this function because otherwise it tends to gobble up memory.
     #I think there might be a better way to deal with the large amounts of memory usage, but I don't yet
     #know what it is.
-    tmpfilename = TEMP_DIRECTORY+'plotData_{}.npy'.format(hashlib.md5(str(galaxies).encode('utf-8')).hexdigest())
+    tmpfilename = TEMP_DIRECTORY+'plotData_{}.npy'.format(myNpHash(galaxies))
     if os.path.exists(tmpfilename):
         return
                                                           
@@ -327,14 +326,18 @@ def correlation(galaxies,maxd,usewt=False):
     )
     
 #NOTE: If the information passed as 'galaxies' to "correlation" changes, you have to update this getHash function too!
+def myNpHash(data):
+    return hashlib.md5((str(data)+str(len(data))).encode('utf-8')).hexdigest()
+
 def getHash(filename,units):
     """Loads up CF2 files and uses them to rebuild the hash database.
-    Returns a list of strings. The strings should be hashed with hashlib.md5(string.encode('utf-8')).hexdigest()"""
+    Returns a list of strings. The strings should be hashed with hashlib.md5(string.encode('utf-8')).hexdigest()
+    I'm not sure what I meant when I put that second line there..."""
     galaxies = common.loadData(filename, dataType = 'CF2')
     if units == 'Mpc/h':
-        return hashlib.md5(str(np.array([(a.x,a.y,a.z,a.v,a.dv) for a in galaxies])).encode('utf-8')).hexdigest()
+        return myNpHash(np.array([(a.x,a.y,a.z,a.v,a.dv) for a in galaxies]))
     elif units == 'km/s':
-        return hashlib.md5(str(np.array([a.getRedshiftXYZ() + (a.v,a.dv) for a in galaxies])).encode('utf-8')).hexdigest()
+        return myNpHash(np.array([a.getRedshiftXYZ() + (a.v,a.dv) for a in galaxies]))
     else:
         raise ValueError("Value of 'units' must be 'Mpc/h' or 'km/s'. Other unit schemes do not exist at present")
 
