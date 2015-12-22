@@ -141,7 +141,8 @@ def main(args):
                     standBackStats(histogramFilesList,
                                    readName,
                                    units,
-                                   outfile.format('',distanceParameters[0],units.replace('/','')) + '.pdf'
+                                   outfile.format('',distanceParameters[0],units.replace('/','')) + '.pdf',
+                                   maxd=maxd_master
                     )
                 print('stats saved in {}.pdf.'.format(outfile.format('','<dist>','<units>')) )
 def starGetHash(x):
@@ -490,7 +491,7 @@ def stats(writeOut,readIn,units):
     plt.close(fig2)
     plt.close(fig3)
 
-def standBackStats(inFileList,name,units,writeOut):
+def standBackStats(inFileList,name,units,writeOut,maxd=100):
     """Do statistics over many input files, for example the three groups of 100 surveys. Average them, plot w/errorbars."""
     assert(len(inFileList) == 100) #Not true in all cases, but sufficient for debugging.
     theMap = map(np.load, inFileList)
@@ -585,11 +586,11 @@ def standBackStats(inFileList,name,units,writeOut):
     #ax6.axis(correlationScale)
 
     if units == 'km/s':
-        ax5.set_xbound(0,100*100)
-        ax6.set_xbound(0,100*100)
+        ax5.set_xbound(0,maxd*100)
+        ax6.set_xbound(0,maxd*100)
     else:
-        ax5.set_xbound(0,100)
-        ax6.set_xbound(0,100)
+        ax5.set_xbound(0,maxd)
+        ax6.set_xbound(0,maxd)
     
     with pdfback.PdfPages(writeOut) as pdf:
         pdf.savefig(f)
