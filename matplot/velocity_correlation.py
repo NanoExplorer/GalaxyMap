@@ -21,14 +21,12 @@ from numpy.core.umath_tests import inner1d #Note: this function has no documenta
 # def inner1d(a,b):
 #     return (a*b).sum(axis=1)
 import gc
-#import sys
 import smtplib
 
 
 
 
 TEMP_DIRECTORY = "/media/christopher/2TB/Christopher/code/Physics/GalaxyMap/tmp/"
-NeedToExit = False
 
 def main(args):
     np.seterr(divide='ignore',invalid='ignore')
@@ -44,7 +42,7 @@ def main(args):
     infile =       settings['input_file']
     unitslist =    settings['binunits']
     maxd_master =  settings['max_distance']
-    pool = Pool()
+    pool = Pool(processes=6)
     if settings['many_squared']:
         distance_args_master = list(zip(dr,min_r,numpoints))
         file_schemes  = list(zip(infile,orig_outfile,settings['readable_name']))
@@ -102,8 +100,6 @@ def main(args):
                  #They did WHAT they were told WHEN they were told to do it!
                 #This line is only required for using itertools starmap with the compute function
                 print(" - Done!")
-                if NeedToExit:
-                    break
             if args.hist:
                 print('Histogramming...')
                 try:
@@ -119,9 +115,7 @@ def main(args):
                                                           itertools.repeat(intervals),
                                                           histogramFiles))
                 list(nothing) #because itertools starmap is LAZY
-                print(" - Done!")
-                if NeedToExit:
-                    break
+                print(" - Done")
             if args.plots:
                 print('plotting...')
                 params = list(itertools.product(infileindices, [dist_arg[0] for dist_arg in distance_args]))
@@ -139,21 +133,17 @@ def main(args):
                     pool.map(starStats,zip(outfiles,
                                                      hists,
                                                      itertools.repeat(units)))
-                if NeedToExit:
-                    break
             if args.stats:
                 print('statting..?')
                 print('no, that doesn\'t sound right')
                 print('computing statistics...')
                 for histogramFilesList,distanceParameters in zip(map(list, zip(*histogramFiles)),distance_args):
                     standBackStats(histogramFilesList,
-                                   settings['readable_name'],
+                                   readName,
                                    units,
                                    outfile.format('',distanceParameters[0],units.replace('/','')) + '.pdf'
                     )
                 print('stats saved in {}.pdf.'.format(outfile.format('','<dist>','<units>')) )
-                if NeedToExit:
-                    break
 def starGetHash(x):
     return getHash(*x)
 
@@ -192,6 +182,9 @@ def compute(infile,maxd,units):
     elif units == 'km/s':
         galaxyXYZV = np.array([a.getRedshiftXYZ() + (a.v,a.dv) for a in galaxies])
         #You can concatenate tuples. getRedshiftXYZ returnes a tuple, and I just append a.v (and dv) to it.
+    else:
+        print("I TOLD YOU, ONLY USE km/s or Mpc/h as your units!!!")
+        print("And you should definitely, NEVER EVER, use '{}'!!".format(units))
 
     try:
         data = correlation(galaxyXYZV,maxd)
@@ -349,6 +342,7 @@ def histogram(theHash,xs,intervals,writeOut):
     We'll save 18 * 100 load cycles this way!
     """
     # try:
+    print("y",end="",flush=True)
     data =np.load(TEMP_DIRECTORY+'plotData_{}.npy'.format(theHash))
         #sys.stdout.flush()
     # except IOError:
@@ -382,7 +376,6 @@ def singleHistogram(data,xs,intervals,writeOut):
     if os.path.exists(writeOut):
         print("*",end="",flush=True)
         return
-    print("y",end="",flush=True)
     indPsiOneNum = data[0]
     indPsiOneDen = data[1]
     indPsiTwoNum = data[2]
