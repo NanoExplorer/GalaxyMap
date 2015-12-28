@@ -18,7 +18,10 @@ matplot/lasdamas-2001.dat
 matplot/mail.json
 matplot/matplot_misc/
 matplot/output/
-matplot/settings/
+matplot/settings/Archive/
+matplot/settings/spatialCorrelation/
+matplot/settings/velocityMocks/old-spec/
+matplot/settings/surveyGenerator/
 matplot/settings_surveyselect.json
 matplot/surveys/
 matplot/tmp/
