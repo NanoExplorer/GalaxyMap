@@ -1,0 +1,41 @@
+{
+    "dr": [1,2,5],
+    "input_file": ["surveys/perturbed/COMPOSITE-1-p-0.1-naive-{}.dat",
+		   "surveys/perturbed/COMPOSITE-1-p-0.2-naive-{}.dat",
+		   "surveys/perturbed/COMPOSITE-1-p-0.1-notmod-{}.dat",
+		   "surveys/perturbed/COMPOSITE-1-p-0.2-notmod-{}.dat",
+		   "surveys/perturbed/COMPOSITE-29-p-0.1-naive-{}.dat",
+		   "surveys/perturbed/COMPOSITE-29-p-0.2-naive-{}.dat",
+		   "surveys/perturbed/COMPOSITE-29-p-0.1-notmod-{}.dat",
+		   "surveys/perturbed/COMPOSITE-29-p-0.2-notmod-{}.dat"
+		  ],
+    "min_r": [0.5,1,2.5],
+    "numpoints": [50,25,10],
+    "max_distance": 50,
+    "_COMMENT":"Yes, it is possible to compute the max distance within python. I want to emphasize that every combination of dr/minr/numpoints should result in the same max distance. Otherwise there will be lots of wasted memory/hdd space and computation time. So, if you want to work with several different maximum distances, make several of these files.",
+    "output_file_name":["output/COMPOSITE-1-p-0.1-naive-{}-bin-{}-{}.dat",
+			"output/COMPOSITE-1-p-0.2-naive-{}-bin-{}-{}.dat",
+			"output/COMPOSITE-1-p-0.1-notmod-{}-bin-{}-{}.dat",
+			"output/COMPOSITE-1-p-0.2-notmod-{}-bin-{}-{}.dat",
+			"output/COMPOSITE-29-p-0.1-naive-{}-bin-{}-{}.dat",
+			"output/COMPOSITE-29-p-0.2-naive-{}-bin-{}-{}.dat",
+			"output/COMPOSITE-29-p-0.1-notmod-{}-bin-{}-{}.dat",
+			"output/COMPOSITE-29-p-0.2-notmod-{}-bin-{}-{}.dat"
+		       ],
+    "step_type": "lin",
+    "many": true,
+    "num_files":100,
+    "offset":0,
+    "binunits":["Mpc/h","km/s"],
+    "readable_name":[
+		     "Naively Perturbed COMPOSITE 01, 0.1",
+		     "Naively Perturbed COMPOSITE 01, 0.2",
+		     "Distance Perturbed COMPOSITE 01, 0.1",
+		     "Distance Perturbed COMPOSITE 01, 0.2",
+		     "Naively Perturbed COMPOSITE 29, 0.1",
+		     "Naively Perturbed COMPOSITE 29, 0.2",
+		     "Distance Perturbed COMPOSITE 29, 0.1",
+		     "Distance Perturbed COMPOSITE 29, 0.2"
+		    ],
+    "many_squared": true
+}
