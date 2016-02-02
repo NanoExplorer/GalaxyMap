@@ -141,7 +141,7 @@ def main(args):
                     standBackStats(histogramFilesList,
                                    readName,
                                    units,
-                                   outfile.format('',distanceParameters[0],units.replace('/','')) + '.pdf',
+                                   outfile.format('',distanceParameters[0],units.replace('/','')),
                                    maxd=maxd_master
                     )
                 print('stats saved in {}.pdf.'.format(outfile.format('','<dist>','<units>')) )
@@ -491,9 +491,97 @@ def stats(writeOut,readIn,units):
     plt.close(fig2)
     plt.close(fig3)
 
-def standBackStats(inFileList,name,units,writeOut,maxd=100):
+def standBackStats(a,b,c,d,maxd=100):
+    standBackStats_toomanyfiles(a,b,c,d,maxd=maxd)
+    #standBackStats_allonepage(a,b,c,d+'.pdf',maxd=maxd)
+    #Set here what you want the stats routine to do. Right now I'm prepping a minipaper, so I need lots of
+    #single plots that can fit on page instead of lots of plots glued together.
+    
+def standBackStats_toomanyfiles(inFileList,name,units,writeOut,maxd=100,savenpy=False):
     """Do statistics over many input files, for example the three groups of 100 surveys. Average them, plot w/errorbars."""
-    assert(len(inFileList) == 100) #Not true in all cases, but sufficient for debugging.
+    assert(len(inFileList) == 100) #Not true in all cases, but sufficient for debugging. REMOVE this line if problems
+    theMap = map(np.load, inFileList)
+    theList = list(theMap)
+    allData = np.array(theList)
+    #allData = np.array(list(map(np.load, inFileList)))
+    #One inFile contains the following: [p1, p2, a, b, psiparallel, psiperpindicular]
+    xs = allData[0][6]
+    std = np.std(allData,axis=0)
+    avg = np.mean(allData,axis=0)
+    low68 = np.percentile(allData,16,axis=0)
+    hi68  = np.percentile(allData,100-16,axis=0)
+    low95 = np.percentile(allData,2.5,axis=0)
+    hi95  = np.percentile(allData,100-2.5,axis=0)
+    
+
+    # if units == 'km/s':
+    #     correlationScale = (0,5000,-1000,5000)
+    # else:
+    #     correlationScale = (0,50,-1000,5000)
+
+    #momentScale = (0,30,0.25,1.1)
+    plotName = name
+
+    matplotlib.rc('font',size=10)
+    
+    fig1 = plt.figure()
+    
+    plt.title('$\psi_1$, {} Survey Mock'.format(plotName))
+    plt.errorbar(xs,
+                 avg[0]/10**4,
+                 yerr=std[0]/10**4,
+                 fmt = 'k-',
+                 elinewidth=0.5,
+                 capsize=2,
+                 capthick=0.5
+    )
+    plt.fill_between(xs,low68[0]/10**4,hi68[0]/10**4,facecolor='black',alpha=0.25)
+    plt.fill_between(xs,low95[0]/10**4,hi95[0]/10**4,facecolor='black',alpha=0.25)
+    
+    plt.xlabel('Distance, {}'.format(units))
+    plt.ylabel('Correlation, $10^4 (km/s)^2$')
+    #plt.axis(correlationScale)
+    if units == 'km/s':
+        plt.xlim(0,5000)
+    else:
+        plt.xlim(0,50)
+
+    fig2 = plt.figure()
+    plt.errorbar(xs, avg[1]/10**4, yerr=std[1]/10**4, fmt = 'k-',
+                 elinewidth=0.5,
+                 capsize=2,
+                 capthick=0.5)
+    plt.title('$\psi_2$, {} Survey Mock'.format(plotName))
+    plt.fill_between(xs,low68[1]/10**4,hi68[1]/10**4,facecolor='black',alpha=0.25)
+    plt.fill_between(xs,low95[1]/10**4,hi95[1]/10**4,facecolor='black',alpha=0.25)
+    plt.xlabel('Distance, Mpc/h')
+    plt.ylabel('Correlation, $(km/s)^2$')
+    #plt.axis(correlationScale)
+    if units == 'km/s':
+        plt.xlim(0,5000)
+    else:
+        plt.xlim(0,50)
+
+    
+    with pdfback.PdfPages(writeOut+'-1.pdf') as pdf:
+        pdf.savefig(fig1)
+
+    with pdfback.PdfPages(writeOut+'-2.pdf') as pdf:
+        pdf.savefig(fig2)
+        
+    plt.close(fig1)
+    plt.close(fig2)
+    if savenpy:
+        np.save(writeOut,np.array([xs,avg[0],std[0],low68[0],hi68[0],low95[0],hi95[0],
+                                   avg[1],std[1],low68[1],hi68[1],low95[1],hi95[1],
+                                   avg[2],std[2],low68[2],hi68[2],low95[2],hi95[2],
+                                   avg[3],std[3],low68[3],hi68[3],low95[3],hi95[3],
+                                   avg[4],std[4],low68[4],hi68[4],low95[4],hi95[4],
+                                   avg[5],std[5],low68[5],hi68[5],low95[5],hi95[5]]))
+    
+def standBackStats_allonepage(inFileList,name,units,writeOut,maxd=100):
+    """Do statistics over many input files, for example the three groups of 100 surveys. Average them, plot w/errorbars."""
+    assert(len(inFileList) == 100) #Not true in all cases, but sufficient for debugging. REMOVE this line if problems
     theMap = map(np.load, inFileList)
     theList = list(theMap)
     allData = np.array(theList)

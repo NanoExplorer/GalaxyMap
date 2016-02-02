@@ -3,6 +3,23 @@ import numpy as np
 import scipy.spatial as space
 import math
 np.seterr(all="raise")
+
+def modulusify(dist, args):
+    if args.altmodulus:
+        return 5*np.log10(dist) + 25
+    else:
+        return np.log(dist)
+def unmodulusify(modulus, args):
+    if args.altmodulus:
+        return 10**((modulus - 25)/5)
+    else:
+        return np.e ** modulus
+
+def calculate_error(modulus,distance,frac_error,args):
+    hubble_constant * (np.e ** (modulus + modulus*args.frac_error) - distance)
+    print("Edit this for the 'normal' modulus")
+    exit()
+    
 def perturb(args):
     num_acks = 0
     second_order_acks = 0
@@ -12,15 +29,19 @@ def perturb(args):
     galaxies = common.loadData(args.cf2file,'CF2')
     perturbed_vs = []
     delta_vs = []
+    if args.altmodulus and args.naive:
+        print("Altmodulus and Naive are mutually exclusive options.")
+        exit()
+        
     for galaxy in galaxies:
         if abs(galaxy.v) > galaxy.cz/10:
             num_acks += 1
             continue
         if not args.distance:
-            distance_modulus = np.log(galaxy.d)
+            distance_modulus = modulusify(galaxy.d,args)
             perturbed_dmod = np.random.normal(distance_modulus,abs(distance_modulus*fractional_error),args.num)
-            skewed_distance = np.e ** perturbed_dmod
-            dv = hubble_constant * (np.e ** (distance_modulus + distance_modulus*args.frac_error) - galaxy.d)
+            skewed_distance = unmodulusify(perturbed_dmod,args)
+            dv = calculate_error(distance_modulus,galaxy.d,frac_error,args)
         else:
             skewed_distance = np.random.normal(galaxy.d,abs(galaxy.d*fractional_error),args.num)
             dv = galaxy.d*fractional_error*hubble_constant
@@ -28,8 +49,9 @@ def perturb(args):
         if args.naive or args.distance:
             try:
                 velocities = galaxy.cz - hubble_constant * skewed_distance
-            except FloatingPointError:
+            except FloatingPointError: #I don't think it's possible to have a FP error here... Could be wrong?
                 num_errs += 1
+                print("I was wrong")
                 continue
         else:
             try:
@@ -66,9 +88,9 @@ def perturb(args):
     print("Also, {} FloatingPoint errors happened, even after taking out the above galaxies.".format(num_errs))
 
 if __name__ == "__main__":
-    arrrghs = common.parseCmdArgs([['cf2file'],['outfile'],['frac_error'],['num'],['-n','--naive'],['-d','--distance']],
-                                   ['CF2 survey file to perturb','Output file spec. Must contain exactly one "{}" for use in numbering.', 'Fractional error, determines the standard deviation of the normal distribution used in the distance modulus','Number of perturbed survey files to generate','Use the naive velocity estimator v = cz - H0*d','Don\'t use the distance modulus, just use distance (implies -n)'],
-                                  [str,str,float,int,'bool','bool'])
+    arrrghs = common.parseCmdArgs([['cf2file'],['outfile'],['frac_error'],['num'],['-n','--naive'],['-d','--distance'],['-a','--altmodulus']],
+                                   ['CF2 survey file to perturb','Output file spec. Must contain exactly one "{}" for use in numbering.', 'Fractional error, determines the standard deviation of the normal distribution used in the distance modulus','Number of perturbed survey files to generate','Use the naive velocity estimator v = cz - H0*d','Don\'t use the distance modulus, just use distance (implies -n)','Use the distance modulus formula 5log10(d) + 25'],
+                                  [str,str,float,int,'bool','bool','bool'])
     perturb(arrrghs)
 
 

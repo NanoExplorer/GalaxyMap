@@ -2,7 +2,7 @@
 %% Sun Nov 29, 2015
 %% Christopher Rooney
 \nonstopmode
-\documentclass[usenatbib]{mn2e}
+\documentclass[letterpaper]{article}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% This section is called the preamble, where we can specify which
@@ -20,20 +20,13 @@
 \usepackage{booktabs}
 %% Set the paper size to be letter, with a 2cm margin 
 %% all around the page.
+\usepackage[margin=1in]{geometry}
 \usepackage{gensymb}
-
+\usepackage{subcaption}
 \newcommand{\iu}{{i\mkern1mu}}
 \newcommand{\e}{{\mathrm e}}
 \usepackage{xspace}
  
-
-\voffset=-0.5truein
-\textheight=9.5truein
-\textwidth=6.5truein
-\voffset=-0.55in
-\hoffset=0.06in
-\textwidth=6.4in
-\textheight=9in
 %
 \def\gtwid{\mathrel{\raise.3ex\hbox{$>$\kern-.75em\lower1ex\hbox{$\sim$}}}}
 \def\ltwid{\mathrel{\raise.3ex\hbox{$<$\kern-.75em\lower1ex\hbox{$\sim$}}}}
@@ -116,54 +109,95 @@ To perturb the catalogs, the following method was used. The perfectly-known dist
 
 \section{Results}
 Figure~\ref{fig:perf-kms} shows the perfect velocity correlation as a function of redshift. This exact plot came from the COMPOSITE sample, but it is representative of all the others. For comparison, Figure~\ref{fig:imperf-kms} is the correlation as a function of redshift after perturbing one of the surveys 100 times with relative errors in the distance modulus equal to 0.2. It appears that it is completely error-dominated now, with everything consistent with zero. That is probably not due to the individual survey chosen to perturb, because Figure~\ref{fig:single} shows a plot of the single survey, and it appears to have more in common with Figure~\ref{fig:perf-kms} than Figure~\ref{fig:imperf-kms}. These patterns are seen in all combinations of perfect and imperfect surveys tested.
+
+%\caption{\small
+%The perfect velocity correlation as a function of redshift. The light grey contours represent the 95th percentile, and the dark grey contours represent the 68th percentile. The error bars are one standard deviation. This plot was generated using the 100 ``perfect knowledge'' COMPOSITE surveys.
+
+%\caption{\small
+%The velocity correlation as a function of redshift, of 100 perturbed COMPOSITE surveys. The contours and error bars in this plot are the same as in Fig.~\ref{fig:perf-kms}.
+
+%\caption{\small
+%The perfect velocity correlation as a function of redshift. This plot uses only the one perfect COMPOSITE survey used to generate all of the perturbed surveys in Fig.~\ref{fig:imperf-kms}.
+
 \begin{figure}
-  \begin{center}
-  \includegraphics[scale=0.75]{psipar-perf-kms.pdf}
-  \end{center}
-\caption{\small
-The perfect velocity correlation as a function of redshift. The light grey contours represent the 95th percentile, and the dark grey contours represent the 68th percentile. The error bars are one standard deviation. This plot was generated using the 100 ``perfect knowledge'' COMPOSITE surveys.
-}
-\label{fig:perf-kms}
+\centering
+\begin{subfigure}{0.475\textwidth}
+  \centering
+  \includegraphics[scale=0.4]{perturbedplots/perfect/COMPOSITE-MOCK-bin-2-Mpch-2.pdf}
+  \caption{Perfect velocity correlation as a function of distance.}
+  \label{fig:dperfect}
+\end{subfigure}
+\hfill
+\begin{subfigure}{0.475\textwidth}
+  \centering
+  \includegraphics[scale=0.4]{perturbedplots/perturbed/COMPOSITE-29-perturbed-0,1--bin-2-Mpch-2.pdf}
+  \caption{Here the distances (and thus velocities) are perturbed in the distance modulus, and the velocities are then estimated using the Feldman estimator.}
+  \label{fig:dperturb}
+\end{subfigure}
+\vskip\baselineskip
+\begin{subfigure}{0.475\textwidth}
+  \centering
+  \includegraphics[scale=0.4]{perturbedplots/naive/COMPOSITE-29-p-0,1-naive--bin-2-Mpch-2.pdf}
+  \caption{Here the distances are perturbed as in Fig.~\ref{fig:dperturb} but the velocities are estimated using the naive, normal cosmological redshift formula.}
+  \label{fig:dnaive}
+\end{subfigure}
+\begin{subfigure}{0.475\textwidth}
+  \centering
+  \includegraphics[scale=0.4]{perturbedplots/notmod/COMPOSITE-29-p-0,1-notmod--bin-2-Mpch-2.pdf}
+  \caption{This time the distances themselves are perturbed.}
+  \label{fig:dnotmod}
+\end{subfigure}
+\label{fig:dist}
+\caption{Various estimations of the velocity correlations. Light grey is 95th percentile contour, dark grey is 68th. Error bars are one standard deviation.}
 \end{figure}
+\hfill
+
 \begin{figure}
-  \begin{center}
-  \includegraphics[scale=0.75]{psipar-pert-0,2-comp29-kms.pdf}
-  \end{center}
-\caption{\small
-The velocity correlation as a function of redshift, of 100 perturbed COMPOSITE surveys. The contours and error bars in this plot are the same as in Fig.~\ref{fig:perf-kms}.
-}
-\label{fig:imperf-kms}
+\centering
+\begin{subfigure}{0.475\textwidth}
+  \centering
+  \includegraphics[scale=0.4]{perturbedplots/perfect/COMPOSITE-MOCK-bin-200-kms-2.pdf}
+  \caption{not yet typed}
+  \label{fig:redperfect}
+\end{subfigure}
+\hfill
+\begin{subfigure}{0.475\textwidth}
+  \centering
+  \includegraphics[scale=0.4]{perturbedplots/perturbed/COMPOSITE-29-perturbed-0,1--bin-200-kms-2.pdf}
+  \caption{not yet typed}
+  \label{fig:redperturb}
+\end{subfigure}
+\vskip\baselineskip
+\begin{subfigure}{0.475\textwidth}
+  \centering
+  \includegraphics[scale=0.4]{perturbedplots/naive/COMPOSITE-29-p-0,1-naive--bin-200-kms-2.pdf}
+  \caption{not yet typed}
+  \label{fig:rednaive}
+\end{subfigure}
+\begin{subfigure}{0.475\textwidth}
+  \centering
+  \includegraphics[scale=0.4]{perturbedplots/notmod/COMPOSITE-29-p-0,1-notmod--bin-200-kms-2.pdf}
+  \caption{not yet typed}
+  \label{fig:rednotmod}
+\end{subfigure}
+\label{fig:allfigures}
+\caption{same as other fig but redshift as distance.}
 \end{figure}
-\begin{figure}
-  \begin{center}
-  \includegraphics[scale=0.4]{single-vcorr-composite1.pdf}
-  \end{center}
-\caption{\small
-The perfect velocity correlation as a function of redshift. This plot uses only the one perfect COMPOSITE survey used to generate all of the perturbed surveys in Fig.~\ref{fig:imperf-kms}.
-}
-\label{fig:single}
-\end{figure}
+
+
 
 A similar situation is found when dealing with correlations as a function of distance, although in this case the dominant feature in the perfect data was a negative slope, which is still seen in the perturbed data. The perfect data is shown in Figure~\ref{fig:perf-mpc}. In the perturbed plots, the scale is wildly different. Instead of the velocity correlation staying between -5 and 25 like it does with the perfect data, it tends to be much more exaggerated in the perturbed data. Figure ~\ref{fig:pert-mpc} may not be the best plot for the job, but it works. In that plot, correlation decreases from -100 to -600. Again, similar features are seen in other combinations of perfect and imperfect datasets.
 
-\begin{figure}
-  \begin{center}
-  \includegraphics[scale=0.75]{psipar-perf-Mpch.pdf}
-  \end{center}
-\caption{\small
-The perfect velocity correlation as a function of distance. This plot uses only the one perfect COMPOSITE survey used to generate all of the perturbed surveys in Fig.~\ref{fig:imperf-kms}.
-}
-\label{fig:perf-mpc}
-\end{figure}
-\begin{figure}
-  \begin{center}
-  \includegraphics[scale=0.75]{psipar-pert-0,2-comp1-mpc.pdf}
-  \end{center}
-\caption{\small
-One plot of the imperfect velocity correlation as a function of distance. The contours and error bars in this plot are the same as in Fig.~\ref{fig:perf-kms}. Note that the scaling is wildly exaggerated from that in Fig~\ref{fig:perf-mpc}.
-}
-\label{fig:pert-mpc}
-\end{figure}
+
+%\caption{\small
+%The perfect velocity correlation as a function of distance. This plot uses only the one perfect COMPOSITE survey used to generate all of the perturbed surveys in Fig.~\ref{fig:imperf-kms}.
+%}
+
+%\caption{\small
+%One plot of the imperfect velocity correlation as a function of distance. The contours and error bars in this plot are the same as in Fig.~\ref{fig:perf-kms}. Note that the scaling is wildly exaggerated from that in Fig~\ref{fig:perf-mpc}.
+%}
+%\label{fig:pert-mpc}
+%\end{figure}
 
 \section{Discussion}
 The perturbed dataset definitely appears to be error-dominated. Whereas there was a clear boost to correlation at small scales when using redshift as distance in the perfect data, there were no such clear features when using the perturbed data. There was still a clear negative slope in the perturbed surveys when using distance as distance, the scale was completely different ($20 \cdot 10^4$ (km/s)$^2$  as opposed to $2500 \cdot 10^4$ (km/s)$^2$). I'm not entirely sure what this means, but it doesn't seem good for being able to extract meaningful information from real surveys. 

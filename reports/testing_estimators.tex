@@ -168,6 +168,19 @@ More normal (pun intended) results - obtained by using the new formula.
 \section{Discussion and Conclusions}
 
 Qualitatively, the improved estimator does seem to do a much better job at producing gaussian distributed peculiar velocities. Now that this technique has been tried in Python, it can be easily implemented into the existing logic for many-survey-statistics. Note that this method doesn't work for velocities large compared to redshift, and it also doesn't work for large redshift.
+
+\section{Future work} 
+Try out the standard distance modulus formula. Maybe use something like 0.03 error instead of 0.1. The formula Yuyu is using is 
+\[
+m-M = 5\cdot \log\left(d\right)+25
+\]
+compared to my formula which is
+\[
+mod = \ln\left(d\right)
+\]
+which accounts for the units of d in Mpc, etc.
+
+If possible prove that they're the same with different scaling factors. 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Finally we specify the format required for our references and the
 %% name of the bibtex file where our references should be taken from.
