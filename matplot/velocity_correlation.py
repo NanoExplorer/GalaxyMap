@@ -22,11 +22,13 @@ from numpy.core.umath_tests import inner1d #Note: this function has no documenta
 #     return (a*b).sum(axis=1)
 import gc
 import smtplib
+import matplotlib.ticker as mtick
 
 
 
 
 TEMP_DIRECTORY = "/media/christopher/2TB/Christopher/code/Physics/GalaxyMap/tmp/"
+PERFECT_LOCATION = 
 
 def main(args):
     np.seterr(divide='ignore',invalid='ignore')
@@ -496,6 +498,89 @@ def standBackStats(a,b,c,d,maxd=100):
     #standBackStats_allonepage(a,b,c,d+'.pdf',maxd=maxd)
     #Set here what you want the stats routine to do. Right now I'm prepping a minipaper, so I need lots of
     #single plots that can fit on page instead of lots of plots glued together.
+
+def standBackStats_perfectBackground(inFileList,name,units,writeOut,maxd=100,perfect_location,savenpy=False):
+    perfect = np.load(perfect_location)
+    theMap = map(np.load, inFileList)
+    theList = list(theMap)
+    allData = np.array(theList)
+    #allData = np.array(list(map(np.load, inFileList)))
+    #One inFile contains the following: [p1, p2, a, b, psiparallel, psiperpindicular]
+    xs = allData[0][6]
+    std = np.std(allData,axis=0)
+    avg = np.mean(allData,axis=0)
+    low68 = perfect[range(3,37,6)] # I don't know why I saved them in this order, but at least it's not too hard
+    hi68  = perfect[range(4,37,6)] # to extract.
+    low95 = perfect[range(5,37,6)]
+    hi95  = perfect[range(6,37,6)]
+
+     
+
+    # if units == 'km/s':
+    #     correlationScale = (0,5000,-1000,5000)
+    # else:
+    #     correlationScale = (0,50,-1000,5000)
+
+    #momentScale = (0,30,0.25,1.1)
+    plotName = name
+
+    matplotlib.rc('font',size=10)
+    
+    fig1 = plt.figure()
+    
+    plt.title('$\psi_1$, {} Survey Mock'.format(plotName))
+    plt.errorbar(xs,
+                 avg[0],
+                 yerr=std[0],
+                 fmt = 'k-',
+                 elinewidth=0.5,
+                 capsize=2,
+                 capthick=0.5
+    )
+    plt.fill_between(xs,low68[0],hi68[0],facecolor='black',alpha=0.25)
+    plt.fill_between(xs,low95[0],hi95[0],facecolor='black',alpha=0.25)
+    
+    plt.xlabel('Distance, {}'.format(units))
+    plt.ylabel('Correlation, $10^4 (km/s)^2$')
+    #plt.axis(correlationScale)
+    if units == 'km/s':
+        plt.xlim(0,5000)
+    else:
+        plt.xlim(0,50)
+    plt.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
+
+    fig2 = plt.figure()
+    plt.errorbar(xs, avg[1], yerr=std[1], fmt = 'k-',
+                 elinewidth=0.5,
+                 capsize=2,
+                 capthick=0.5)
+    plt.title('$\psi_2$, {} Survey Mock'.format(plotName))
+    plt.fill_between(xs,low68[1],hi68[1],facecolor='black',alpha=0.25)
+    plt.fill_between(xs,low95[1],hi95[1],facecolor='black',alpha=0.25)
+    plt.xlabel('Distance, Mpc/h')
+    plt.ylabel('Correlation, $(km/s)^2$')
+    plt.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
+    #plt.axis(correlationScale)
+    if units == 'km/s':
+        plt.xlim(0,5000)
+    else:
+        plt.xlim(0,50)
+
+    with pdfback.PdfPages(writeOut+'-1.pdf') as pdf:
+        pdf.savefig(fig1)
+
+    with pdfback.PdfPages(writeOut+'-2.pdf') as pdf:
+        pdf.savefig(fig2)
+        
+    plt.close(fig1)
+    plt.close(fig2)
+    if savenpy:
+        np.save(writeOut,np.array([xs,avg[0],std[0],low68[0],hi68[0],low95[0],hi95[0],
+                                   avg[1],std[1],low68[1],hi68[1],low95[1],hi95[1],
+                                   avg[2],std[2],low68[2],hi68[2],low95[2],hi95[2],
+                                   avg[3],std[3],low68[3],hi68[3],low95[3],hi95[3],
+                                   avg[4],std[4],low68[4],hi68[4],low95[4],hi95[4],
+                                   avg[5],std[5],low68[5],hi68[5],low95[5],hi95[5]]))
     
 def standBackStats_toomanyfiles(inFileList,name,units,writeOut,maxd=100,savenpy=False):
     """Do statistics over many input files, for example the three groups of 100 surveys. Average them, plot w/errorbars."""
