@@ -28,8 +28,8 @@ import matplotlib.ticker as mtick
 
 
 TEMP_DIRECTORY = "/media/christopher/2TB/Christopher/code/Physics/GalaxyMap/tmp/"
-PERFECT_LOCATION = 
-
+PERFECT_LOCATION = "output/npy/perfect/COMPOSITE-MOCK-bin-{}-{}.pdf.npy"
+print("Warning: Non-general perfect location")
 def main(args):
     np.seterr(divide='ignore',invalid='ignore')
     """ Compute the velocity correlations on one or many galaxy surveys. 
@@ -136,17 +136,27 @@ def main(args):
                                                      hists,
                                                      itertools.repeat(units)))
             if args.stats:
-                print('statting..?')
-                print('no, that doesn\'t sound right')
-                print('computing statistics...')
+                print("MAKING ALL THE PLOTS.")
                 for histogramFilesList,distanceParameters in zip(map(list, zip(*histogramFiles)),distance_args):
-                    standBackStats(histogramFilesList,
-                                   readName,
-                                   units,
-                                   outfile.format('',distanceParameters[0],units.replace('/','')),
-                                   maxd=maxd_master
+                    standBackStats_perfectBackground(histogramFilesList,
+                                                     readName,
+                                                     units,
+                                                     outfile.format('',distanceParameters[0],units.replace('/','')),
+                                                     PERFECT_LOCATION,
+                                                     maxd=maxd_master
                     )
-                print('stats saved in {}.pdf.'.format(outfile.format('','<dist>','<units>')) )
+            # if args.stats:
+            #     print('statting..?')
+            #     print('no, that doesn\'t sound right')
+            #     print('computing statistics...')
+            #     for histogramFilesList,distanceParameters in zip(map(list, zip(*histogramFiles)),distance_args):
+            #         standBackStats(histogramFilesList,
+            #                        readName,
+            #                        units,
+            #                        outfile.format('',distanceParameters[0],units.replace('/','')),
+            #                        maxd=maxd_master
+            #         )
+            #     print('stats saved in {}.pdf.'.format(outfile.format('','<dist>','<units>')) )
 def starGetHash(x):
     return getHash(*x)
 
@@ -500,13 +510,14 @@ def standBackStats(a,b,c,d,maxd=100):
     #single plots that can fit on page instead of lots of plots glued together.
 
 def standBackStats_perfectBackground(inFileList,name,units,writeOut,maxd=100,perfect_location,savenpy=False):
-    perfect = np.load(perfect_location)
+    
     theMap = map(np.load, inFileList)
     theList = list(theMap)
     allData = np.array(theList)
     #allData = np.array(list(map(np.load, inFileList)))
     #One inFile contains the following: [p1, p2, a, b, psiparallel, psiperpindicular]
     xs = allData[0][6]
+    perfect = np.load(perfect_location.format(xs[1]-xs[0],units.replace('/','')))
     std = np.std(allData,axis=0)
     avg = np.mean(allData,axis=0)
     low68 = perfect[range(3,37,6)] # I don't know why I saved them in this order, but at least it's not too hard
