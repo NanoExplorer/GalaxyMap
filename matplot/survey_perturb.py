@@ -45,7 +45,6 @@ def perturb(args):
         else:
             skewed_distance = np.random.normal(galaxy.d,abs(galaxy.d*fractional_error),args.num)
             
-            
         if args.naive or args.distance:
             try:
                 velocities = galaxy.cz - hubble_constant * skewed_distance
@@ -87,7 +86,7 @@ def perturb(args):
     print("i.e. the condition on our estimator that v << cz was not satisfied.")
     print("This happened to the random data {} times out of {}.".format(second_order_acks,args.num*len(galaxies)))
     print()
-    print("Also, {} FloatingPoint errors happened, even after taking out the above galaxies.".format(num_errs))
+    print("Also, {} FloatingPoint errors happened, even after taking out the close-by galaxies.".format(num_errs))
 
 if __name__ == "__main__":
     arrrghs = common.parseCmdArgs([['cf2file'],['outfile'],['frac_error'],['num'],['-n','--naive'],['-d','--distance'],['-a','--altmodulus']],
