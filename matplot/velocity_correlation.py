@@ -28,13 +28,13 @@ import matplotlib.ticker as mtick
 
 
 TEMP_DIRECTORY = "/media/christopher/2TB/Christopher/code/Physics/GalaxyMap/tmp/"
-PERFECT_LOCATION = "output/npy/perfect/COMPOSITE-MOCK-bin-{}-{}.pdf.npy"
+PERFECT_LOCATION = "output/COMPOSITE-MOCK-bin-{:.0f}-{}.npy"
 print("Warning: Non-general perfect location")
 def main(args):
     np.seterr(divide='ignore',invalid='ignore')
     """ Compute the velocity correlations on one or many galaxy surveys. 
     """
-    #Get setup information from the settings file
+    #Get setup information from the settings files
     settings =   common.getdict(args.settings)
     numpoints =    settings['numpoints']
     dr =           settings['dr']
@@ -44,7 +44,7 @@ def main(args):
     infile =       settings['input_file']
     unitslist =    settings['binunits']
     maxd_master =  settings['max_distance']
-    pool = Pool(processes=6)
+    pool = Pool(processes=2)
     if settings['many_squared']:
         distance_args_master = list(zip(dr,min_r,numpoints))
         file_schemes  = list(zip(infile,orig_outfile,settings['readable_name']))
@@ -116,6 +116,9 @@ def main(args):
                                                           itertools.repeat(xs),
                                                           itertools.repeat(intervals),
                                                           histogramFiles))
+                # I totally should've put a comment here. I *Think* that this section is actually faster
+                #when not threaded. 
+                
                 list(nothing) #because itertools starmap is LAZY
                 print(" - Done")
             if args.plots:
@@ -135,8 +138,8 @@ def main(args):
                     pool.map(starStats,zip(outfiles,
                                                      hists,
                                                      itertools.repeat(units)))
-            if args.stats:
-                print("MAKING ALL THE PLOTS.")
+            if args.statspb:
+                print("MAKING Perturbed plots..")
                 for histogramFilesList,distanceParameters in zip(map(list, zip(*histogramFiles)),distance_args):
                     standBackStats_perfectBackground(histogramFilesList,
                                                      readName,
@@ -145,18 +148,18 @@ def main(args):
                                                      PERFECT_LOCATION,
                                                      maxd=maxd_master
                     )
-            # if args.stats:
-            #     print('statting..?')
-            #     print('no, that doesn\'t sound right')
-            #     print('computing statistics...')
-            #     for histogramFilesList,distanceParameters in zip(map(list, zip(*histogramFiles)),distance_args):
-            #         standBackStats(histogramFilesList,
-            #                        readName,
-            #                        units,
-            #                        outfile.format('',distanceParameters[0],units.replace('/','')),
-            #                        maxd=maxd_master
-            #         )
-            #     print('stats saved in {}.pdf.'.format(outfile.format('','<dist>','<units>')) )
+            if args.stats:
+                print('statting..?')
+                print('no, that doesn\'t sound right')
+                print('computing statistics...')
+                for histogramFilesList,distanceParameters in zip(map(list, zip(*histogramFiles)),distance_args):
+                    standBackStats(histogramFilesList,
+                                   readName,
+                                   units,
+                                   outfile.format('',distanceParameters[0],units.replace('/','')),
+                                   maxd=maxd_master
+                    )
+                print('stats saved in {}.pdf.'.format(outfile.format('','<dist>','<units>')) )
 def starGetHash(x):
     return getHash(*x)
 
@@ -504,12 +507,12 @@ def stats(writeOut,readIn,units):
     plt.close(fig3)
 
 def standBackStats(a,b,c,d,maxd=100):
-    standBackStats_toomanyfiles(a,b,c,d,maxd=maxd)
+    standBackStats_toomanyfiles(a,b,c,d,maxd=maxd,savenpy=True)
     #standBackStats_allonepage(a,b,c,d+'.pdf',maxd=maxd)
     #Set here what you want the stats routine to do. Right now I'm prepping a minipaper, so I need lots of
     #single plots that can fit on page instead of lots of plots glued together.
 
-def standBackStats_perfectBackground(inFileList,name,units,writeOut,maxd=100,perfect_location,savenpy=False):
+def standBackStats_perfectBackground(inFileList,name,units,writeOut,perfect_location,savenpy=False,maxd=100):
     
     theMap = map(np.load, inFileList)
     theList = list(theMap)
@@ -548,17 +551,20 @@ def standBackStats_perfectBackground(inFileList,name,units,writeOut,maxd=100,per
                  capsize=2,
                  capthick=0.5
     )
-    plt.fill_between(xs,low68[0],hi68[0],facecolor='black',alpha=0.25)
-    plt.fill_between(xs,low95[0],hi95[0],facecolor='black',alpha=0.25)
+    #print(xs)
+    #print(low68[0])
+    
+    plt.fill_between(xs,low68[0][0:50],hi68[0][0:50],facecolor='black',alpha=0.25)
+    plt.fill_between(xs,low95[0][0:50],hi95[0][0:50],facecolor='black',alpha=0.25)
     
     plt.xlabel('Distance, {}'.format(units))
-    plt.ylabel('Correlation, $10^4 (km/s)^2$')
+    plt.ylabel('Correlation, (km/s)^2$')
     #plt.axis(correlationScale)
     if units == 'km/s':
         plt.xlim(0,5000)
     else:
         plt.xlim(0,50)
-    plt.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
+    #ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
 
     fig2 = plt.figure()
     plt.errorbar(xs, avg[1], yerr=std[1], fmt = 'k-',
@@ -566,11 +572,11 @@ def standBackStats_perfectBackground(inFileList,name,units,writeOut,maxd=100,per
                  capsize=2,
                  capthick=0.5)
     plt.title('$\psi_2$, {} Survey Mock'.format(plotName))
-    plt.fill_between(xs,low68[1],hi68[1],facecolor='black',alpha=0.25)
-    plt.fill_between(xs,low95[1],hi95[1],facecolor='black',alpha=0.25)
+    plt.fill_between(xs,low68[1][0:50],hi68[1],facecolor='black',alpha=0.25)
+    plt.fill_between(xs,low95[1][0:50],hi95[1],facecolor='black',alpha=0.25)
     plt.xlabel('Distance, Mpc/h')
     plt.ylabel('Correlation, $(km/s)^2$')
-    plt.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
+    #ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
     #plt.axis(correlationScale)
     if units == 'km/s':
         plt.xlim(0,5000)
@@ -939,15 +945,18 @@ if __name__ == "__main__":
                                    ['-H','--hist'],
                                    ['-p','--plots'],
                                    ['-s','--stats'],
-                                   ['-n','--notify']],
+                                   ['-n','--notify'],
+                                   ['-b','--statspb']
+                               ],
                                   ['Settings json file',
                                    'Compute values for individual galaxies',
                                    'Compute histograms (requires a prior or concurrent -c run)',
                                    'Make a plot for every input survey (requires a prior or concurrent -H run)',
                                    'Do the overview stats routine, one plot for all surveys (requires a prior or concurrent -H run)',
-                                   'Notify me via text message when the job is done running'
+                                   'Notify me via text message when the job is done running',
+                                   'Do the stats with perfect contours in the background'
                                   ],
-                                   [str,'bool','bool','bool','bool','bool'])
+                                   [str,'bool','bool','bool','bool','bool','bool'])
     try:
         main(arrrghs)
         if arrrghs.notify:

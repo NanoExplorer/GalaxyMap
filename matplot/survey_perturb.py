@@ -8,13 +8,13 @@ def modulusify(dist, args):
     if args.altmodulus:
         return 5*np.log10(dist) + 25
     else:
-        return np.log(dist)
+        return np.log10(dist)
         
 def unmodulusify(modulus, args):
     if args.altmodulus:
         return 10**((modulus - 25)/5)
     else:
-        return np.e ** modulus
+        return 10 ** modulus
 
 
 
