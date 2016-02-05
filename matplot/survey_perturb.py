@@ -16,11 +16,8 @@ def unmodulusify(modulus, args):
     else:
         return np.e ** modulus
 
-def calculate_error(modulus,distance,frac_error,args):
-    hubble_constant * (np.e ** (modulus + modulus*args.frac_error) - distance)
-    print("Edit this for the 'normal' modulus")
-    exit()
-    
+
+
 def perturb(args):
     num_acks = 0
     second_order_acks = 0
@@ -35,6 +32,9 @@ def perturb(args):
         exit()
         
     for galaxy in galaxies:
+        #q_0 = -0.595
+        #z = galaxy.cz/(3*10**8)
+        #zmod = z*(1 + 0.5*(1-q_0)*z + (1/6)*(2-q_0-3q_0**2)*z**2)
         if abs(galaxy.v) > galaxy.cz/10:
             num_acks += 1
             continue
@@ -42,14 +42,14 @@ def perturb(args):
             distance_modulus = modulusify(galaxy.d,args)
             perturbed_dmod = np.random.normal(distance_modulus,abs(distance_modulus*fractional_error),args.num)
             skewed_distance = unmodulusify(perturbed_dmod,args)
-            dv = calculate_error(distance_modulus,galaxy.d,frac_error,args)
         else:
             skewed_distance = np.random.normal(galaxy.d,abs(galaxy.d*fractional_error),args.num)
-            dv = galaxy.d*fractional_error*hubble_constant
+            
             
         if args.naive or args.distance:
             try:
                 velocities = galaxy.cz - hubble_constant * skewed_distance
+                dv = galaxy.d*fractional_error*hubble_constant
             except FloatingPointError: #I don't think it's possible to have a FP error here... Could be wrong?
                 num_errs += 1
                 print("I was wrong")
@@ -57,6 +57,7 @@ def perturb(args):
         else:
             try:
                 velocities = galaxy.cz * np.log(galaxy.cz / (hubble_constant * skewed_distance) )
+                dv = galaxy.cz*fractional_error#calculate_error(distance_modulus,galaxy.d,frac_error,args)
                 for velocity in velocities:
                     if abs(velocity) > galaxy.cz / 10:
                         second_order_acks += 1
