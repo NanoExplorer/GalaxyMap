@@ -17,6 +17,17 @@ def unmodulusify(modulus, args):
         return 10 ** modulus
 
 
+def perturb_distance(distance,error,args):
+    if args.distance:
+        return np.random.normal(distance,abs(distance*error),args.num)
+    else:
+        distance_modulus = modulusify(galaxy.d,args)
+        if args.unrelative:
+            perturbed_dmod = np.random.normal(distance_modulus,fractional_error,args.num)
+        else:
+            perturbed_dmod = np.random.normal(distance_modulus,abs(distance_modulus*fractional_error),args.num)
+            skewed_distance = unmodulusify(perturbed_dmod,args)
+        
 
 def perturb(args):
     num_acks = 0
@@ -40,12 +51,7 @@ def perturb(args):
             num_acks += 1
             continue
         if not args.distance:
-            distance_modulus = modulusify(galaxy.d,args)
-            if args.unrelative:
-                perturbed_dmod = np.random.normal(distance_modulus,fractional_error,args.num)
-            else:
-                perturbed_dmod = np.random.normal(distance_modulus,abs(distance_modulus*fractional_error),args.num)
-            skewed_distance = unmodulusify(perturbed_dmod,args)
+            
         else:
             skewed_distance = np.random.normal(galaxy.d,abs(galaxy.d*fractional_error),args.num)
             
@@ -93,27 +99,17 @@ def perturb(args):
     print("Also, {} FloatingPoint errors happened, even after taking out the close-by galaxies.".format(num_errs))
 
 if __name__ == "__main__":
-    arrrghs = common.parseCmdArgs([['cf2file'],
-                                   ['outfile'],
-                                   ['frac_error'],
-                                   ['num'],
-                                   ['-n','--naive'],
-                                   ['-d','--distance'],
-                                   ['-a','--altmodulus'],
-                                   ['-u','--unrelative']
+    parser=argparse.ArgumentParser()
+    parser.add_argument('cf2file',help='CF2 survey file to perturb',type=str)
+    parser.add_argument( 'outfile' ,help= 'Output file spec. Must contain exactly one "{}" for use in numbering.' ,type=str)
+    parser.add_argument('frac_error',help='Fractional error, determines the standard deviation of the normal distribution used in the distance modulus',type=float)
+    parser.add_argument('num',help="Numper of perturbed survey files to generate",type=int)
+    parser.add_argument('type',choices=['distance','modulus','relative'],help="The type of perturbations, consistent naming with my paper")
+    parser.add_argument('estimator',choices=['cz','feldman'])
+    parser.add_argument('modulus',choices=['ln','log','textbook'])
 
-                               ],
-                                  
-                                   ['CF2 survey file to perturb',
-                                    'Output file spec. Must contain exactly one "{}" for use in numbering.',
-                                    'Fractional error, determines the standard deviation of the normal distribution used in the distance modulus',
-                                    'Number of perturbed survey files to generate',
-                                    'Use the naive velocity estimator v = cz - H0*d',
-                                    'Don\'t use the distance modulus, just use distance (implies -n)',
-                                    'Use the distance modulus formula 5log10(d) + 25',
-                                    'Use the "Modulus" method from the paper. Default when this flag is not in use: use the "Relative" method.'
-                                ],
-                                  [str,str,float,int,'bool','bool','bool','bool'])
+    arrrghs = parser.parse_args()
     perturb(arrrghs)
 
 
+#You need to specify a place (perturbation type), a modulus, and an estimator.
