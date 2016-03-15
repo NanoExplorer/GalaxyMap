@@ -85,14 +85,15 @@ def main(args):
                                                       itertools.repeat(xs),
                                                       itertools.repeat(intervals)))
 
-            itertools.starmap(standBackStats_perfectBackground,
+            list(itertools.starmap(standBackStats_perfectBackground,
                               zip(histogramData,
                                   itertools.repeat(readName),
                                   itertools.repeat(units),
                                   itertools.repeat(outfile.format('',distance_args[0],units.replace('/',''))),
                                   itertools.repeat(PERFECT_LOCATION),
                                   itertools.repeat(maxd_master))
-            )
+            ))
+            
     
 def formatHash(string,*args):
     return hashlib.md5(string.format(*args).encode('utf-8')).hexdigest()
