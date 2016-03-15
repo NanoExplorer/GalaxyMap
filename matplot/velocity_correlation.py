@@ -70,7 +70,7 @@ def main(args):
             else:
                 xs = xs_master
                 intervals = intervals_master
-                #distance_args = distance_args_master
+                distance_args = distance_args_master
                 maxd = maxd_master
                 
             if settings['many']:
@@ -89,7 +89,7 @@ def main(args):
                               zip(histogramData,
                                   itertools.repeat(readName),
                                   itertools.repeat(units),
-                                  itertools.repeat(outfile.format('',distanceParameters[0],units.replace('/',''))),
+                                  itertools.repeat(outfile.format('',distance_args[0],units.replace('/',''))),
                                   itertools.repeat(PERFECT_LOCATION),
                                   itertools.repeat(maxd=maxd_master))
             )
