@@ -398,11 +398,7 @@ def standBackStats(a,b,c,d,maxd=100):
     #Set here what you want the stats routine to do. Right now I'm prepping a minipaper, so I need lots of
     #single plots that can fit on page instead of lots of plots glued together.
 
-def standBackStats_perfectBackground(inFileList,name,units,writeOut,perfect_location,maxd,savenpy=True):
-    
-    theMap = map(np.load, inFileList)
-    theList = list(theMap)
-    allData = np.array(theList)
+def standBackStats_perfectBackground(allData,name,units,writeOut,perfect_location,maxd,savenpy=True):
     #allData = np.array(list(map(np.load, inFileList)))
     #One inFile contains the following: [p1, p2, a, b, psiparallel, psiperpindicular]
     xs = allData[0][6]
