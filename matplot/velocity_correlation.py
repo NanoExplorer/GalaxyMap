@@ -151,7 +151,7 @@ def compute(infile,maxd,units):
         print("And you should definitely, NEVER EVER, use '{}'!!".format(units))
 
     try:
-        data = correlation(galaxyXYZV,maxd)
+        data = correlation(galaxyXYZV,maxd,units)
     except RuntimeError:
         print('Runtime Error encountered at {}.'.format(infile))
         raise
@@ -187,18 +187,14 @@ def _kd_query(positions,maxd,units):
         return pairarray
 
 
-def correlation(galaxies,maxd,usewt=False):
+def correlation(galaxies,maxd,units,usewt=False):
     """ Computes the raw galaxy-galaxy correlation information on a per-galaxy basis, and saves it to file"""
     #There are lots of dels in this function because otherwise it tends to gobble up memory.
     #I think there might be a better way to deal with the large amounts of memory usage, but I don't yet
     #know what it is.
-    tmpfilename = TEMP_DIRECTORY+'plotData_{}.npy'.format(myNpHash(galaxies))
-    if os.path.exists(tmpfilename):
-        print("*",end="",flush=True)
-        return
                                                           
     # galaxies = [(galaxies[a],galaxies[b]) for a,b in interval_shell]
-    galaxyPairs = _kd_query(galaxies[:,0:3],maxd)
+    galaxyPairs = _kd_query(galaxies[:,0:3],maxd,units)
     #print("Done! (with the thing)")
     lGalaxies = galaxies[galaxyPairs[:,0]]
     rGalaxies = galaxies[galaxyPairs[:,1]]
