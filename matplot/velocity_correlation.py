@@ -22,7 +22,7 @@ from numpy.core.umath_tests import inner1d #Note: this function has no documenta
 #     return (a*b).sum(axis=1)
 import gc
 import smtplib
-import matplotlib.ticker as mtick
+#import matplotlib.ticker as mtick
 
 
 
@@ -70,15 +70,13 @@ def main(args):
             else:
                 xs = xs_master
                 intervals = intervals_master
-                distance_args = distance_args_master
+                #distance_args = distance_args_master
                 maxd = maxd_master
                 
             if settings['many']:
                 #If there are lots of files, set them up accordingly.
                 inFileList = [rawInFile.format(x) for x in infileindices]
-
-                #Warning: This assumes that the infiles don't ever change. Make sure to clean your cache regularly!
-                #HistogramFiles are the places where histograms from the singleHistogram function are stored.
+                
             else:
                 inFileList = [rawInFile]
             histogramData = pool.starmap(turboRun,zip(inFileList,
@@ -87,20 +85,40 @@ def main(args):
                                                       itertools.repeat(xs),
                                                       itertools.repeat(intervals)))
 
-            standBackStats_perfectBackground(histogramData,
-                                             readName,
-                                             units,
-                                             outfile.format('',distanceParameters[0],units.replace('/','')),
-                                             PERFECT_LOCATION,
-                                             maxd=maxd_master
+            itertools.starmap(standBackStats_perfectBackground,
+                              zip(histogramData,
+                                  itertools.repeat(readName),
+                                  itertools.repeat(units),
+                                  itertools.repeat(outfile.format('',distanceParameters[0],units.replace('/',''))),
+                                  itertools.repeat(PERFECT_LOCATION),
+                                  itertools.repeat(maxd=maxd_master))
             )
     
 def formatHash(string,*args):
     return hashlib.md5(string.format(*args).encode('utf-8')).hexdigest()
 
 def turboRun(infile,maxd,units,xs,intervals):
+    """Returns a list of histograms, where a histogram is defined as a numpy array
+    [[psi1 values] [psi2 values]
+     [a values]    [b values]
+     [par values]  [perp values]
+     [x values]
+    ]
+
+    The list of histograms returned is as follows
+    [histogram(xs[0],intervals[0]),
+     histogram(xs[1],intervals[1]),
+     ...
+     histogram(xs[n],intervals[n])
+    ]
+    """
     correlations=compute(infile,maxd,units)
-    return histogram(correlations,xs,intervals)
+    return list(itertools.starmap(singleHistogram,zip(itertools.repeat(correlations),
+                                                xs,
+                                                intervals
+                                            )
+                                 )
+               )
     
 def compute(infile,maxd,units):
     """Formerly called 'singlePlot,' this function computes all pair-pair galaxy information,
@@ -245,7 +263,7 @@ def correlation(galaxies,maxd,usewt=False):
             ])
     
     
-NOTE: If the information passed as 'galaxies' to "correlation" changes, you have to update this getHash function too!
+#NOTE: If the information passed as 'galaxies' to "correlation" changes, you have to update this getHash function too!
 def myNpHash(data):
     return hashlib.md5((str(data)+str(len(data))).encode('utf-8')).hexdigest()
 
@@ -263,9 +281,6 @@ def getHash(filename,units):
 
 
 def singleHistogram(data,xs,intervals):
-    if os.path.exists(writeOut):
-        print("*",end="",flush=True)
-        return
     indPsiOneNum = data[0]
     indPsiOneDen = data[1]
     indPsiTwoNum = data[2]
