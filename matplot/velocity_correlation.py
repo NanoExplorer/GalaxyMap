@@ -91,7 +91,7 @@ def main(args):
                                   itertools.repeat(units),
                                   itertools.repeat(outfile.format('',distance_args[0],units.replace('/',''))),
                                   itertools.repeat(PERFECT_LOCATION),
-                                  itertools.repeat(maxd=maxd_master))
+                                  itertools.repeat(maxd_master))
             )
     
 def formatHash(string,*args):
@@ -397,7 +397,7 @@ def standBackStats(a,b,c,d,maxd=100):
     #Set here what you want the stats routine to do. Right now I'm prepping a minipaper, so I need lots of
     #single plots that can fit on page instead of lots of plots glued together.
 
-def standBackStats_perfectBackground(inFileList,name,units,writeOut,perfect_location,savenpy=False,maxd=100):
+def standBackStats_perfectBackground(inFileList,name,units,writeOut,perfect_location,maxd,savenpy=True):
     
     theMap = map(np.load, inFileList)
     theList = list(theMap)
