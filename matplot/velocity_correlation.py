@@ -3,12 +3,12 @@
 #STERN WARNING: Running this code on python 2 is not recommended, for many reasons. First, Garbage Collection
 #seems greatly improved in python 3, resulting in *much* reduced memory usage. Second, everything runs much faster
 #under python 3 for whatever reason.
+import matplotlib
 import common
 from scipy.spatial import cKDTree
 import numpy as np
 from multiprocessing import Pool
 import itertools
-import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.backends.backend_pdf as pdfback
 import os
@@ -128,7 +128,7 @@ def main(args):
                                                                                formatHash(rawInFile,param[0]))
                          for param in params]
                 
-                outfiles = [outfile.format(param[0],param[1],units) for param in params]
+                outfiles = [outfile.format(param[0],param[1],units.replace('/','')) for param in params]
                 
                 try:
                     pool.starmap(stats,zip(outfiles,
@@ -505,6 +505,7 @@ def stats(writeOut,readIn,units):
     plt.close(fig)
     plt.close(fig2)
     plt.close(fig3)
+    np.save(writeOut+".npy",data)
 
 def standBackStats(a,b,c,d,maxd=100):
     standBackStats_toomanyfiles(a,b,c,d,maxd=maxd,savenpy=True)
@@ -513,6 +514,119 @@ def standBackStats(a,b,c,d,maxd=100):
     #single plots that can fit on page instead of lots of plots glued together.
 
 def standBackStats_perfectBackground(inFileList,name,units,writeOut,perfect_location,savenpy=False,maxd=100):
+    
+    theMap = map(np.load, inFileList)
+    theList = list(theMap)
+    allData = np.array(theList)
+    #allData = np.array(list(map(np.load, inFileList)))
+    #One inFile contains the following: [p1, p2, a, b, psiparallel, psiperpindicular]
+    xs = allData[0][6]
+    perfect = np.load(perfect_location.format(xs[1]-xs[0],units.replace('/','')))
+    std = np.std(allData,axis=0)
+    avg = np.mean(allData,axis=0)
+    low68 = perfect[range(3,37,6)] # I don't know why I saved them in this order, but at least it's not too hard
+    hi68  = perfect[range(4,37,6)] # to extract.
+    low95 = perfect[range(5,37,6)]
+    hi95  = perfect[range(6,37,6)]
+
+
+    plotName = name
+
+    matplotlib.rc('font',size=10)
+    
+    f, ((ax1,ax2),(ax3,ax4),(ax5,ax6)) = plt.subplots(3,2,sharex='col',sharey='row',figsize=(8.5,11))
+    f.suptitle('Statistics of the {} Survey Mocks'.format(plotName))
+    ax1.errorbar(xs,
+                 avg[0]/10**4,
+                 yerr=std[0]/10**4,
+                 fmt = 'k-',
+                 elinewidth=0.5,
+                 capsize=2,
+                 capthick=0.5
+    )
+    ax1.fill_between(xs,low68[0]/10**4,hi68[0]/10**4,facecolor='black',alpha=0.25)
+    ax1.fill_between(xs,low95[0]/10**4,hi95[0]/10**4,facecolor='black',alpha=0.25)
+    ax1.set_title('$\psi_1$ Correlation')
+    #ax1.set_xlabel('Distance, Mpc/h')
+    ax1.set_ylabel('Correlation, $10^4 (km/s)^2$')
+    #ax1.axis(correlationScale)
+    
+    ax2.errorbar(xs, avg[1]/10**4, yerr=std[1]/10**4, fmt = 'k-',
+                 elinewidth=0.5,
+                 capsize=2,
+                 capthick=0.5)
+    ax2.set_title('$\psi_2$ Correlation')
+    ax2.fill_between(xs,low68[1]/10**4,hi68[1]/10**4,facecolor='black',alpha=0.25)
+    ax2.fill_between(xs,low95[1]/10**4,hi95[1]/10**4,facecolor='black',alpha=0.25)
+    #plt.xlabel('Distance, Mpc/h')
+    #plt.ylabel('Correlation, $(km/s)^2$')
+    #plt.axis(correlationScale)
+    
+    ax3.errorbar(xs, avg[2], yerr=std[2], fmt = 'k-',
+                 elinewidth=0.5,
+                 capsize=2,
+                 capthick=0.5)
+    ax3.set_title('Moment of the Selection Function, $\cal A$')
+    ax3.fill_between(xs,low68[2],hi68[2],facecolor='black',alpha=0.25)
+    ax3.fill_between(xs,low95[2],hi95[2],facecolor='black',alpha=0.25)
+    #plt.xlabel('Distance, Mpc/h')
+    ax3.set_ylabel('Value (unitless)')
+    #plt.axis(momentScale)
+    
+    ax4.errorbar(xs, avg[3], yerr=std[3], fmt = 'k-',
+                 elinewidth=0.5,
+                 capsize=2,
+                 capthick=0.5)
+    ax4.set_title('Moment of the Selection Function, $\cal B$')
+    ax4.fill_between(xs,low68[3],hi68[3],facecolor='black',alpha=0.25)
+    ax4.fill_between(xs,low95[3],hi95[3],facecolor='black',alpha=0.25)
+    #plt.xlabel('Distance, Mpc/h')
+    #plt.ylabel('Value (unitless)')
+    #plt.axis(momentScale)
+
+    ax5.errorbar(xs, avg[4]/10**4, yerr=std[4]/10**4, fmt = 'k-',
+                 elinewidth=0.5,
+                 capsize=2,
+                 capthick=0.5)
+    ax5.fill_between(xs,low68[4]/10**4,hi68[4]/10**4,facecolor='black',alpha=0.25)
+    ax5.fill_between(xs,low95[4]/10**4,hi95[4]/10**4,facecolor='black',alpha=0.25)
+    ax5.set_title('$\Psi_{{\parallel}}$ Correlation')
+    ax5.set_xlabel('Distance, {}'.format(units))
+    ax5.set_ylabel('Correlation, $10^4 (km/s)^2$')
+    #plt.axis(correlationScale)
+
+    ax6.errorbar(xs,avg[5]/10**4, yerr=std[5]/10**4, fmt = 'k-',
+                 elinewidth=0.5,
+                 capsize=2,
+                 capthick=0.5)
+    ax6.fill_between(xs,low68[5]/10**4,hi68[5]/10**4,facecolor='black',alpha=0.25)
+    ax6.fill_between(xs,low95[5]/10**4,hi95[5]/10**4,facecolor='black',alpha=0.25)
+    ax6.set_title('$\Psi_{{\perp}}$ Correlation')
+    ax6.set_xlabel('Distance, {}'.format(units))
+    #plt.ylabel('Correlation, $(km/s)^2$')
+    #ax6.axis(correlationScale)
+
+    if units == 'km/s':
+        ax5.set_xbound(0,maxd*100)
+        ax6.set_xbound(0,maxd*100)
+    else:
+        ax5.set_xbound(0,maxd)
+        ax6.set_xbound(0,maxd)
+    
+    with pdfback.PdfPages(writeOut) as pdf:
+        pdf.savefig(f)
+    plt.close(f)
+    np.save(writeOut,np.array([xs,avg[0],std[0],low68[0],hi68[0],low95[0],hi95[0],
+                               avg[1],std[1],low68[1],hi68[1],low95[1],hi95[1],
+                               avg[2],std[2],low68[2],hi68[2],low95[2],hi95[2],
+                               avg[3],std[3],low68[3],hi68[3],low95[3],hi95[3],
+                               avg[4],std[4],low68[4],hi68[4],low95[4],hi95[4],
+                               avg[5],std[5],low68[5],hi68[5],low95[5],hi95[5]]))
+
+        
+
+        
+def standBackStats_perfectBackground_old(inFileList,name,units,writeOut,perfect_location,savenpy=False,maxd=100):
     
     theMap = map(np.load, inFileList)
     theList = list(theMap)
