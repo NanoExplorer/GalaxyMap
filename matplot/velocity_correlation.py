@@ -81,97 +81,27 @@ def main(args):
                 #HistogramFiles are the places where histograms from the singleHistogram function are stored.
             else:
                 inFileList = [rawInFile]
-            histogramFiles = [[TEMP_DIRECTORY + 'histogram_binsize-{}_{}.npy'.format(distargs[0],
-                                                                                     formatHash(oneInFile))
-                               for distargs in distance_args]
-                              for oneInFile in inFileList]
+            histogramData = pool.starmap(turboRun,zip(inFileList,
+                                                      itertools.repeat(maxd),
+                                                      itertools.repeat(units),
+                                                      itertools.repeat(xs),
+                                                      itertools.repeat(intervals)))
 
-            if args.comp:
-                print('computing...')
-                try:
-                    nothing = pool.starmap(compute,zip(inFileList,
-                                                       itertools.repeat(maxd),
-                                                       itertools.repeat(units)
-                                                   )) 
-                except AttributeError:
-                    nothing = pool.map(starCompute,zip(inFileList, 
-                                                       itertools.repeat(maxd),
-                                                       itertools.repeat(units)
-                                                   ))
-                    list(nothing) #stupid lazy functions. I tell ya... Back in my day, functions HAD A WORK ETHIC!
-                 #They did WHAT they were told WHEN they were told to do it!
-                #This line is only required for using itertools starmap with the compute function
-                print(" - Done!")
-            if args.hist:
-                print('Histogramming...')
-                try:
-                    
-                    hashes = pool.starmap(getHash, zip(inFileList,
-                                                       itertools.repeat(units)))
-                except AttributeError:
-                    hashes = pool.map(starGetHash,zip(inFileList,itertools.repeat(units)))
-                    #the lazy idiom works for me here!
-                
-                nothing = itertools.starmap(histogram,zip(hashes,
-                                                          itertools.repeat(xs),
-                                                          itertools.repeat(intervals),
-                                                          histogramFiles))
-                # I totally should've put a comment here. I *Think* that this section is actually faster
-                #when not threaded. 
-                
-                list(nothing) #because itertools starmap is LAZY
-                print(" - Done")
-            if args.plots:
-                print('plotting...')
-                params = list(itertools.product(infileindices, [dist_arg[0] for dist_arg in distance_args]))
-                hists = [TEMP_DIRECTORY + 'histogram_binsize-{}_{}.npy'.format(param[1],
-                                                                               formatHash(rawInFile,param[0]))
-                         for param in params]
-                
-                outfiles = [outfile.format(param[0],param[1],units.replace('/','')) for param in params]
-                
-                try:
-                    pool.starmap(stats,zip(outfiles,
-                                           hists,
-                                           itertools.repeat(units)))
-                except AttributeError:
-                    pool.map(starStats,zip(outfiles,
-                                                     hists,
-                                                     itertools.repeat(units)))
-            if args.statspb:
-                print("MAKING Perturbed plots..")
-                for histogramFilesList,distanceParameters in zip(map(list, zip(*histogramFiles)),distance_args):
-                    standBackStats_perfectBackground(histogramFilesList,
-                                                     readName,
-                                                     units,
-                                                     outfile.format('',distanceParameters[0],units.replace('/','')),
-                                                     PERFECT_LOCATION,
-                                                     maxd=maxd_master
-                    )
-            if args.stats:
-                print('statting..?')
-                print('no, that doesn\'t sound right')
-                print('computing statistics...')
-                for histogramFilesList,distanceParameters in zip(map(list, zip(*histogramFiles)),distance_args):
-                    standBackStats(histogramFilesList,
-                                   readName,
-                                   units,
-                                   outfile.format('',distanceParameters[0],units.replace('/','')),
-                                   maxd=maxd_master
-                    )
-                print('stats saved in {}.pdf.'.format(outfile.format('','<dist>','<units>')) )
-def starGetHash(x):
-    return getHash(*x)
-
-def starCompute(x):
-    return compute(*x)
-
-def starStats(x):
-    return stats(*x)
+            standBackStats_perfectBackground(histogramData,
+                                             readName,
+                                             units,
+                                             outfile.format('',distanceParameters[0],units.replace('/','')),
+                                             PERFECT_LOCATION,
+                                             maxd=maxd_master
+            )
     
 def formatHash(string,*args):
-    return hashlib.md5(string.format(*args).encode('utf-8')).hexdigest()   
+    return hashlib.md5(string.format(*args).encode('utf-8')).hexdigest()
 
+def turboRun(infile,maxd,units,xs,intervals):
+    correlations=compute(infile,maxd,units)
+    return histogram(correlations,xs,intervals)
+    
 def compute(infile,maxd,units):
     """Formerly called 'singlePlot,' this function computes all pair-pair galaxy information,
     including figuring out the list of pairs.
@@ -210,7 +140,7 @@ def compute(infile,maxd,units):
     return data
 
 #@profile 
-def _kd_query(positions,maxd):
+def _kd_query(positions,maxd,units):
     """Returns a np array of pairs of galaxies."""
     #This is still the best function, despite all of my scheming.
     tmpfilename = TEMP_DIRECTORY + 'rawkd_{}_{}.npy'.format(maxd,myNpHash(positions))
@@ -218,16 +148,13 @@ def _kd_query(positions,maxd):
     #THERE WERE. Thanks for just leaving a warning instead of fixing it :P
     #The warning still stands, but it's a bit better now.
     
-    if os.path.exists(tmpfilename):
+    if units == "km/s" and os.path.exists(tmpfilename):
         print("!",end="",flush=True)
         return np.load(tmpfilename)
     else:
         print(".",end="",flush=True)
-        #sys.stdout.flush()
         kd = cKDTree(positions)
         pairs = kd.query_pairs(maxd)
-        #print(len(pairs))
-        #print((kd.count_neighbors(kd,max(intervals))-len(positions))/2)
         #Find zero-distance pairs
         removePairs = kd.query_pairs(np.finfo(float).eps)
         pairs.difference_update(removePairs)
@@ -235,15 +162,11 @@ def _kd_query(positions,maxd):
         pairarray = np.array(listOfPairs) #The np array creation takes a LOT of time. I am still wondering why.
         del pairs, removePairs, kd #This also takes forever.
         gc.collect()
-        np.save(tmpfilename,pairarray)
+        if units == "km/s":
+            np.save(tmpfilename,pairarray)
+            #The caching scheme only helps if we have the same set of distance data over and over again.
+            #That is the case with redshift-binned data, but not anything else.
         return pairarray
-    
-
-# def ss(numpyarray):
-#     print(numpyarray.nbytes)
-
-# def gs(numpyarray):
-#     return numpyarray.nbytes
 
 
 def correlation(galaxies,maxd,usewt=False):
@@ -294,8 +217,7 @@ def correlation(galaxies,maxd,usewt=False):
     
     cosTheta1 = inner1d(r,g1norm)
     cosTheta2 = inner1d(r,g2norm)
-    #ss(r)
-    #print(gs(g1vs)+gs(g2vs)+gs(g1norm)+gs(g2norm)+gs(distBetweenG1G2)+gs(r)+gs(cosdTheta)+gs(cosTheta1)+gs(cosTheta2))
+
     del r #R hogs a lot of memory, so we want to get rid of it as fast as possible.
     cosdTheta = inner1d(g1norm,g2norm)
     del g1norm, g2norm
@@ -310,19 +232,8 @@ def correlation(galaxies,maxd,usewt=False):
     indBNum        = wt*bNumerator(cosTheta1,cosTheta2)
     indBDen        = wt*bDenominator(cosTheta1,cosTheta2,cosdTheta)
     del cosTheta1, cosTheta2, cosdTheta,wt
-    # np.savez_compressed(TEMP_DIRECTORY+'plotData_{}.npz'.format(hashlib.md5(str(galaxies).encode('utf-8')).hexdigest()),
-    #                     p1n = indPsiOneNum,
-    #                     p1d = indPsiOneDen,
-    #                     p2n = indPsiTwoNum,
-    #                     p2d = indPsiTwoDen,
-    #                     an  = indAFeldmanNum,
-    #                     ad  = indAFeldmanDen,
-    #                     bn  = indBNum,
-    #                     bd  = indBDen,
-    #                     dist= distBetweenG1G2
-    # )
-    np.save(tmpfilename,
-            np.array([indPsiOneNum,
+
+    return  np.array([indPsiOneNum,
                      indPsiOneDen,
                      indPsiTwoNum,
                      indPsiTwoDen,
@@ -332,9 +243,9 @@ def correlation(galaxies,maxd,usewt=False):
                      indBDen,
                      distBetweenG1G2
             ])
-    )
     
-#NOTE: If the information passed as 'galaxies' to "correlation" changes, you have to update this getHash function too!
+    
+NOTE: If the information passed as 'galaxies' to "correlation" changes, you have to update this getHash function too!
 def myNpHash(data):
     return hashlib.md5((str(data)+str(len(data))).encode('utf-8')).hexdigest()
 
@@ -350,45 +261,8 @@ def getHash(filename,units):
     else:
         raise ValueError("Value of 'units' must be 'Mpc/h' or 'km/s'. Other unit schemes do not exist at present")
 
-def histogram(theHash,xs,intervals,writeOut):
-    """Bins individual galaxy-pair data by distance, and writes the results to a np array file.
-    Loading the data is pretty slow, so now we do that only once, then do a histogram on it a bunch of times.
 
-    Previously, we had to load the file and do one histogram, then load the file and do one histogram...
-    We'll save 18 * 100 load cycles this way!
-    """
-    # try:
-    print("y",end="",flush=True)
-    data =np.load(TEMP_DIRECTORY+'plotData_{}.npy'.format(theHash))
-        #sys.stdout.flush()
-    # except IOError:
-    #     #Then the file is saved in the old, klunky npz format. Let's go ahead and load it, then save it to an npy
-    #     #for waaay faster loading next time.
-    #     with np.load(TEMP_DIRECTORY+'plotData_{}.npz'.format(theHash)) as tdata: #T is for temporary. 
-        
-    #         data = np.array([tdata['p1n'],
-    #                          tdata['p1d'],
-    #                          tdata['p2n'],
-    #                          tdata['p2d'],
-    #                          tdata['an'],
-    #                          tdata['ad'],
-    #                          tdata['bn'],
-    #                          tdata['bd'],
-    #                          tdata['dist']
-    #                      ])
-    #         print("z",end="",flush=True)
-    #         #sys.stdout.flush()
-    #     np.save(TEMP_DIRECTORY + 'plotData_{}.npy'.format(theHash),data) #npy files are SO MUCH faster than npz
-    #if not manysq:
-    #    xs = [xs]
-    #    intervals = [intervals]
-    #    writeOut = [writeOut]
-    #print(xs, intervals, writeOut)
-    parameters = list(zip(itertools.repeat(data),xs,intervals,writeOut))
-    nothing = itertools.starmap(singleHistogram,parameters)
-    list(nothing) #I HATE LAZY FUNCTIONS most of the time
-
-def singleHistogram(data,xs,intervals,writeOut):
+def singleHistogram(data,xs,intervals):
     if os.path.exists(writeOut):
         print("*",end="",flush=True)
         return
@@ -422,8 +296,7 @@ def singleHistogram(data,xs,intervals,writeOut):
     psiParallel = ((1-b)*psione-(1-a)*psitwo)/aminusb
     psiPerpindicular = (a*psitwo-b*psione)/aminusb
     del aminusb
-    finalResults = np.array( (psione,psitwo,a,b,psiParallel,psiPerpindicular,xs) )
-    np.save(writeOut,finalResults)
+    return np.array( (psione,psitwo,a,b,psiParallel,psiPerpindicular,xs) )
 
 def psiOneNumerator(rv1, rv2, cosdTheta):
     """
