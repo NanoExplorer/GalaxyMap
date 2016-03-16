@@ -84,6 +84,7 @@ def main(args):
                                                       itertools.repeat(units),
                                                       itertools.repeat(xs),
                                                       itertools.repeat(intervals)))
+            print(" Done!")
 
     pool.close()
     for rawInFile, outfile, readName in file_schemes:
