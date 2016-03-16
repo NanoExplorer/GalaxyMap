@@ -85,14 +85,15 @@ def main(args):
                                                       itertools.repeat(xs),
                                                       itertools.repeat(intervals)))
 
-            list(itertools.starmap(standBackStats_perfectBackground,
-                              zip(histogramData,
-                                  itertools.repeat(readName),
-                                  itertools.repeat(units),
-                                  itertools.repeat(outfile.format('',distance_args[0],units.replace('/',''))),
-                                  itertools.repeat(PERFECT_LOCATION),
-                                  itertools.repeat(maxd_master))
-            ))
+    pool.close()
+    list(itertools.starmap(standBackStats_perfectBackground,
+                           zip(histogramData,
+                               itertools.repeat(readName),
+                               itertools.repeat(units),
+                               itertools.repeat(outfile.format('',distance_args[0],units.replace('/',''))),
+                               itertools.repeat(PERFECT_LOCATION),
+                               itertools.repeat(maxd_master))
+                ))
             
     
 def formatHash(string,*args):
