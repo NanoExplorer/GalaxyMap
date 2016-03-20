@@ -21,6 +21,7 @@ from numpy.core.umath_tests import inner1d #Note: this function has no documenta
 # def inner1d(a,b):
 #     return (a*b).sum(axis=1)
 import gc
+import time
 import smtplib
 #import matplotlib.ticker as mtick
 
@@ -416,7 +417,7 @@ def standBackStats_perfectBackground(allData,name,units,writeOut,perfect_locatio
 
 
     plotName = name
-
+    """
     matplotlib.rc('font',size=10)
     
     f, ((ax1,ax2),(ax3,ax4),(ax5,ax6)) = plt.subplots(3,2,sharex='col',sharey='row',figsize=(8.5,11))
@@ -501,6 +502,7 @@ def standBackStats_perfectBackground(allData,name,units,writeOut,perfect_locatio
     with pdfback.PdfPages(writeOut) as pdf:
         pdf.savefig(f)
     plt.close(f)
+    """
     np.save(writeOut,np.array([xs,avg[0],std[0],low68[0],hi68[0],low95[0],hi95[0],
                                avg[1],std[1],low68[1],hi68[1],low95[1],hi95[1],
                                avg[2],std[2],low68[2],hi68[2],low95[2],hi95[2],
@@ -939,6 +941,7 @@ def sendMessage(message):
                       
     
 if __name__ == "__main__":
+    start = time.time()
     arrrghs = common.parseCmdArgs([['settings'],
                                    ['-c','--comp'],
                                    ['-H','--hist'],
@@ -958,12 +961,14 @@ if __name__ == "__main__":
                                    [str,'bool','bool','bool','bool','bool','bool'])
     try:
         main(arrrghs)
+        print("That took {:.1f} s".format(time.time()-start))
         if arrrghs.notify:
-            sendMessage("Job Finished")
+            sendMessage("Job Finished in {:,1f} s".format(time.time()-start))
     except:
         if arrrghs.notify:
             sendMessage("Job Failed")
         raise
+        
 
 
 
