@@ -25,11 +25,28 @@ import time
 import smtplib
 #import matplotlib.ticker as mtick
 
-
+"""
+Traceback (most recent call last):
+  File "velocity_correlation.py", line 963, in <module>
+    main(arrrghs)
+  File "velocity_correlation.py", line 99, in main
+    itertools.repeat(maxd_master))
+  File "velocity_correlation.py", line 411, in standBackStats_perfectBackground
+    std = np.std(allData,axis=0)
+  File "/home/christopher/.Envs/new-matplot/lib/python3.4/site-packages/numpy/core/fromnumeric.py", line 2985, in std
+    keepdims=keepdims)
+  File "/home/christopher/.Envs/new-matplot/lib/python3.4/site-packages/numpy/core/_methods.py", line 124, in _std
+    keepdims=keepdims)
+  File "/home/christopher/.Envs/new-matplot/lib/python3.4/site-packages/numpy/core/_methods.py", line 77, in _var
+    arr = asanyarray(a)
+  File "/home/christopher/.Envs/new-matplot/lib/python3.4/site-packages/numpy/core/numeric.py", line 525, in asanyarray
+    return array(a, dtype, copy=False, order=order, subok=True)
+ValueError: could not broadcast input array from shape (7,50) into shape (7)
+"""
 
 
 TEMP_DIRECTORY = "/media/christopher/2TB/Christopher/code/Physics/GalaxyMap/tmp/"
-PERFECT_LOCATION = "output/COMPOSITE-MOCK-bin-{:.0f}-{}.npy"
+PERFECT_LOCATION = "output/PERFECT_DONTTOUCH/COMPOSITE-MOCK-bin-{:.0f}-{}.npy"
 print("Warning: Non-general perfect location")
 def main(args):
     np.seterr(divide='ignore',invalid='ignore')
@@ -64,6 +81,7 @@ def main(args):
     for rawInFile, outfile, readName in file_schemes:
         for units in unitslist:
             if units == 'km/s':
+                
                 xs = [[x * 100 for x in y] for y in xs_master]
                 intervals = [[x * 100 for x in y] for y in intervals_master]
                 distance_args = [(x[0]*100,x[1]*100,x[2]) for x in distance_args_master]
@@ -80,25 +98,38 @@ def main(args):
                 
             else:
                 inFileList = [rawInFile]
-            histogramData = pool.starmap(turboRun,zip(inFileList,
-                                                      itertools.repeat(maxd),
-                                                      itertools.repeat(units),
-                                                      itertools.repeat(xs),
-                                                      itertools.repeat(intervals)))
+                
+            with Pool(processes=2) as pool:
+                histogramData = list(pool.starmap(turboRun,zip(inFileList,
+                                                                   itertools.repeat(maxd),
+                                                                   itertools.repeat(units),
+                                                                   itertools.repeat(xs),
+                                                                   itertools.repeat(intervals))))
+                """
+                Each turbo run returns a list of histograms [ 5-length histogram, 10-length histogram, 20-length etc]
+                so histogramData is a list of turbo runs, which means data is a jagged array
+                data = [
+                
+                [ [ ----- ],
+                  [ ---------- ],
+                  [ -------------------- ] ],
+                
+                [ [ ----- ],
+                  [ ---------- ],
+                  [ -------------------- ] ],
+                
+                ]
+                """
+            for scheme_index in range(len(intervals)):
+                hist_for_scheme = np.array([turbo_data[scheme_index] for turbo_data in histogramData])
+                standBackStats_perfectBackground(hist_for_scheme,
+                                                 readName,
+                                                 units,
+                                                 outfile.format('',distance_args[scheme_index][0],units.replace('/','')),
+                                                 PERFECT_LOCATION,
+                                                 maxd
+                                             )
             print(" Done!")
-
-    pool.close()
-    for rawInFile, outfile, readName in file_schemes:
-        for units in unitslist:
-            list(itertools.starmap(standBackStats_perfectBackground,
-                                   zip(histogramData,
-                                       itertools.repeat(readName),
-                                       itertools.repeat(units),
-                                       itertools.repeat(outfile.format('',distance_args[0],units.replace('/',''))),
-                                       itertools.repeat(PERFECT_LOCATION),
-                                       itertools.repeat(maxd_master))
-                    ))
-            
     
 def formatHash(string,*args):
     return hashlib.md5(string.format(*args).encode('utf-8')).hexdigest()
