@@ -42,7 +42,7 @@ def perturb(infile,outfile,err,num,ptype,est,mod,lots):
         infiles = [infile.format(x) for x in range(lots)]   
     else:
         infiles = [infile]
-    for i,infile in enumerate(infiles):
+    for in_i,infile in enumerate(infiles):
         num_acks = 0
         second_order_acks = 0
         num_errs = 0
@@ -90,12 +90,12 @@ def perturb(infile,outfile,err,num,ptype,est,mod,lots):
 
             perturbed_vs.append((velocities,galaxy))
             delta_vs.append(dv)
+
         print("{} out of {} galaxies ({:.2f}) had true velocity NOT much less than redshift,".format(num_acks,len(galaxies),num_acks/len(galaxies)))
         print("i.e. the condition on our estimator that v << cz was not satisfied.")
         print("This happened to the random data {} times out of {}.".format(second_order_acks,num*len(galaxies)))
-        print()
         print("Also, {} FloatingPoint errors happened, even after taking out the close-by galaxies.".format(num_errs))
-    
+        print()
         for n in range(num):
             outCF2String = ""
             for i,pv in enumerate(perturbed_vs):
@@ -107,8 +107,8 @@ def perturb(infile,outfile,err,num,ptype,est,mod,lots):
                           galaxy.lon,
                           galaxy.lat]
                 outCF2String = outCF2String + '{}  {}  {}  {}  {}  {}\n'.format(*cf2row)
-
-            with open(outfile.format(i*num+n), 'w') as cf2outfile:
+          
+            with open(outfile.format(in_i*num+n), 'w') as cf2outfile:
                 cf2outfile.write(outCF2String)
 
         
