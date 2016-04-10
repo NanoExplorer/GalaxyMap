@@ -53,6 +53,9 @@ def main(args):
     """ Compute the velocity correlations on one or many galaxy surveys. 
     """
     #Get setup information from the settings files
+    if settings['num_files'] != 10000:
+        print("Sorry! We can only handle 100x100 surveys. For other uses, use the turbospeed branch instead")
+        exit()
     settings =   common.getdict(args.settings)
     numpoints =    settings['numpoints']
     dr =           settings['dr']
@@ -92,19 +95,22 @@ def main(args):
                 distance_args = distance_args_master
                 maxd = maxd_master
                 
-            if settings['many']:
-                #If there are lots of files, set them up accordingly.
-                inFileList = [rawInFile.format(x) for x in infileindices]
-                
-            else:
-                inFileList = [rawInFile]
-                
             with Pool(processes=2) as pool:
-                histogramData = list(pool.starmap(turboRun,zip(inFileList,
-                                                                   itertools.repeat(maxd),
-                                                                   itertools.repeat(units),
-                                                                   itertools.repeat(xs),
-                                                                   itertools.repeat(intervals))))
+                data = np.load(rawInFile)
+                s = time.time()
+                #d = [ data[x/100][np.invert(np.isnan(data[x/100][:,0]))] for x in range(10000)] BAD. REALLY BAD.
+                nansremoved = [ data[x][np.invert(np.isnan(data[x][:,0]))] for x in range(100)]
+                del data
+                d = [nansremoved[x//100] for x in range(10000)]
+                i = [ x%100  for x in range(10000) ]
+                print(d[542])
+                print(time.time()-s)
+                histogramData = list(pool.starmap(turboRun,zip(d,i,
+                                                               itertools.repeat(maxd),
+                                                               itertools.repeat(units),
+                                                               itertools.repeat(xs),
+                                                               itertools.repeat(intervals)
+                                                           )))
                 """
                 Each turbo run returns a list of histograms [ 5-length histogram, 10-length histogram, 20-length etc]
                 so histogramData is a list of turbo runs, which means data is a jagged array
@@ -134,7 +140,7 @@ def main(args):
 def formatHash(string,*args):
     return hashlib.md5(string.format(*args).encode('utf-8')).hexdigest()
 
-def turboRun(infile,maxd,units,xs,intervals):
+def turboRun(data,index,maxd,units,xs,intervals):
     """Returns a list of histograms, where a histogram is defined as a numpy array
     [[psi1 values] [psi2 values]
      [a values]    [b values]
@@ -149,7 +155,10 @@ def turboRun(infile,maxd,units,xs,intervals):
      histogram(xs[n],intervals[n])
     ]
     """
-    correlations=compute(infile,maxd,units)
+    d = np.concatenate((data[:,0:7],data[:,7+index:207:100]),axis=1)
+    #mask = np.invert(np.isnan(d[:,0]))
+    correlations=compute(d,maxd,units)
+    del d
     return list(itertools.starmap(singleHistogram,zip(itertools.repeat(correlations),
                                                 xs,
                                                 intervals
@@ -157,7 +166,7 @@ def turboRun(infile,maxd,units,xs,intervals):
                                  )
                )
     
-def compute(infile,maxd,units):
+def compute(data,maxd,units):
     """Formerly called 'singlePlot,' this function computes all pair-pair galaxy information,
     including figuring out the list of pairs.
     Input - cf2 file to read from.
@@ -175,13 +184,12 @@ def compute(infile,maxd,units):
     Maybe index all hashes into a helpful file in the tmp directory?
     """
     #Load the survey
-    galaxies = common.loadData(infile, dataType = 'CF2')
 
     #Make an array of just the x,y,z coordinate and radial component of peculiar velocity (v)
     if units == 'Mpc/h':
-        galaxyXYZV = np.array([(a.x,a.y,a.z,a.v,a.dv) for a in galaxies])
+        galaxyXYZV = np.concatenate((data[:,0:3]*data[:,7][:,None],d[:,8],d[:,6]),axis=1)
     elif units == 'km/s':
-        galaxyXYZV = np.array([a.getRedshiftXYZ() + (a.v,a.dv) for a in galaxies])
+        galaxyXYZV = np.concatenate((data[:,3:6],d[:,8],d[:,6]),axis=1)
         #You can concatenate tuples. getRedshiftXYZ returnes a tuple, and I just append a.v (and dv) to it.
     else:
         print("I TOLD YOU, ONLY USE km/s or Mpc/h as your units!!!")
@@ -236,6 +244,7 @@ def correlation(galaxies,maxd,units,usewt=False):
     lGalaxies = galaxies[galaxyPairs[:,0]]
     rGalaxies = galaxies[galaxyPairs[:,1]]
     del galaxyPairs
+    del galaxies
     
     #"Galaxy 1 VelocitieS"
     g1vs  = lGalaxies[:,3]

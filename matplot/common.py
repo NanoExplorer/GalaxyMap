@@ -416,19 +416,20 @@ class CF2:
         self.data = data
         self.theta = math.radians(self.lon-180)
         self.phi = math.radians(self.lat+90)
-        self.x = self.d*math.sin(self.phi)*math.cos(self.theta)
-        self.y = self.d*math.sin(self.phi)*math.sin(self.theta)
-        self.z = self.d*math.cos(self.phi)
+        self.normx = math.sin(self.phi)*math.cos(self.theta)
+        self.normy = math.sin(self.phi)*math.sin(self.theta)
+        self.normz = math.cos(self.phi)
+        self.x = self.d*self.normx
+        self.y = self.d*self.normy
+        self.z = self.d*self.normz
+        self.redx = self.cz*self.normx
+        self.redy = self.cz*self.normy
+        self.redz = self.cz*self.normz
     def __str__(self):
         outstr = "CF2 galaxy at redshift {} km/s, distance {} Mpc/h,\n".format(self.cz,self.d)
         outstr += "with peculiar velocity {} km/s.\n".format(self.v)
         outstr += "This galaxy is in the sky at galactic latitude {} and longitude {} (deg)".format(self.lat,self.lon)
         return outstr
-    def getRedshiftXYZ(self):
-        redx = self.cz*math.sin(self.phi)*math.cos(self.theta)
-        redy = self.cz*math.sin(self.phi)*math.sin(self.theta)
-        redz = self.cz*math.cos(self.phi)
-        return(redx,redy,redz)
     def toList(self):
         return self.data
         

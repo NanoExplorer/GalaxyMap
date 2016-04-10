@@ -21,7 +21,6 @@ def unmodulusify(modulus, args):
     elif args == "ln":
         return np.exp(modulus)
 
-
 def perturb(infile,outfile,err,num,ptype,est,mod,lots):
     """Infile and outfile are filenames. Outfile always has a {} in it, and infile should have one too if you're
     using the 'lots' option.
@@ -42,6 +41,7 @@ def perturb(infile,outfile,err,num,ptype,est,mod,lots):
         infiles = [infile.format(x) for x in range(lots)]   
     else:
         infiles = [infile]
+    surveys = []
     for in_i,infile in enumerate(infiles):
         num_acks = 0
         second_order_acks = 0
@@ -94,27 +94,29 @@ def perturb(infile,outfile,err,num,ptype,est,mod,lots):
         print("This happened to the random data {} times out of {}.".format(second_order_acks,num*len(galaxies)))
         print("Also, {} FloatingPoint errors happened, even after taking out the close-by galaxies.".format(num_errs))
         print()
-        galaxies = []
+        survey = []
         for v,dv,d,galaxy in perturbed_vs:
-            galaxies.append(np.array((galaxy.x /galaxy.d,
-                             galaxy.y /galaxy.d,
-                             galaxy.z /galaxy.d) + galaxy.getRedshiftXYZ()))
-        galaxiesnp = np.array(galaxies)
-        surveys = []
-        for n in range(num):
-            survey = [[],[],[]]
-            for pv in perturbed_vs:
-                survey[0].append(pv[2][n])
-                survey[1].append(pv[0][n])
-                survey[2].append(pv[1])
-        
-            surveys.append(survey)
-
-        surveysnp = np.array(surveys)
-        print(galaxiesnp.shape)
-        print(surveysnp.shape)
-        np.save(outfile+"{}_1.npy".format(in_i),galaxiesnp)
-        np.save(outfile+"{}_2.npy".format(in_i),surveysnp)
+            np1 = np.array((galaxy.normx,
+                            galaxy.normy,
+                            galaxy.normz,
+                            galaxy.redx,
+                            galaxy.redy,
+                            galaxy.redz,
+                            dv
+                        ))
+            
+            survey.append(np.concatenate((np1,d,v)))
+        surveys.append(survey)
+    maxlength = max([len(survey) for survey in surveys])
+    surveylength = len(surveys[0][0])
+    for survey in surveys:
+        for x in range(len(survey),maxlength):
+            filler = np.empty(surveylength)
+            filler[:] = np.NAN
+            survey.append(filler)
+    surveysnp = np.array(surveys)
+    print(surveysnp.shape)
+    np.save(outfile,surveysnp)
 if __name__ == "__main__":
     parser=argparse.ArgumentParser()
     parser.add_argument('cf2file',help='CF2 survey file to perturb',type=str)
