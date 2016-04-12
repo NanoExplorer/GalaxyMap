@@ -95,7 +95,7 @@ def main(args):
                 distance_args = distance_args_master
                 maxd = maxd_master
                 
-            with Pool(processes=2) as pool:
+            with Pool(processes=4) as pool:
                 data = np.load(rawInFile)
                 s = time.time()
                 #d = [ data[x/100][np.invert(np.isnan(data[x/100][:,0]))] for x in range(10000)] BAD. REALLY BAD.
