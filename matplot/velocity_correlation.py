@@ -53,10 +53,10 @@ def main(args):
     """ Compute the velocity correlations on one or many galaxy surveys. 
     """
     #Get setup information from the settings files
+    settings =   common.getdict(args.settings)
     if settings['num_files'] != 10000:
         print("Sorry! We can only handle 100x100 surveys. For other uses, use the turbospeed branch instead")
         exit()
-    settings =   common.getdict(args.settings)
     numpoints =    settings['numpoints']
     dr =           settings['dr']
     min_r =        settings['min_r']
@@ -97,14 +97,12 @@ def main(args):
                 
             with Pool(processes=2) as pool:
                 data = np.load(rawInFile)
-                s = time.time()
                 #d = [ data[x/100][np.invert(np.isnan(data[x/100][:,0]))] for x in range(10000)] BAD. REALLY BAD.
                 nansremoved = [ data[x][np.invert(np.isnan(data[x][:,0]))] for x in range(100)]
                 del data
                 d = [nansremoved[x//100] for x in range(10000)]
                 i = [ x%100  for x in range(10000) ]
-                print(d[542])
-                print(time.time()-s)
+                print(d[542].shape)
                 histogramData = list(pool.starmap(turboRun,zip(d,i,
                                                                itertools.repeat(maxd),
                                                                itertools.repeat(units),
@@ -136,7 +134,7 @@ def main(args):
                                                  maxd
                                              )
             print(" Done!")
-    
+
 def formatHash(string,*args):
     return hashlib.md5(string.format(*args).encode('utf-8')).hexdigest()
 
@@ -187,9 +185,9 @@ def compute(data,maxd,units):
 
     #Make an array of just the x,y,z coordinate and radial component of peculiar velocity (v)
     if units == 'Mpc/h':
-        galaxyXYZV = np.concatenate((data[:,0:3]*data[:,7][:,None],d[:,8],d[:,6]),axis=1)
+        galaxyXYZV = np.concatenate((data[:,0:3]*data[:,7][:,None],data[:,8][:,None],data[:,6][:,None]),axis=1)
     elif units == 'km/s':
-        galaxyXYZV = np.concatenate((data[:,3:6],d[:,8],d[:,6]),axis=1)
+        galaxyXYZV = np.concatenate((data[:,3:6],data[:,8][:,None],data[:,6][:,None]),axis=1)
         #You can concatenate tuples. getRedshiftXYZ returnes a tuple, and I just append a.v (and dv) to it.
     else:
         print("I TOLD YOU, ONLY USE km/s or Mpc/h as your units!!!")
@@ -308,18 +306,6 @@ def correlation(galaxies,maxd,units,usewt=False):
 #NOTE: If the information passed as 'galaxies' to "correlation" changes, you have to update this getHash function too!
 def myNpHash(data):
     return hashlib.md5((str(data)+str(len(data))).encode('utf-8')).hexdigest()
-
-def getHash(filename,units):
-    """Loads up CF2 files and uses them to rebuild the hash database.
-    Returns a list of strings. The strings should be hashed with hashlib.md5(string.encode('utf-8')).hexdigest()
-    I'm not sure what I meant when I put that second line there..."""
-    galaxies = common.loadData(filename, dataType = 'CF2')
-    if units == 'Mpc/h':
-        return myNpHash(np.array([(a.x,a.y,a.z,a.v,a.dv) for a in galaxies]))
-    elif units == 'km/s':
-        return myNpHash(np.array([a.getRedshiftXYZ() + (a.v,a.dv) for a in galaxies]))
-    else:
-        raise ValueError("Value of 'units' must be 'Mpc/h' or 'km/s'. Other unit schemes do not exist at present")
 
 
 def singleHistogram(data,xs,intervals):
