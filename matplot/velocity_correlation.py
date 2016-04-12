@@ -61,7 +61,15 @@ def main(args):
         xs_master = [xs_master]
         intervals_master = [intervals_master]
     
-    
+    try:
+        print(args.override)
+        indices = args.override.split(':')
+        a = int(indices[0])
+        b = int(indices[1])
+        file_schemes = file_schemes[a:b]
+        print(file_schemes)
+    except:
+        pass
     for rawInFile, outfile, readName in file_schemes:
         for units in unitslist:
             if units == 'km/s':
@@ -366,11 +374,11 @@ def saveOutput(allData,writeOut):
     
 if __name__ == "__main__":
     start = time.time()
-    arrrghs = common.parseCmdArgs([['settings']
+    arrrghs = common.parseCmdArgs([['settings'],['-o','--override']
                                ],
-                                  ['Settings json file'
+                                  ['Settings json file','array indices in the format a:b to extract from infile list'
                                   ],
-                                   [str])
+                                   [str,str])
 
     main(arrrghs)
     print("That took {:.1f} s".format(time.time()-start))
