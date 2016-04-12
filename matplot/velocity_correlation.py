@@ -189,7 +189,7 @@ def _kd_query(positions,maxd,units):
     #THERE WERE. Thanks for just leaving a warning instead of fixing it :P
     #The warning still stands, but it's a bit better now.
     
-    if units == "km/s" and os.path.exists(tmpfilename):
+    if False:# units == "km/s" and os.path.exists(tmpfilename):
         print("!",end="",flush=True)
         return np.load(tmpfilename)
     else:
@@ -203,7 +203,7 @@ def _kd_query(positions,maxd,units):
         pairarray = np.array(listOfPairs) #The np array creation takes a LOT of time. I am still wondering why.
         del pairs, removePairs, kd #This also takes forever.
         gc.collect()
-        if units == "km/s":
+        if False: #units == "km/s":
             np.save(tmpfilename,pairarray)
             #The caching scheme only helps if we have the same set of distance data over and over again.
             #That is the case with redshift-binned data, but not anything else.
