@@ -47,6 +47,7 @@ ValueError: could not broadcast input array from shape (7,50) into shape (7)
 
 TEMP_DIRECTORY = "/media/christopher/2TB/Christopher/code/Physics/GalaxyMap/tmp/"
 PERFECT_LOCATION = "output/PERFECT_DONTTOUCH/COMPOSITE-MOCK-bin-{:.0f}-{}.npy"
+USE_TMP = False
 print("Warning: Non-general perfect location")
 def main(args):
     np.seterr(divide='ignore',invalid='ignore')
@@ -196,6 +197,7 @@ def compute(infile,maxd,units):
 
 #@profile 
 def _kd_query(positions,maxd,units):
+    
     """Returns a np array of pairs of galaxies."""
     #This is still the best function, despite all of my scheming.
     tmpfilename = TEMP_DIRECTORY + 'rawkd_{}_{}.npy'.format(maxd,myNpHash(positions))
@@ -203,7 +205,7 @@ def _kd_query(positions,maxd,units):
     #THERE WERE. Thanks for just leaving a warning instead of fixing it :P
     #The warning still stands, but it's a bit better now.
     
-    if units == "km/s" and os.path.exists(tmpfilename):
+    if units == "km/s" and os.path.exists(tmpfilename) and USE_TMP:
         print("!",end="",flush=True)
         return np.load(tmpfilename)
     else:
@@ -217,7 +219,7 @@ def _kd_query(positions,maxd,units):
         pairarray = np.array(listOfPairs) #The np array creation takes a LOT of time. I am still wondering why.
         del pairs, removePairs, kd #This also takes forever.
         gc.collect()
-        if units == "km/s":
+        if units == "km/s" and USE_TMP:
             np.save(tmpfilename,pairarray)
             #The caching scheme only helps if we have the same set of distance data over and over again.
             #That is the case with redshift-binned data, but not anything else.
