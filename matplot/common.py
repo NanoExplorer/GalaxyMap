@@ -280,7 +280,7 @@ def loadRawMillHybrid(filename,offset):
                 strrow = ""
                 for cell in newrow:
                     strrow = strrow + str(cell) + ','
-                strrow = strrow + '\n'
+                strrow = strrow.strip(',')
                 if valid:
                     csvData.append(strrow)
     return csvData

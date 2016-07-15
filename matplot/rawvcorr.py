@@ -11,6 +11,8 @@ import matplotlib.backends.backend_pdf as pdfback
 def main(args):
     """ Compute the velocity correlations on one or many galaxy surveys. 
     """
+    print("Incomplete function - see comments")
+    exit()
     #Get setup information from the settings file
     settings = common.getdict(args.settings)
     numpoints = settings["numpoints"]
@@ -93,8 +95,8 @@ def main(args):
         ax32.plot(xs,a32)
         ax33.plot(xs,a33)
         
-        set x axis and y axis to be the same
-        go out to until correlation is zero
+        #set x axis and y axis to be the same
+        #go out to until correlation is zero
         
         f.suptitle('3-D velocity correlation')
         ax31.set_xlabel('Distance, Mpc/h')

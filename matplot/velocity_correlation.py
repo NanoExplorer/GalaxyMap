@@ -123,11 +123,11 @@ def main(args):
                 """
             for scheme_index in range(len(intervals)):
                 hist_for_scheme = np.array([turbo_data[scheme_index] for turbo_data in histogramData])
-                standBackStats_perfectBackground(hist_for_scheme,
+                standBackStats_allonepage(hist_for_scheme,
                                                  readName,
                                                  units,
                                                  outfile.format('',distance_args[scheme_index][0],units.replace('/','')),
-                                                 PERFECT_LOCATION,
+                                                 #PERFECT_LOCATION,
                                                  maxd
                                              )
             print(" Done!")
@@ -715,12 +715,12 @@ def standBackStats_toomanyfiles(inFileList,name,units,writeOut,maxd=100,savenpy=
                                    avg[4],std[4],low68[4],hi68[4],low95[4],hi95[4],
                                    avg[5],std[5],low68[5],hi68[5],low95[5],hi95[5]]))
     
-def standBackStats_allonepage(inFileList,name,units,writeOut,maxd=100):
+def standBackStats_allonepage(allData,name,units,writeOut,maxd=100):
     """Do statistics over many input files, for example the three groups of 100 surveys. Average them, plot w/errorbars."""
-    assert(len(inFileList) == 100) #Not true in all cases, but sufficient for debugging. REMOVE this line if problems
-    theMap = map(np.load, inFileList)
-    theList = list(theMap)
-    allData = np.array(theList)
+    #assert(len(inFileList) == 100) #Not true in all cases, but sufficient for debugging. REMOVE this line if problems
+    #theMap = map(np.load, inFileList)
+    #theList = list(theMap)
+    #allData = np.array(theList)
     #allData = np.array(list(map(np.load, inFileList)))
     #One inFile contains the following: [p1, p2, a, b, psiparallel, psiperpindicular]
     xs = allData[0][6]
@@ -996,7 +996,7 @@ if __name__ == "__main__":
         main(arrrghs)
         print("That took {:.1f} s".format(time.time()-start))
         if arrrghs.notify:
-            sendMessage("Job Finished in {:,1f} s".format(time.time()-start))
+            sendMessage("Job Finished in {:.1f} s".format(time.time()-start))
     except:
         if arrrghs.notify:
             sendMessage("Job Failed")

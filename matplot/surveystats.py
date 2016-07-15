@@ -78,7 +78,7 @@ def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
     plt.xlabel("Distance, Mpc/h")
     plt.title("Distribution of Galaxy Distance")
     plt.legend()
-    plt.axis([0,chop,0,1000])
+    plt.axis([0,chop,0,500])
     fig2 = plt.figure()
     shellVolume = [common.shellVolCenter(robot.centerbins[i],binsize)  for i in range(len(n))]
     plt.title("Galaxies per Cubic Mpc")
