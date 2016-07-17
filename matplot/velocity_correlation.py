@@ -25,9 +25,8 @@ import os
 #import smtplib
 #import matplotlib.ticker as mtick
 
-TEMP_DIRECTORY = "tmp/"
-PERFECT_LOCATION = "output/PERFECT_DONTTOUCH/COMPOSITE-MOCK-bin-{:.0f}-{}.npy"
-NUM_PROCESSES=8
+TEMP_DIRECTORY = "/data/c156r133/tmp/"
+NUM_PROCESSES=12
 print("Warning: Non-general perfect location")
 def main(args):
     np.seterr(divide='ignore',invalid='ignore')
