@@ -6,7 +6,7 @@ import math
 def transpose(args):
     hubble_constant = 100
     fractional_error = 0.1
-    use_dvs = True;
+    use_dvs = False;
     survey_info = common.getdict(args.survey_file)
     print(survey_info)
     for survey in survey_info:
@@ -20,7 +20,7 @@ def transpose(args):
                 rotationMatrix = np.matrix(survey['rot'])
                 ontoGalaxy = np.array([galaxy.x-center[0],galaxy.y-center[1],galaxy.z-center[2]])
                 #ontoGalaxy is the vector from the survey origin to the galaxy
-                rotatedCoord = ontoGalaxy * rotationMatrix
+                rotatedCoord = ontoGalaxy #* rotationMatrix
                 x = rotatedCoord.item(0)
                 y = rotatedCoord.item(1)
                 z = rotatedCoord.item(2)
@@ -48,5 +48,5 @@ def transpose(args):
 
 if __name__ == "__main__":
     print("RUN WItH GALAXY.PY STUPID")
-    print('note: if your name is not Christopher Rooney, I\'m not calling you stupid')
-    print("I have just made this mistake too many times and am calling myself names")
+    print('note: if your name is not Christopher Rooney, I\'m not calling you stupid.')
+    print("That Christopher guy has made this mistake too many times, so I'm calling him names.")

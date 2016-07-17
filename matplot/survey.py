@@ -7,6 +7,7 @@ import os
 import multiprocessing
 import time
 import random
+USE_GPU = False
 try:
     import pycuda.autoinit
     from pycuda import gpuarray
@@ -16,7 +17,10 @@ except:
     print("[INFO] GPU unavailable.")
     USE_GPU=False
 
-NUM_PROCESSORS = 4
+
+NUM_PROCESSORS = 2
+
+EDGES = [np.array((x,y,z)) for x in [-1,0,1] for y in [-1,0,1] for z in [-1,0,1]]
 
 def genBins(binsize,chop):
     return [x*binsize for x in range(int(chop/binsize)+2)]
@@ -37,7 +41,8 @@ def compute_want_density(r,binsize, A, r_0, n_1, n_2):
     r_calc = (A*((r_gpu/r_0)**n_1)*(1+(r_gpu/r_0)**(n_1+n_2))**-1) / ((ftpi*(r_gpu+dr)**3)-(ftpi*(r_gpu-dr)**3))
     #(A*(r/r0)^n_1)*(1+(r/r0)^(n1+n2))^-1 is the selection function, i.e. number of galaxies in a binsize Mpc bin
     #centered on r distance from center
-
+    #THAT IS THE IMPORTANT PART - the bin width is the same, but the center of the bin is at the position of
+    #the galaxy I THINK THIS CORRECTS THE MALMQUIST BIAS
     #4/3 pi * (r+dr)^3 - 4/3 pi * (r-dr)^3 is the volume of that bin
 
     #divide count by volume to get density.
@@ -72,7 +77,7 @@ def selectrun(args):
     #The survey function (the filename of the function parameter json)
     #minimum distance between surveys
     #number of surveys
-    
+    global USE_GPU
     #I'll need to go through the database in blocks using the usual sub-box method 
     USE_GPU = args.gpu and USE_GPU
     #USE_GPU represents whether we can and want to use the gpu. 
@@ -82,6 +87,9 @@ def selectrun(args):
     #density        = settings['dataset_density']
     surveyOverride = settings['survey_position_override']
     boxSize        = settings['box_size']
+    if boxSize[0] != 500 or boxSize[1] != 500 or boxSize[2] != 500:
+        print("Not designed with other simulation boxes in mind.")
+        exit()
     outFileName    = settings['survey_output_files']
 
     if os.path.isdir(hugeFile):
@@ -126,33 +134,38 @@ def selectrun(args):
     selectionParams = common.getdict(settings['selection_function_json'])
 
     #Grab the pre-computed distance files if they exist, or if not generate them.
-    distFileBase = hugeFile.rstrip('/') + "_distances_{:x}/".format(hash(tuple([tuple(x) for x in surveys]))) 
-    distanceFiles = [distFileBase + os.path.basename(os.path.splitext(milFile)[0]) + '.npy' for milFile in files]
+    distFileBase = "/media/christopher/2TB1/Christopher/code/Physics/GalaxyMap/tmp/" + hugeFile.rstrip('/') + "_distances_{:x}/".format(hash(tuple([tuple(x) for x in surveys]))) 
+    distanceFiles = [distFileBase + os.path.basename(os.path.splitext(milFile)[0]) for milFile in files]
     #Distance file format: outFile location + hash of survey centerpoints / xi.yi.zi.npy
     
     pool = multiprocessing.Pool(processes = NUM_PROCESSORS)
 
-    if not os.path.exists(distFileBase):
-        start = time.time()
-        print("Generating distance data...")
-        os.mkdir(distFileBase)
-        pool.starmap(distanceOneBox,zip(files,
-                                        itertools.repeat(surveys),
-                                        distanceFiles))
-        print("Generating distance data took {} seconds.".format(time.time()-start))
-        #Single core version for use with profiling
-        #os.mkdir(distFileBase)
-        #[distanceOneBox(afile,surveys,distanceFile) for afile,distanceFile in zip(files,distanceFiles)]
-    else:
-        print("Found distance data!")
+    # if not os.path.exists(distFileBase):
+    #     start = time.time()
+    #     print("Generating distance data...")
+    #     os.mkdir(distFileBase)
+    #     pool.starmap(distanceOneBox,zip(files,
+    #                                     itertools.repeat(surveys),
+    #                                     distanceFiles))
+    #     print("Generating distance data took {} seconds.".format(time.time()-start))
+    #     #Single core version for use with profiling
+    #     #os.mkdir(distFileBase)
+    #     #[distanceOneBox(afile,surveys,distanceFile) for afile,distanceFile in zip(files,distanceFiles)]
+    # else:
+    #     print("Found distance data!")
 
     #Generate lookup-tables for 'original-number-of-galaxies' if they don't already exist
-    boxMaxDistance = space.distance.euclidean([0,0,0],boxSize)
+    boxMaxDistance = 350 # space.distance.euclidean([0,0,0],boxSize)
+    print("Assuming chop distance of 350 Mpc/h")
     if not os.path.exists(distFileBase+'hist.npy'):
         print("Generating histograms...")
         start = time.time()
         
-        listOfHistograms = pool.starmap(surveyBins,zip(distanceFiles,
+        # listOfHistograms = pool.starmap(surveyBins,zip(distanceFiles,
+        #                                                itertools.repeat(selectionParams["info"]["shell_thickness"]),
+        #                                                itertools.repeat(boxMaxDistance)))
+        listOfHistograms = pool.starmap(distsurvey,zip(files,
+                                                       itertools.repeat(surveys),
                                                        itertools.repeat(selectionParams["info"]["shell_thickness"]),
                                                        itertools.repeat(boxMaxDistance)))
         full_histogram = sum(listOfHistograms)
@@ -164,23 +177,23 @@ def selectrun(args):
         full_histogram = np.load(distFileBase+'hist.npy')
         
     print("Generating surveys...")
-    #Single-core method for profiling
     start = time.time()
     if USE_GPU:
+        pool.close()
         listOfSurveyContents = itertools.starmap(surveyOneFile,zip(files,
-                                                                   distanceFiles,
+                                                                   itertools.repeat(surveys),
                                                                    itertools.repeat(selectionParams),
                                                                    itertools.repeat(full_histogram),
                                                                    itertools.repeat(boxMaxDistance)
                                                                ))
     else:
         listOfSurveyContents = pool.starmap(surveyOneFile,zip(files,
-                                                              distanceFiles,
+                                                              itertools.repeat(surveys),
                                                               itertools.repeat(selectionParams),
                                                               itertools.repeat(full_histogram),
                                                               itertools.repeat(boxMaxDistance)
                                                           ))
-    
+    listOfSurveyContents=list(listOfSurveyContents)
     print("Generating surveys took {} seconds.".format(time.time()-start))
        
     #Format of listOfSurveyContents:
@@ -190,8 +203,8 @@ def selectrun(args):
 
     #e.g. [
     #       [
-    #         [rows from survey 1],
-    #         [rows from survey 2],
+    #         [rows for survey 1],
+    #         [rows for survey 2],
     #         ...],
     #       [],[],...,[]]
     info = []
@@ -219,16 +232,44 @@ def transposeMappedSurvey(data):
     return surveyContent
 
 #@profile
+def distsurvey(hugeFile,surveys,binsize,boxMaxDistance):
+    galaxies = np.array(common.loadData(hugeFile,dataType = 'millPos'))
+    masterhist = []
+    firstrun = True
+    for boxoffset in EDGES:
+        distances = space.distance.cdist(galaxies + boxoffset * 500,surveys)
+        numSurveys = distances.shape[1]
+        assert(numSurveys == len(surveys))
+        bins = genBins(binsize,boxMaxDistance)
+        histogram = [] 
+        for i in range(numSurveys):
+            thisSurveyDistances = distances[:,i] #This means take distances for all the galaxies, but only the ith survey
+            #That works since the first dimension of distances is the galaxies and the second dimension is surveys
+            hist,edges = np.histogram(thisSurveyDistances, bins)
+            histogram.append(hist)
+        if firstrun:
+            masterhist = histogram
+        else:
+            for i in range(len(masterhist)):
+                masterhist[i] = histogram[i]+masterhist[i]
+        firstrun = False
+    print(".",end="",flush=True)
+    return np.array(masterhist)
+    
 def distanceOneBox(hugeFile,surveys,outFile):
     #Generate distance data for one sub-box - distance from each galaxy to each survey center
     #These distances are not returned, instead they are only written to the disk.
-    galaxies = common.loadData(hugeFile,dataType = 'millPos')
-    galaxPos = [galaxy[0:3] for galaxy in galaxies]
-    distances = space.distance.cdist(galaxPos,surveys)
-    np.save(outFile,distances)
+    galaxies = np.array(common.loadData(hugeFile,dataType = 'millPos'))
+    for boxoffset in EDGES:
+        distances = space.distance.cdist(galaxies + boxoffset * 500,surveys)
+        np.save(outFile+"_{}_{}_{}.npy".format(boxoffset[0],
+                                               boxoffset[1],
+                                               boxoffset[2]),
+                distances)
     #Write distances to files for later use
     #Also this algorithm seems VERY fast. It also doesn't seem to get slower with more surveys!
     #Which means that it doesn't get faster with fewer surveys...
+    #Oh, let's be quick and only generate one survey... hmm, why is it going so slowly????
     
 
 def surveyBins(distanceFile,binsize,boxMaxDistance):
@@ -238,73 +279,102 @@ def surveyBins(distanceFile,binsize,boxMaxDistance):
     as surveystats.
     The distance file MUST exist before this method is called.
     """
-    distances = np.load(distanceFile)
-    numSurveys = distances.shape[1]
-    bins = genBins(binsize,boxMaxDistance)
-    histogram = [] #np.zeros((distances.shape[1],int(boxMaxDistance/binsize)+1))
-    #list of surveys. Each survey will contain a list of bins,
-    #Each bin will contain the number of galaxies in that bin.
-    #This is the list we're generating.
-
-    #This method is not necessarily the best - it basically counts galaxies.
-    #Maybe there's a better way?
-    #Answer - definitely! Numpy.histogram.
-    for i in range(numSurveys):
-        thisSurveyDistances = distances[:,i] #This means take distances for all the galaxies, but only the ith survey
-        #That works since the first dimension of distances is the galaxies and the second dimension is surveys
-        hist,edges = np.histogram(thisSurveyDistances, bins)
-        histogram.append(hist)
-    # for i,galaxy in enumerate(distances):
-    #     for surveyNum,distance in enumerate(galaxy):
-    #         histogram[surveyNum][int(distance/binsize)] += 1
-    return np.array(histogram)
+    masterhist = []
+    firstrun = True
+    for boxoffset in EDGES:
+        
+        distances = np.load(distanceFile+"_{}_{}_{}.npy".format(boxoffset[0],
+                                                                boxoffset[1],
+                                                                boxoffset[2]))
+        numSurveys = distances.shape[1]
+        bins = genBins(binsize,boxMaxDistance)
+        histogram = [] 
+        for i in range(numSurveys):
+            thisSurveyDistances = distances[:,i] #This means take distances for all the galaxies, but only the ith survey
+            #That works since the first dimension of distances is the galaxies and the second dimension is surveys
+            hist,edges = np.histogram(thisSurveyDistances, bins)
+            histogram.append(hist)
+        if firstrun:
+            masterhist = histogram
+        else:
+            for i in range(len(masterhist)):
+                masterhist[i] = histogram[i]+masterhist[i]
+        firstrun = False
+    return np.array(masterhist)
 
 #@profile
-def surveyOneFile(hugeFile,distanceFile,selectionParams,histogram,boxMaxDistance):
+def surveyOneFile(hugeFile,surveys,selectionParams,histogram,boxMaxDistance):
     """
     Given the original data, distances, wanted numbers, and other parameters we actually generate the
     mock surveys. This is currently the biggest bottleneck of the program, but I'm not entirely sure why.
-                  ^ That comment might be outdated. Since I wrote it, I've rearranged the code a lot for
+                  ^ That comment might be outdated (It's not). Since I wrote it, I've rearranged the code a lot for
                   improved efficiency, including using the GPU for some otherwise expensive calculations.
     """
     #Set up variables
     rng = np.random.RandomState() #Make a process-safe random number generator
-    distances = np.load(distanceFile) #load the distance file !! 7.3% !!
-    surveyContent = [[] for i in range(distances.shape[1])] #Make the skeleton structure for the end result
-    galaxies = common.loadData(hugeFile,dataType = 'millRaw') #Load the galaxies !! 13.9% !!
-    binsize = selectionParams['info']['shell_thickness'] #Load the size of a bin
-    bins = genBins(binsize,boxMaxDistance)
-    numSurveys = distances.shape[1]
+    first = True
+    mastersurvey = []
+    galax_pos =  np.array(common.loadData(hugeFile,dataType = 'millPos'))
+    for boxoffset in EDGES:
+        # distances = np.load(distanceFile+"_{}_{}_{}.npy".format(boxoffset[0],
+        #                                                         boxoffset[1],
+        #                                                         boxoffset[2])) #load the distance file !! 7.3% !!
+        distances = space.distance.cdist(galax_pos + boxoffset * 500,surveys)
+        surveyContent = [[] for i in range(distances.shape[1])] #Make the skeleton structure for the end result
+        galaxies = common.loadRawMillHybrid(hugeFile,boxoffset) #Load the galaxies !! 13.9% !!
+        #WARNING: ^ Function assumes 500x500x500 box
+        binsize = selectionParams['info']['shell_thickness'] #Load the size of a bin
+        bins = genBins(binsize,boxMaxDistance)
+        numSurveys = distances.shape[1]
     
-    #Do calculations
-    wantDensity = compute_want_density(distances,binsize,**(selectionParams["constants"])) #!! 20 % !!
-    #wantDensity  =selection_values / common.shellVolCenter(distances,binsize)         #!! 22 % !!
-    tdistBin =(np.digitize(distances.flatten(),bins)-1).reshape(distances.shape)
-    distBin = np.transpose(tdistBin)# !! 6 % !!
-    originalCount = np.transpose(np.array([histogram[n][distBin[n]] for n in range(numSurveys)])) # 2.2%
-    #volumes = calcVolumes(np.transpose(np.array(distBin))*binsize + (binsize/2),binsize)# !! 23 % !!
-    volumes = calcVolumes(tdistBin,binsize)# !! 23 % !!
-    originalDensity = originalCount / volumes
-    #I'm currently under the impression that this for loop is the main bottleneck in this function.
-    #It isn't a complicated task, so it might be worthwhile to consider alternate implementations.
-    #Let's see...
-    #This for loop uses information from distances, binsize, histogram
+        #Do calculations
+        wantDensity = compute_want_density(distances,binsize,**(selectionParams["constants"])) #!! 20 % !!
+        #wantDensity  =selection_values / common.shellVolCenter(distances,binsize)         #!! 22 % !!
+        tdistBin =(np.digitize(distances.flatten(),bins)-1).reshape(distances.shape)
+        #!!!!IMPORTANT!!!!!
+        #tdistBin and distBin are the indexes of the bin each galaxy goes into
+        #Remember these are only the galaxies in the subbox we're looking at (surveyONEFILE)
+        
+        distBin = np.transpose(tdistBin)# !! 6 % !!
+        histogram = np.concatenate((histogram,np.zeros((100,1))-1),axis=1)
+
+        #When a galaxy is outside chop, its "number of galaxies around here" is set to -1
+        #That makes the density negative
+        #Which makes the probability negative so it is impossible for that galaxy to be selected.
+        something = [histogram[n][distBin[n]] for n in range(numSurveys)]
+        #This is the number of galaxies in the same bin as the galaxy and in the same box as the galaxy
+        originalCount = np.transpose(np.array(something)) # 2.2%
+        #volumes = calcVolumes(np.transpose(np.array(distBin))*binsize + (binsize/2),binsize)# !! 23 % !!
+        volumes = calcVolumes(tdistBin,binsize)# !! 23 % !!
+        originalDensity = originalCount / volumes
+        #I'm currently under the impression that this for loop is the main bottleneck in this function.
+        #It isn't a complicated task, so it might be worthwhile to consider alternate implementations.
+        #Let's see...
+        #This for loop uses information from distances, binsize, histogram
     
-    # for i,galaxy in enumerate(distances):
-    #     for j,surveyDist in enumerate(galaxy):
-    #         distBin = int(distBinNotAnInt[i][j])
-    #         originalDensity[i][j] = histogram[j][distBin] / common.shellVolCenter(distBin*binsize + (binsize/2),binsize)
-    probability = wantDensity / originalDensity
-    dice = rng.random_sample(probability.shape)
-    toAdd = dice < probability
-    # for i,galaxy in enumerate(toAdd):
-    #     for j,addBool in enumerate(galaxy):
-    #         if addBool:
-    #             rawLine = galaxies[i][3]
-    #             surveyContent[j].append(rawLine)
-    arrGalaxies = np.array(galaxies)
-    surveyContent = [arrGalaxies[toAdd[:,n]] for n in range(numSurveys)]
-    return surveyContent
+        # for i,galaxy in enumerate(distances):
+        #     for j,surveyDist in enumerate(galaxy):
+        #         distBin = int(distBinNotAnInt[i][j])
+        #         originalDensity[i][j] = histogram[j][distBin] / common.shellVolCenter(distBin*binsize + (binsize/2),binsize)
+        probability = wantDensity / originalDensity
+        dice = rng.random_sample(probability.shape)
+        toAdd = dice < probability
+        # for i,galaxy in enumerate(toAdd):
+        #     for j,addBool in enumerate(galaxy):
+        #         if addBool:
+        #             rawLine = galaxies[i][3]
+        #             surveyContent[j].append(rawLine)
+        arrGalaxies = np.array(galaxies,dtype="object")
+        surveyContent = [arrGalaxies[toAdd[:,n]] for n in range(numSurveys)]
+        print(".",end="",flush=True)
+        if first:
+            mastersurvey = surveyContent
+            first = False
+        else:
+            for i in range(len(surveyContent)):
+                mastersurvey[i] = np.concatenate((mastersurvey[i],surveyContent[i]))
+    print("!")
+    return mastersurvey
 
 
 
@@ -334,14 +404,16 @@ def genSurveyPos(separation, boxsize, numSurveys,files):
             #galaxyCoord = random.choice(positionList)
             galaxy=millennium.getARandomGalaxy()
             galaxyCoord = (galaxy.x,galaxy.y,galaxy.z)
-            distances = [math.sqrt((r1[0]-r2[0])**2+
-                                   (r1[1]-r2[1])**2+
-                                   (r1[2]-r2[2])**2)
-                             for r1,r2 in zip(itertools.repeat(galaxyCoord),surveys)]
-            for i,c in enumerate(galaxyCoord):
-                distances.append(c)
-                distances.append(boxsize[i]-c)
-            if all(distance > separation for distance in distances):
+            #distances = [math.sqrt((r1[0]-r2[0])**2+
+            #                       (r1[1]-r2[1])**2+
+            #                       (r1[2]-r2[2])**2)
+            #                 for r1,r2 in zip(itertools.repeat(galaxyCoord),surveys)]
+            if len(surveys) != 0:
+                distances = space.distance.cdist([galaxyCoord],surveys)
+            else:
+                distances = np.array([])
+            
+            if np.all(distances > separation):
                 #All is officially the 'coolest function ever.' All of an empty list is true!
                 surveys.append(galaxyCoord)
                 break

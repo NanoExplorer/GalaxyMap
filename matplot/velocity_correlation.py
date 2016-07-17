@@ -21,14 +21,33 @@ from numpy.core.umath_tests import inner1d #Note: this function has no documenta
 # def inner1d(a,b):
 #     return (a*b).sum(axis=1)
 import gc
+import time
 import smtplib
 #import matplotlib.ticker as mtick
 
-
+"""
+Traceback (most recent call last):
+  File "velocity_correlation.py", line 963, in <module>
+    main(arrrghs)
+  File "velocity_correlation.py", line 99, in main
+    itertools.repeat(maxd_master))
+  File "velocity_correlation.py", line 411, in standBackStats_perfectBackground
+    std = np.std(allData,axis=0)
+  File "/home/christopher/.Envs/new-matplot/lib/python3.4/site-packages/numpy/core/fromnumeric.py", line 2985, in std
+    keepdims=keepdims)
+  File "/home/christopher/.Envs/new-matplot/lib/python3.4/site-packages/numpy/core/_methods.py", line 124, in _std
+    keepdims=keepdims)
+  File "/home/christopher/.Envs/new-matplot/lib/python3.4/site-packages/numpy/core/_methods.py", line 77, in _var
+    arr = asanyarray(a)
+  File "/home/christopher/.Envs/new-matplot/lib/python3.4/site-packages/numpy/core/numeric.py", line 525, in asanyarray
+    return array(a, dtype, copy=False, order=order, subok=True)
+ValueError: could not broadcast input array from shape (7,50) into shape (7)
+"""
 
 
 TEMP_DIRECTORY = "/media/christopher/2TB/Christopher/code/Physics/GalaxyMap/tmp/"
-PERFECT_LOCATION = "output/COMPOSITE-MOCK-bin-{:.0f}-{}.npy"
+PERFECT_LOCATION = "output/PERFECT_DONTTOUCH/COMPOSITE-MOCK-bin-{:.0f}-{}.npy"
+USE_TMP = False
 print("Warning: Non-general perfect location")
 def main(args):
     np.seterr(divide='ignore',invalid='ignore')
@@ -63,6 +82,7 @@ def main(args):
     for rawInFile, outfile, readName in file_schemes:
         for units in unitslist:
             if units == 'km/s':
+                
                 xs = [[x * 100 for x in y] for y in xs_master]
                 intervals = [[x * 100 for x in y] for y in intervals_master]
                 distance_args = [(x[0]*100,x[1]*100,x[2]) for x in distance_args_master]
@@ -79,20 +99,38 @@ def main(args):
                 
             else:
                 inFileList = [rawInFile]
-            histogramData = pool.starmap(turboRun,zip(inFileList,
-                                                      itertools.repeat(maxd),
-                                                      itertools.repeat(units),
-                                                      itertools.repeat(xs),
-                                                      itertools.repeat(intervals)))
-
-            itertools.starmap(standBackStats_perfectBackground,
-                              zip(histogramData,
-                                  itertools.repeat(readName),
-                                  itertools.repeat(units),
-                                  itertools.repeat(outfile.format('',distance_args[0],units.replace('/',''))),
-                                  itertools.repeat(PERFECT_LOCATION),
-                                  itertools.repeat(maxd=maxd_master))
-            )
+                
+            with Pool(processes=2) as pool:
+                histogramData = list(pool.starmap(turboRun,zip(inFileList,
+                                                                   itertools.repeat(maxd),
+                                                                   itertools.repeat(units),
+                                                                   itertools.repeat(xs),
+                                                                   itertools.repeat(intervals))))
+                """
+                Each turbo run returns a list of histograms [ 5-length histogram, 10-length histogram, 20-length etc]
+                so histogramData is a list of turbo runs, which means data is a jagged array
+                data = [
+                
+                [ [ ----- ],
+                  [ ---------- ],
+                  [ -------------------- ] ],
+                
+                [ [ ----- ],
+                  [ ---------- ],
+                  [ -------------------- ] ],
+                
+                ]
+                """
+            for scheme_index in range(len(intervals)):
+                hist_for_scheme = np.array([turbo_data[scheme_index] for turbo_data in histogramData])
+                standBackStats_allonepage(hist_for_scheme,
+                                                 readName,
+                                                 units,
+                                                 outfile.format('',distance_args[scheme_index][0],units.replace('/','')),
+                                                 #PERFECT_LOCATION,
+                                                 maxd
+                                             )
+            print(" Done!")
     
 def formatHash(string,*args):
     return hashlib.md5(string.format(*args).encode('utf-8')).hexdigest()
@@ -151,7 +189,7 @@ def compute(infile,maxd,units):
         print("And you should definitely, NEVER EVER, use '{}'!!".format(units))
 
     try:
-        data = correlation(galaxyXYZV,maxd)
+        data = correlation(galaxyXYZV,maxd,units)
     except RuntimeError:
         print('Runtime Error encountered at {}.'.format(infile))
         raise
@@ -159,6 +197,7 @@ def compute(infile,maxd,units):
 
 #@profile 
 def _kd_query(positions,maxd,units):
+    
     """Returns a np array of pairs of galaxies."""
     #This is still the best function, despite all of my scheming.
     tmpfilename = TEMP_DIRECTORY + 'rawkd_{}_{}.npy'.format(maxd,myNpHash(positions))
@@ -166,7 +205,7 @@ def _kd_query(positions,maxd,units):
     #THERE WERE. Thanks for just leaving a warning instead of fixing it :P
     #The warning still stands, but it's a bit better now.
     
-    if units == "km/s" and os.path.exists(tmpfilename):
+    if units == "km/s" and os.path.exists(tmpfilename) and USE_TMP:
         print("!",end="",flush=True)
         return np.load(tmpfilename)
     else:
@@ -180,25 +219,21 @@ def _kd_query(positions,maxd,units):
         pairarray = np.array(listOfPairs) #The np array creation takes a LOT of time. I am still wondering why.
         del pairs, removePairs, kd #This also takes forever.
         gc.collect()
-        if units == "km/s":
+        if units == "km/s" and USE_TMP:
             np.save(tmpfilename,pairarray)
             #The caching scheme only helps if we have the same set of distance data over and over again.
             #That is the case with redshift-binned data, but not anything else.
         return pairarray
 
 
-def correlation(galaxies,maxd,usewt=False):
+def correlation(galaxies,maxd,units,usewt=False):
     """ Computes the raw galaxy-galaxy correlation information on a per-galaxy basis, and saves it to file"""
     #There are lots of dels in this function because otherwise it tends to gobble up memory.
     #I think there might be a better way to deal with the large amounts of memory usage, but I don't yet
     #know what it is.
-    tmpfilename = TEMP_DIRECTORY+'plotData_{}.npy'.format(myNpHash(galaxies))
-    if os.path.exists(tmpfilename):
-        print("*",end="",flush=True)
-        return
                                                           
     # galaxies = [(galaxies[a],galaxies[b]) for a,b in interval_shell]
-    galaxyPairs = _kd_query(galaxies[:,0:3],maxd)
+    galaxyPairs = _kd_query(galaxies[:,0:3],maxd,units)
     #print("Done! (with the thing)")
     lGalaxies = galaxies[galaxyPairs[:,0]]
     rGalaxies = galaxies[galaxyPairs[:,1]]
@@ -401,11 +436,7 @@ def standBackStats(a,b,c,d,maxd=100):
     #Set here what you want the stats routine to do. Right now I'm prepping a minipaper, so I need lots of
     #single plots that can fit on page instead of lots of plots glued together.
 
-def standBackStats_perfectBackground(inFileList,name,units,writeOut,perfect_location,savenpy=False,maxd=100):
-    
-    theMap = map(np.load, inFileList)
-    theList = list(theMap)
-    allData = np.array(theList)
+def standBackStats_perfectBackground(allData,name,units,writeOut,perfect_location,maxd,savenpy=True):
     #allData = np.array(list(map(np.load, inFileList)))
     #One inFile contains the following: [p1, p2, a, b, psiparallel, psiperpindicular]
     xs = allData[0][6]
@@ -419,7 +450,7 @@ def standBackStats_perfectBackground(inFileList,name,units,writeOut,perfect_loca
 
 
     plotName = name
-
+    """
     matplotlib.rc('font',size=10)
     
     f, ((ax1,ax2),(ax3,ax4),(ax5,ax6)) = plt.subplots(3,2,sharex='col',sharey='row',figsize=(8.5,11))
@@ -504,6 +535,7 @@ def standBackStats_perfectBackground(inFileList,name,units,writeOut,perfect_loca
     with pdfback.PdfPages(writeOut) as pdf:
         pdf.savefig(f)
     plt.close(f)
+    """
     np.save(writeOut,np.array([xs,avg[0],std[0],low68[0],hi68[0],low95[0],hi95[0],
                                avg[1],std[1],low68[1],hi68[1],low95[1],hi95[1],
                                avg[2],std[2],low68[2],hi68[2],low95[2],hi95[2],
@@ -683,12 +715,12 @@ def standBackStats_toomanyfiles(inFileList,name,units,writeOut,maxd=100,savenpy=
                                    avg[4],std[4],low68[4],hi68[4],low95[4],hi95[4],
                                    avg[5],std[5],low68[5],hi68[5],low95[5],hi95[5]]))
     
-def standBackStats_allonepage(inFileList,name,units,writeOut,maxd=100):
+def standBackStats_allonepage(allData,name,units,writeOut,maxd=100):
     """Do statistics over many input files, for example the three groups of 100 surveys. Average them, plot w/errorbars."""
-    assert(len(inFileList) == 100) #Not true in all cases, but sufficient for debugging. REMOVE this line if problems
-    theMap = map(np.load, inFileList)
-    theList = list(theMap)
-    allData = np.array(theList)
+    #assert(len(inFileList) == 100) #Not true in all cases, but sufficient for debugging. REMOVE this line if problems
+    #theMap = map(np.load, inFileList)
+    #theList = list(theMap)
+    #allData = np.array(theList)
     #allData = np.array(list(map(np.load, inFileList)))
     #One inFile contains the following: [p1, p2, a, b, psiparallel, psiperpindicular]
     xs = allData[0][6]
@@ -942,6 +974,7 @@ def sendMessage(message):
                       
     
 if __name__ == "__main__":
+    start = time.time()
     arrrghs = common.parseCmdArgs([['settings'],
                                    ['-c','--comp'],
                                    ['-H','--hist'],
@@ -961,12 +994,14 @@ if __name__ == "__main__":
                                    [str,'bool','bool','bool','bool','bool','bool'])
     try:
         main(arrrghs)
+        print("That took {:.1f} s".format(time.time()-start))
         if arrrghs.notify:
-            sendMessage("Job Finished")
+            sendMessage("Job Finished in {:.1f} s".format(time.time()-start))
     except:
         if arrrghs.notify:
             sendMessage("Job Failed")
         raise
+        
 
 
 

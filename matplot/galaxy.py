@@ -46,7 +46,7 @@ def main():
 
     parser_selectsurvey = subparsers.add_parser('select',help='Uses a settings file to extract lots of virtual surveys (like the cf2 and composite ones) from the huge millennium data file.')
     parser_selectsurvey.add_argument('settings',help='JSON file to read settings from.',type=str)
-    parser_selectsurvey.add_argument('-g','--gpu',help='use the GPU to try to speed up computations. GPU works best for large numbers of surveys.',type=bool)
+    parser_selectsurvey.add_argument('-g','--gpu',help='use the GPU to try to speed up computations. GPU works best for large numbers of surveys.',action='store_true')
     parser_selectsurvey.set_defaults(func=survey.selectrun)
     
     parser_surveytranspose = subparsers.add_parser('transpose',help='Transforms cartesian surveys into CF2 format')

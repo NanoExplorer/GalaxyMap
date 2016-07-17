@@ -1,0 +1,138 @@
+%% A brief test of different estimators of galaxy peculiar velocity
+%% Sun Nov 29, 2015
+%% Christopher Rooney
+\nonstopmode
+\documentclass[usenatbib]{mn2e}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% This section is called the preamble, where we can specify which
+%% latex packages we required.  Most (but not of all) of the packages
+%% below should be fairly standard in most latex documents.  The
+%% exception is xspace and the new \latex command, which you probably
+%% do not need.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Bibliography style:
+\usepackage{mathptmx}           % Use the Times font.
+\usepackage{graphicx}           % Needed for including graphics.
+\usepackage{url}                % Facility for activating URLs.
+\usepackage{verbatim}           % For verbatiminput command.
+\usepackage{booktabs}
+%% Set the paper size to be letter, with a 2cm margin 
+%% all around the page.
+\usepackage{gensymb}
+
+\newcommand{\iu}{{i\mkern1mu}}
+\newcommand{\e}{{\mathrm e}}
+\usepackage{xspace}
+ 
+
+\voffset=-0.5truein
+\textheight=9.5truein
+\textwidth=6.5truein
+\voffset=-0.55in
+\hoffset=0.06in
+\textwidth=6.4in
+\textheight=9in
+%
+\def\gtwid{\mathrel{\raise.3ex\hbox{$>$\kern-.75em\lower1ex\hbox{$\sim$}}}}
+\def\ltwid{\mathrel{\raise.3ex\hbox{$<$\kern-.75em\lower1ex\hbox{$\sim$}}}}
+\def\lessim{\mathrel{\raise.3ex\hbox{$<$\kern-.75em\lower1ex\hbox{$\sim$}}}}
+\def\\{\hfil\break}
+\def\ie{{\it i.e.\ }}
+\def\eg{{\it e.g.\ }}
+\def\etal{{\it et al.\ }}
+%\newcommand{\apj}{ApJ}
+
+%Astro Stuff
+%some units
+\newcommand{\km}{\unit{km}}
+\newcommand{\kms}{\unit{km~s\mone}}
+\newcommand{\kpc}{\unit{kpc}}
+\newcommand{\mpc}{\unit{Mpc}}
+\newcommand{\hkpc}{\mamo{h\mone}\kpc}
+\newcommand{\hmpc}{\mamo{h\mone}\mpc}
+\newcommand{\parsec}{\unit{pc}}
+\newcommand{\chisq}{\mamo{\chi^2}}
+%
+\newcommand{\hr}{\mamo{^{\rm h}}}
+\newcommand{\m}{\mamo{^{\rm m}}}
+%
+\newcommand{\lb}[2]{\mamo{l = #1\arcdeg}, \mamo{b = #2\arcdeg}}
+\newcommand{\dlb}[4]{\mamo{l = #1\fdg#2}, \mamo{b = #3\fdg#4}}
+\newcommand{\lbapr}[2]{\mamo{l \approx #1\arcdeg}, \mamo{b \approx #2\arcdeg}}
+%
+\newcommand{\rightascen}{\mbox{R.A.}}
+\newcommand{\declin}{\mbox{Dec.}}
+\newcommand{\radec}[2]{\mamo{\alpha = #1^{\rm h}}, \mamo{\delta = #2\arcdeg}}
+\newcommand{\dradec}[4]{\mamo{\alpha = #1\fh#2}, \mamo{\delta = #2\fdg#4}}
+%
+\newcommand{\xyz}[3]{($#1$, $#2$, $#3$)}
+%
+% useful abbreviations
+\newcommand{\wrt}{with respect to}
+\newcommand{\ebv}{\mbox{$E(B-V)$}}
+\renewcommand{\lg}{\mamo{\sb{LG}}}
+\newcommand{\cmb}{\mamo{\sb{CMB}}}
+\newcommand{\rhat}{\mamo{\hat{\bfv{r}}}}
+%
+\newcommand{\secref}[1]{Section~\ref{sec:#1}}
+\newcommand{\brref}[1]{(equation~\ref{eq:#1})}
+%\newcommand{\eqref}[1]{equation~(\ref{eq:#1})}
+\newcommand{\Eqref}[1]{Equation~(\ref{eq:#1})}
+\newcommand{\figref}[1]{Fig.~\ref{fig:#1}}
+\newcommand{\tabref}[1]{Table~\ref{tab:#1}}
+
+\newcommand{\bt}{\mamo{B/T}}
+\newcommand{\br}{\mamo{B-R}}
+\newcommand{\del}{\mbox{d}}
+
+\newcommand{\aap}{A\&A}
+\newcommand{\apj}{ApJ}
+\newcommand{\apjl}{ApJL}
+\newcommand{\apjs}{ApJ Supp}
+\newcommand{\aj}{AJ}
+\newcommand{\mnras}{MNRAS}
+\newcommand{\pasp}{PASP}
+\newcommand{\prd}{Phys Rev D}
+\begin{document}
+
+\author{Christopher Rooney}
+\date{\today}
+\title{Peculiar Velocity Estimators}
+\maketitle
+
+\begin{abstract}
+
+\end{abstract}
+
+\section{Introduction}
+
+
+\section{Methodology}
+The Millennium Simulation was used as a main source for the data. Galaxies were extracted from the !!! database of the original Millennium run, and reorganized into mock surveys. To make a mock survey, a selection function was fitted using a chi-squared fit to the radial galaxy distribution of the real CosmicFlows-2 and COMPOSITE surveys.
+
+The velocity correlations are computed as described in G\'orski et. al. (1989). We reproduce his equations here for reference. Sums are performed over pairs of galaxies at approximately the same distances, in bins. The quantities $u_1$ and $u_2$ are the peculiar velocities of the two galaxies in a given pair. Because this statistic only depends on radial velocities, it is measurable, unlike the original velocity correlation tensor, which requires three-component measurements of particle velocities. The known distances to the galaxies from the survey centerpoint allow the construction of a triangle with points at the survey origin and each galaxy. This fact is used to calculate $\cos\theta_1$, $\cos\theta_2$, and $\cos\theta_{12}$ efficiently. The quantity $\cos\theta_1 = \hat{r}\cdot\hat{r}_1$ is the angle at the vertex of galaxy 1, $\cos\theta_2$ is the angle at galaxy 2, and $\cos\theta_{12}$ is the angle between the two galaxies in the sky as seen from the survey origin. 
+\begin{equation}
+\psi_1 \equiv \frac{\Sigma_{pairs(r)}u_1u_2\cos\theta_{12}}{\Sigma_{pairs(r)}\cos^2\theta_{12}}
+\end{equation}
+\begin{equation}
+\psi_2 \equiv \frac{\Sigma_{pairs(r)}u_1u_2\cos\theta_{1}\cos\theta_2}{\Sigma_{pairs(r)}\cos\theta_{12}\cos\theta_1\cos\theta_2}
+\end{equation}
+In our computations, the individual values of the sum terms are computed out to a maximum pair distance and stored, then the sums are computed over these values several times for different bin widths. The results of the sums are then divided, resulting in the final $\psi_1$ and $\psi_2$ correlations.
+\section{Data}
+
+\section{Discussion and Conclusions}
+
+\section{Future work} 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Finally we specify the format required for our references and the
+%% name of the bibtex file where our references should be taken from.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\bibliographystyle{mn2e}
+\bibliography{paper}
+\end{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% The end.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

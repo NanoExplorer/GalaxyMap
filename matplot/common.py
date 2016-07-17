@@ -257,6 +257,34 @@ def _loadMillenniumRawLines(filename):
                     csvData.append(line)
     return csvData
 
+def loadRawMillHybrid(filename,offset):
+    """
+    Loads the raw CSV lines from a CSV file and modifies them with offset data for periodic bounding
+    WARNING: Assumes 500x500x500 box
+    """
+    csvData = []
+    with open(filename, "r") as boxfile:
+        for line in boxfile:
+            if line[0]!="#":#comment lines need to be ignored
+                row = line.split(',')
+                valid = True
+                newrow = []
+                for i,cell in enumerate(row[0:3]):
+                    try:
+                        newrow.append(float(cell) + 500*offset[i])
+                    except ValueError:
+                        valid = False#sometimes the CSV file doesn't contain a number.
+                                     #In that case, just skip that row.
+                
+                newrow = newrow + row[3:]
+                strrow = ""
+                for cell in newrow:
+                    strrow = strrow + str(cell) + ','
+                strrow = strrow.strip(',')
+                if valid:
+                    csvData.append(strrow)
+    return csvData
+
 def _loadMillenniumVelocityData(filename):
     csvData = []
     with open(filename, "r") as boxfile:
