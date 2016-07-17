@@ -27,6 +27,31 @@ import os
 
 TEMP_DIRECTORY = "/data/c156r133/tmp/"
 NUM_PROCESSES=12
+"""
+Traceback (most recent call last):
+  File "velocity_correlation.py", line 963, in <module>
+    main(arrrghs)
+  File "velocity_correlation.py", line 99, in main
+    itertools.repeat(maxd_master))
+  File "velocity_correlation.py", line 411, in standBackStats_perfectBackground
+    std = np.std(allData,axis=0)
+  File "/home/christopher/.Envs/new-matplot/lib/python3.4/site-packages/numpy/core/fromnumeric.py", line 2985, in std
+    keepdims=keepdims)
+  File "/home/christopher/.Envs/new-matplot/lib/python3.4/site-packages/numpy/core/_methods.py", line 124, in _std
+    keepdims=keepdims)
+  File "/home/christopher/.Envs/new-matplot/lib/python3.4/site-packages/numpy/core/_methods.py", line 77, in _var
+    arr = asanyarray(a)
+  File "/home/christopher/.Envs/new-matplot/lib/python3.4/site-packages/numpy/core/numeric.py", line 525, in asanyarray
+    return array(a, dtype, copy=False, order=order, subok=True)
+ValueError: could not broadcast input array from shape (7,50) into shape (7)
+"""
+
+
+
+#PERFECT_LOCATION = "output/PERFECT_DONTTOUCH/COMPOSITE-MOCK-bin-{:.0f}-{}.npy"
+USE_TMP = True
+#This saves KD tree data. Turn it to True when doing redhsift surveys or when doing the same survey multiple times.
+
 print("Warning: Non-general perfect location")
 def main(args):
     np.seterr(divide='ignore',invalid='ignore')
@@ -45,7 +70,7 @@ def main(args):
     infile =       settings['input_file']
     unitslist =    settings['binunits']
     maxd_master =  settings['max_distance']
-    pool = Pool(processes=2)
+    pool = Pool(processes=NUM_PROCESSES)
     if settings['many_squared']:
         distance_args_master = list(zip(dr,min_r,numpoints))
         file_schemes  = list(zip(infile,orig_outfile,settings['readable_name']))
@@ -181,6 +206,7 @@ def compute(data,maxd,units):
 
 #@profile 
 def _kd_query(positions,maxd,units):
+    
     """Returns a np array of pairs of galaxies."""
     #This is still the best function, despite all of my scheming.
     tmpfilename = TEMP_DIRECTORY + 'rawkd_{}_{}.npy'.format(maxd,myNpHash(positions))
@@ -188,7 +214,7 @@ def _kd_query(positions,maxd,units):
     #THERE WERE. Thanks for just leaving a warning instead of fixing it :P
     #The warning still stands, but it's a bit better now.
     
-    if units == "km/s" and os.path.exists(tmpfilename):
+    if units == "km/s" and os.path.exists(tmpfilename) and USE_TMP:
         print("!",end="",flush=True)
         return np.load(tmpfilename)
     else:
@@ -202,7 +228,7 @@ def _kd_query(positions,maxd,units):
         pairarray = np.array(listOfPairs) #The np array creation takes a LOT of time. I am still wondering why.
         del pairs, removePairs, kd #This also takes forever.
         gc.collect()
-        if units == "km/s":
+        if units == "km/s" and USE_TMP:
             np.save(tmpfilename,pairarray)
             #The caching scheme only helps if we have the same set of distance data over and over again.
             #That is the case with redshift-binned data, but not anything else.
@@ -358,13 +384,13 @@ def saveOutput(allData,writeOut):
     std = np.std(allData,axis=0)
     avg = np.mean(allData,axis=0)
 
-    np.save(writeOut,np.array([xs,avg[0],std[0],
-                               avg[1],std[1],
-                               avg[2],std[2],
-                               avg[3],std[3],
-                               avg[4],std[4],
-                               avg[5],std[5]]))
-
+    np.save(writeOut+'nice',np.array([xs,avg[0],std[0],
+                                      avg[1],std[1],
+                                      avg[2],std[2],
+                                      avg[3],std[3],
+                                      avg[4],std[4],
+                                      avg[5],std[5]]))
+    np.save(writeOut+'all',allData)
         
 
 

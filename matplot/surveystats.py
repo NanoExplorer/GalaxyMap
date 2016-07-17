@@ -1,7 +1,8 @@
+import matplotlib
+import matplotlib.pyplot as plt
 import common
 import numpy as np
 import scipy.optimize as optimize
-import pylab
 import matplotlib.backends.backend_pdf as pdfback
 
 def statsrun(args):
@@ -38,7 +39,7 @@ def genBins(binsize,chop):
     #Always starts at zero
     
 def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
-    fig = pylab.figure()
+    fig = plt.figure()
     galaxies = common.loadData(filename, dataType = "CF2")
     distances = [galaxy.d for galaxy in galaxies]
     #get a list of all the distances to galaxies. This will let us send it directly to the histogram 
@@ -46,10 +47,10 @@ def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
     bins_orig = genBins(binsize,chop)
 
     #Make a histogram using pylab histogram function.
-    n, bins, patches = pylab.hist(distances, bins_orig, histtype="stepfilled",label="Galaxy Distribution,\n binsize={:.2f}Mpc".format(binsize))
+    n, bins, patches = plt.hist(distances, bins_orig, histtype="stepfilled",label="Galaxy Distribution,\n binsize={:.2f}Mpc".format(binsize))
 
     #Change visual properties of the histogram
-    pylab.setp(patches, 'facecolor','g','alpha',0.75)
+    plt.setp(patches, 'facecolor','g','alpha',0.75)
     robot = chi_sq_solver(bins,n,selection_function)
     if modelOverride is None:
         #If we don't have an existing model to use, we find a best fit and plot it
@@ -58,7 +59,7 @@ def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
         #Plot the best fit
         domain = np.arange(0,chop,1)
         model = [selection_function(r,*(robot.result.x)) for r in domain]
-        pylab.plot(domain,model, 'k--',linewidth=1.5,label="Model fit: $A = {:.3f}$\n$r_0 = {:.3f}$\n$n_1 = {:.3f}$\n$n_2={:.3f}$\n$\chi^2={chisq:.3f}$".format(*(robot.result.x),chisq = robot.result.fun))
+        plt.plot(domain,model, 'k--',linewidth=1.5,label="Model fit: $A = {:.3f}$\n$r_0 = {:.3f}$\n$n_1 = {:.3f}$\n$n_2={:.3f}$\n$\chi^2={chisq:.3f}$".format(*(robot.result.x),chisq = robot.result.fun))
         chisq = robot.result.fun
     else:
         #Plot the model given in the settings function instead of calculating a new one
@@ -67,28 +68,28 @@ def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
         chisq = robot.chi_sq(params)
         domain = np.arange(0,chop,1)
         model = [selection_function(r,*params) for r in domain]
-        pylab.plot(domain,model, 'k--',linewidth=1.5,label="Model fit: $A = {:.3f}$\n$r_0 = {:.3f}$\n$n_1 = {:.3f}$\n$n_2={:.3f}$\n$\chi^2={chisq:.3f}$".format(*params,chisq = chisq))
+        plt.plot(domain,model, 'k--',linewidth=1.5,label="Model fit: $A = {:.3f}$\n$r_0 = {:.3f}$\n$n_1 = {:.3f}$\n$n_2={:.3f}$\n$\chi^2={chisq:.3f}$".format(*params,chisq = chisq))
         
    
     
 
     #Add axis labels
-    pylab.ylabel("Galaxy count")
-    pylab.xlabel("Distance, Mpc/h")
-    pylab.title("Distribution of Galaxy Distance")
-    pylab.legend()
-    pylab.axis([0,chop,0,1000])
-    fig2 = pylab.figure()
+    plt.ylabel("Galaxy count")
+    plt.xlabel("Distance, Mpc/h")
+    plt.title("Distribution of Galaxy Distance")
+    plt.legend()
+    plt.axis([0,chop,0,1000])
+    fig2 = plt.figure()
     shellVolume = [common.shellVolCenter(robot.centerbins[i],binsize)  for i in range(len(n))]
-    pylab.title("Galaxies per Cubic Mpc")
-    pylab.xlabel("Distance, Mpc/h")
-    pylab.ylabel("Density, galaxies/(Mpc/h)^3")
+    plt.title("Galaxies per Cubic Mpc")
+    plt.xlabel("Distance, Mpc/h")
+    plt.ylabel("Density, galaxies/(Mpc/h)^3")
     density = [n[i]/shellVolume[i] for i in range(len(n))]
-    pylab.plot(robot.centerbins,density)
+    plt.plot(robot.centerbins,density)
     #Save figure
-    with pdfback.PdfPages(outputFile+str(binsize)) as pdf:
+    with pdfback.PdfPages(outputFile+str(binsize)+'.pdf') as pdf:
         pdf.savefig(fig)
-        pdf.savefig(fig2)
+        #pdf.savefig(fig2)
     if modelOverride is None:
     #Write paramaters to a file for later use.
         common.writedict(outputFile+str(binsize)+'_params.json',{'constants':{'A':params[0],
@@ -100,7 +101,7 @@ def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
                                                                          'chisq': chisq
                                                                      }
                                                              })
-    pylab.close('all')
+    plt.close('all')
 
 class chi_sq_solver:
     def __init__(self,bins,ys,function):

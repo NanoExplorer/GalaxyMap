@@ -229,6 +229,7 @@ def distanceOneBox(hugeFile,surveys,outFile):
     #Write distances to files for later use
     #Also this algorithm seems VERY fast. It also doesn't seem to get slower with more surveys!
     #Which means that it doesn't get faster with fewer surveys...
+    #Oh, let's be quick and only generate one survey... hmm, why is it going so slowly????
     
 
 def surveyBins(distanceFile,binsize,boxMaxDistance):
