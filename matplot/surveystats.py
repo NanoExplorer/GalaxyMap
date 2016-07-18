@@ -85,7 +85,7 @@ def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
     plt.xlabel("Distance, Mpc/h")
     plt.ylabel("Density, galaxies/(Mpc/h)^3")
     density = [n[i]/shellVolume[i] for i in range(len(n))]
-    plt.plot(robot.centerbins,density)
+    plt.plot(robot.centerbins,density,'o')
     #Save figure
     with pdfback.PdfPages(outputFile+str(binsize)+'.pdf') as pdf:
         pdf.savefig(fig)

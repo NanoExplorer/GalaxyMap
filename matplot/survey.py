@@ -18,7 +18,7 @@ except:
     USE_GPU=False
 
 
-NUM_PROCESSORS = 2
+NUM_PROCESSORS = 8
 
 EDGES = [np.array((x,y,z)) for x in [-1,0,1] for y in [-1,0,1] for z in [-1,0,1]]
 
@@ -426,3 +426,12 @@ def genSurveyPos(separation, boxsize, numSurveys,files):
     print("Caught {}!".format(numCatches))
     print([list(survey) for survey in surveys])
     return surveys
+
+if __name__ == "__main__":
+    arrrghs = common.parseCmdArgs([['settings'],['-g','--gpu']
+                               ],
+                                  ['Settings json file','use pyCUDA when GPU is available'
+                                  ],
+                                   [str,'bool'])
+
+    main(arrrghs)
