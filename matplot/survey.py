@@ -157,7 +157,7 @@ def selectrun(args):
     #Generate lookup-tables for 'original-number-of-galaxies' if they don't already exist
     boxMaxDistance = 350 # space.distance.euclidean([0,0,0],boxSize)
     print("Assuming chop distance of 350 Mpc/h")
-    if not os.path.exists(distFileBase+'hist.npy'):
+    if not os.path.exists(distFileBase+'hist{}.npy'.format(selectionParams["info"]["shell_thickness"])):
         print("Generating histograms...")
         start = time.time()
         
@@ -169,12 +169,12 @@ def selectrun(args):
                                                        itertools.repeat(selectionParams["info"]["shell_thickness"]),
                                                        itertools.repeat(boxMaxDistance)))
         full_histogram = sum(listOfHistograms)
-        np.save(distFileBase+'hist.npy',full_histogram)
+        np.save(distFileBase+'hist{}.npy'.format(selectionParams["info"]["shell_thickness"]),full_histogram)
         print("Generating histograms took {} seconds.".format(time.time()-start))
         #because the surveyBins function returns a numpy array, the sum function will add them all together element-wise!
     else:
         print("Found histogram!")
-        full_histogram = np.load(distFileBase+'hist.npy')
+        full_histogram = np.load(distFileBase+'hist{}.npy'.format(selectionParams["info"]["shell_thickness"]))
         
     print("Generating surveys...")
     start = time.time()
