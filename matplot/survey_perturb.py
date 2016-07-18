@@ -21,7 +21,6 @@ def unmodulusify(modulus, args):
     elif args == "ln":
         return np.exp(modulus)
 
-
 def perturb(infile,outfile,err,num,ptype,est,mod,lots):
     """Infile and outfile are filenames. Outfile always has a {} in it, and infile should have one too if you're
     using the 'lots' option.
@@ -42,6 +41,7 @@ def perturb(infile,outfile,err,num,ptype,est,mod,lots):
         infiles = [infile.format(x) for x in range(lots)]   
     else:
         infiles = [infile]
+    surveys = []
     for in_i,infile in enumerate(infiles):
         num_acks = 0
         second_order_acks = 0
@@ -87,35 +87,40 @@ def perturb(infile,outfile,err,num,ptype,est,mod,lots):
                 except FloatingPointError:
                     num_errs += 1
                     continue
-
-            perturbed_vs.append((velocities,galaxy))
-            delta_vs.append(dv)
+            perturbed_vs.append((velocities,dv,skewed_distance,galaxy))
 
         print("{} out of {} galaxies ({:.2f}) had true velocity NOT much less than redshift,".format(num_acks,len(galaxies),num_acks/len(galaxies)))
         print("i.e. the condition on our estimator that v << cz was not satisfied.")
         print("This happened to the random data {} times out of {}.".format(second_order_acks,num*len(galaxies)))
         print("Also, {} FloatingPoint errors happened, even after taking out the close-by galaxies.".format(num_errs))
         print()
-        for n in range(num):
-            outCF2String = ""
-            for i,pv in enumerate(perturbed_vs):
-                galaxy = pv[1]
-                cf2row = [galaxy.cz,
-                          (galaxy.cz - pv[0][n])/100,
-                          pv[0][n],
-                          delta_vs[i],
-                          galaxy.lon,
-                          galaxy.lat]
-                outCF2String = outCF2String + '{}  {}  {}  {}  {}  {}\n'.format(*cf2row)
-          
-            with open(outfile.format(in_i*num+n), 'w') as cf2outfile:
-                cf2outfile.write(outCF2String)
-
-        
+        survey = []
+        for v,dv,d,galaxy in perturbed_vs:
+            np1 = np.array((galaxy.normx,
+                            galaxy.normy,
+                            galaxy.normz,
+                            galaxy.redx,
+                            galaxy.redy,
+                            galaxy.redz,
+                            dv
+                        ))
+            
+            survey.append(np.concatenate((np1,d,v)))
+        surveys.append(survey)
+    maxlength = max([len(survey) for survey in surveys])
+    surveylength = len(surveys[0][0])
+    for survey in surveys:
+        for x in range(len(survey),maxlength):
+            filler = np.empty(surveylength)
+            filler[:] = np.NAN
+            survey.append(filler)
+    surveysnp = np.array(surveys)
+    print(surveysnp.shape)
+    np.save(outfile,surveysnp)
 if __name__ == "__main__":
     parser=argparse.ArgumentParser()
     parser.add_argument('cf2file',help='CF2 survey file to perturb',type=str)
-    parser.add_argument( 'outfile' ,help= 'Output file spec. Must contain exactly one "{}" for use in numbering.' ,type=str)
+    parser.add_argument( 'outfile' ,help= 'Output file spec.' ,type=str)
     parser.add_argument('frac_error',help='Fractional error, determines the standard deviation of the normal distribution used in the distance modulus',type=float)
     parser.add_argument('num',help="Numper of perturbed survey files to generate",type=int)
     parser.add_argument('-n','--numin',type=int,help='Specify the number of input files. If using this option, include one "{}" in the cf2file for the index')

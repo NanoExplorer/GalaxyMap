@@ -3,15 +3,14 @@
 #STERN WARNING: Running this code on python 2 is not recommended, for many reasons. First, Garbage Collection
 #seems greatly improved in python 3, resulting in *much* reduced memory usage. Second, everything runs much faster
 #under python 3 for whatever reason.
-import matplotlib
+#import matplotlib
 import common
 from scipy.spatial import cKDTree
 import numpy as np
 from multiprocessing import Pool
 import itertools
-import matplotlib.pyplot as plt
-import matplotlib.backends.backend_pdf as pdfback
-import os
+#import matplotlib.pyplot as plt
+#import matplotlib.backends.backend_pdf as pdfback
 import hashlib
 #import pdb
 from numpy.core.umath_tests import inner1d #Note: this function has no documentation and could easily be deprecated.
@@ -22,9 +21,12 @@ from numpy.core.umath_tests import inner1d #Note: this function has no documenta
 #     return (a*b).sum(axis=1)
 import gc
 import time
-import smtplib
+import os
+#import smtplib
 #import matplotlib.ticker as mtick
 
+TEMP_DIRECTORY = "/data/c156r133/tmp/"
+NUM_PROCESSES=12
 """
 Traceback (most recent call last):
   File "velocity_correlation.py", line 963, in <module>
@@ -45,9 +47,11 @@ ValueError: could not broadcast input array from shape (7,50) into shape (7)
 """
 
 
-TEMP_DIRECTORY = "/media/christopher/2TB/Christopher/code/Physics/GalaxyMap/tmp/"
-PERFECT_LOCATION = "output/PERFECT_DONTTOUCH/COMPOSITE-MOCK-bin-{:.0f}-{}.npy"
-USE_TMP = False
+
+#PERFECT_LOCATION = "output/PERFECT_DONTTOUCH/COMPOSITE-MOCK-bin-{:.0f}-{}.npy"
+USE_TMP = True
+#This saves KD tree data. Turn it to True when doing redhsift surveys or when doing the same survey multiple times.
+
 print("Warning: Non-general perfect location")
 def main(args):
     np.seterr(divide='ignore',invalid='ignore')
@@ -55,6 +59,9 @@ def main(args):
     """
     #Get setup information from the settings files
     settings =   common.getdict(args.settings)
+    if settings['num_files'] != 10000 and settings['use_npy']:
+        print("Sorry! We can only handle 100x100 surveys. For other uses, use the turbospeed branch instead")
+        exit()
     numpoints =    settings['numpoints']
     dr =           settings['dr']
     min_r =        settings['min_r']
@@ -63,7 +70,7 @@ def main(args):
     infile =       settings['input_file']
     unitslist =    settings['binunits']
     maxd_master =  settings['max_distance']
-    pool = Pool(processes=2)
+    numpy =        settings['use_npy']
     if settings['many_squared']:
         distance_args_master = list(zip(dr,min_r,numpoints))
         file_schemes  = list(zip(infile,orig_outfile,settings['readable_name']))
@@ -77,8 +84,15 @@ def main(args):
         xs_master,intervals_master = common.genBins(min_r,numpoints,dr,step_type)
         xs_master = [xs_master]
         intervals_master = [intervals_master]
-        
-    infileindices = [x + settings['offset'] for x in range(settings['num_files'])]
+    if numpy:
+        print(args.override)
+        indices = args.override.split(':')
+        a = int(indices[0])
+        b = int(indices[1])
+        file_schemes = file_schemes[a:b]
+        print(file_schemes)
+    else:    
+        infileindices = [x + settings['offset'] for x in range(settings['num_files'])]
     for rawInFile, outfile, readName in file_schemes:
         for units in unitslist:
             if units == 'km/s':
@@ -93,19 +107,49 @@ def main(args):
                 distance_args = distance_args_master
                 maxd = maxd_master
                 
-            if settings['many']:
+            if settings['many'] and not numpy:
                 #If there are lots of files, set them up accordingly.
                 inFileList = [rawInFile.format(x) for x in infileindices]
-                
+                galaxiess = [common.loadData(f) for f in inFileList]                
+                d = [np.array([(g.normx,
+                                g.normy,
+                                g.normz,
+                                g.redx,
+                                g.redy,
+                                g.redz,
+                                g.dv,
+                                g.d,
+                                g.v) for g in galaxies])]) for galaxies in galaxiess]
+                i = 
+            elif not numpy:
+                galaxies = common.loadData(rawInFile,dataType='CF2')
+                d = [np.array([(g.normx,
+                                g.normy,
+                                g.normz,
+                                g.redx,
+                                g.redy,
+                                g.redz,
+                                g.dv,
+                                g.d,
+                                g.v) for g in galaxies])]
+                i = ['nothing']
             else:
-                inFileList = [rawInFile]
-                
-            with Pool(processes=2) as pool:
-                histogramData = list(pool.starmap(turboRun,zip(inFileList,
-                                                                   itertools.repeat(maxd),
-                                                                   itertools.repeat(units),
-                                                                   itertools.repeat(xs),
-                                                                   itertools.repeat(intervals))))
+                data = np.load(rawInFile)
+                #d = [ data[x/100][np.invert(np.isnan(data[x/100][:,0]))] for x in range(10000)] BAD. REALLY BAD.
+                nansremoved = [ data[x][np.invert(np.isnan(data[x][:,0]))] for x in range(100)]
+                del data
+                d = [nansremoved[x//100] for x in range(10000)]
+                i = [ x%100  for x in range(10000) ]
+                print(d[542].shape)
+
+
+            with Pool(processes=NUM_PROCESSES) as pool:
+                histogramData = list(pool.starmap(turboRun,zip(d,i,np,
+                                                               itertools.repeat(maxd),
+                                                               itertools.repeat(units),
+                                                               itertools.repeat(xs),
+                                                               itertools.repeat(intervals)
+                                                           )))
                 """
                 Each turbo run returns a list of histograms [ 5-length histogram, 10-length histogram, 20-length etc]
                 so histogramData is a list of turbo runs, which means data is a jagged array
@@ -123,19 +167,13 @@ def main(args):
                 """
             for scheme_index in range(len(intervals)):
                 hist_for_scheme = np.array([turbo_data[scheme_index] for turbo_data in histogramData])
-                standBackStats_allonepage(hist_for_scheme,
-                                                 readName,
-                                                 units,
-                                                 outfile.format('',distance_args[scheme_index][0],units.replace('/','')),
-                                                 #PERFECT_LOCATION,
-                                                 maxd
-                                             )
+                saveOutput(hist_for_scheme,outfile.format('',distance_args[scheme_index][0],units.replace('/','')))
             print(" Done!")
-    
+
 def formatHash(string,*args):
     return hashlib.md5(string.format(*args).encode('utf-8')).hexdigest()
 
-def turboRun(infile,maxd,units,xs,intervals):
+def turboRun(data,index,np,maxd,units,xs,intervals):
     """Returns a list of histograms, where a histogram is defined as a numpy array
     [[psi1 values] [psi2 values]
      [a values]    [b values]
@@ -150,7 +188,13 @@ def turboRun(infile,maxd,units,xs,intervals):
      histogram(xs[n],intervals[n])
     ]
     """
-    correlations=compute(infile,maxd,units)
+    if np:
+        d = np.concatenate((data[:,0:7],data[:,7+index:207:100]),axis=1)
+        #mask = np.invert(np.isnan(d[:,0]))
+    else:
+        d = data
+    correlations=compute(d,maxd,units)
+    del d
     return list(itertools.starmap(singleHistogram,zip(itertools.repeat(correlations),
                                                 xs,
                                                 intervals
@@ -158,7 +202,7 @@ def turboRun(infile,maxd,units,xs,intervals):
                                  )
                )
     
-def compute(infile,maxd,units):
+def compute(data,maxd,units):
     """Formerly called 'singlePlot,' this function computes all pair-pair galaxy information,
     including figuring out the list of pairs.
     Input - cf2 file to read from.
@@ -176,23 +220,20 @@ def compute(infile,maxd,units):
     Maybe index all hashes into a helpful file in the tmp directory?
     """
     #Load the survey
-    galaxies = common.loadData(infile, dataType = 'CF2')
 
     #Make an array of just the x,y,z coordinate and radial component of peculiar velocity (v)
     if units == 'Mpc/h':
-        galaxyXYZV = np.array([(a.x,a.y,a.z,a.v,a.dv) for a in galaxies])
+        galaxyXYZV = np.concatenate((data[:,0:3]*data[:,7][:,None],data[:,8][:,None],data[:,6][:,None]),axis=1)
+        #0-3 is direction vector. 7 is distance magnitude.
     elif units == 'km/s':
-        galaxyXYZV = np.array([a.getRedshiftXYZ() + (a.v,a.dv) for a in galaxies])
+        galaxyXYZV = np.concatenate((data[:,3:6],data[:,8][:,None],data[:,6][:,None]),axis=1)
         #You can concatenate tuples. getRedshiftXYZ returnes a tuple, and I just append a.v (and dv) to it.
     else:
         print("I TOLD YOU, ONLY USE km/s or Mpc/h as your units!!!")
         print("And you should definitely, NEVER EVER, use '{}'!!".format(units))
 
-    try:
-        data = correlation(galaxyXYZV,maxd,units)
-    except RuntimeError:
-        print('Runtime Error encountered at {}.'.format(infile))
-        raise
+    data = correlation(galaxyXYZV,maxd,units)
+
     return data
 
 #@profile 
@@ -238,6 +279,7 @@ def correlation(galaxies,maxd,units,usewt=False):
     lGalaxies = galaxies[galaxyPairs[:,0]]
     rGalaxies = galaxies[galaxyPairs[:,1]]
     del galaxyPairs
+    del galaxies
     
     #"Galaxy 1 VelocitieS"
     g1vs  = lGalaxies[:,3]
@@ -377,630 +419,40 @@ def bNumerator(costheta1,costheta2):
 def bDenominator(costheta1,costheta2,cosdTheta):
     return costheta1*costheta2*cosdTheta
 
-#@profile
-def stats(writeOut,readIn,units):
-    """Make plots of the data output by the main function
-    """
-    Y_SCALE_FACTOR = 10**4
-    #Get settings
-    data = np.load(readIn)
-    xs = data[6]
-    a = data[2]
-    b = data[3]
-    psione = data[0]/Y_SCALE_FACTOR
-    psitwo = data[1]/Y_SCALE_FACTOR
-    psipar = data[4]/Y_SCALE_FACTOR
-    psiprp = data[5]/Y_SCALE_FACTOR
-
-    fig = plt.figure()
-    plt.plot(xs,a,'-',label='$\cal A$ (Borgani)')
-    plt.plot(xs,b,'k--',label='$\cal B$')
-    plt.title('Moment of the selection function')
-    plt.ylabel('Value (unitless)')
-    plt.xlabel('Distance, {}'.format(units))
-    plt.legend(loc=2)
-    #plt.yscale('log')
-    #plt.xscale('log')
-    #plt.axis((0,31,.62,.815))
 
 
-    fig2 = plt.figure()
-    plt.plot(xs,psione,'-',label='$\psi_1$')
-    plt.plot(xs,psitwo,'k--',label="$\psi_2$")
-    plt.title('Velocity correlation function')
-    plt.xlabel('Distance, {}'.format(units))
-    plt.ylabel('Correlation, $10^4 (km/s)^2$')
-    #plt.axis((0,31,0,32))
-    plt.legend()
-
-    fig3 = plt.figure()
-    plt.plot(xs,psipar,'-',label='$\psi_{\parallel}$')
-    plt.plot(xs,psiprp,'-',label='$\psi_{\perp}$')
-    plt.title('Velocity correlation')
-    plt.xlabel('Distance, {}'.format(units))
-    plt.ylabel('Correlation, $10^4 (km/s)^2$')
-    plt.legend()
-
-    with pdfback.PdfPages(writeOut) as pdf:
-        pdf.savefig(fig3)
-        pdf.savefig(fig2)
-        pdf.savefig(fig)
-    plt.close(fig)
-    plt.close(fig2)
-    plt.close(fig3)
-    np.save(writeOut+".npy",data)
-
-def standBackStats(a,b,c,d,maxd=100):
-    standBackStats_toomanyfiles(a,b,c,d,maxd=maxd,savenpy=True)
-    #standBackStats_allonepage(a,b,c,d+'.pdf',maxd=maxd)
-    #Set here what you want the stats routine to do. Right now I'm prepping a minipaper, so I need lots of
-    #single plots that can fit on page instead of lots of plots glued together.
-
-def standBackStats_perfectBackground(allData,name,units,writeOut,perfect_location,maxd,savenpy=True):
-    #allData = np.array(list(map(np.load, inFileList)))
-    #One inFile contains the following: [p1, p2, a, b, psiparallel, psiperpindicular]
-    xs = allData[0][6]
-    perfect = np.load(perfect_location.format(xs[1]-xs[0],units.replace('/','')))
-    std = np.std(allData,axis=0)
-    avg = np.mean(allData,axis=0)
-    low68 = perfect[range(3,37,6)] # I don't know why I saved them in this order, but at least it's not too hard
-    hi68  = perfect[range(4,37,6)] # to extract.
-    low95 = perfect[range(5,37,6)]
-    hi95  = perfect[range(6,37,6)]
-
-
-    plotName = name
-    """
-    matplotlib.rc('font',size=10)
-    
-    f, ((ax1,ax2),(ax3,ax4),(ax5,ax6)) = plt.subplots(3,2,sharex='col',sharey='row',figsize=(8.5,11))
-    f.suptitle('Statistics of the {} Survey Mocks'.format(plotName))
-    ax1.errorbar(xs,
-                 avg[0]/10**4,
-                 yerr=std[0]/10**4,
-                 fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5
-    )
-    ax1.fill_between(xs,low68[0]/10**4,hi68[0]/10**4,facecolor='black',alpha=0.25)
-    ax1.fill_between(xs,low95[0]/10**4,hi95[0]/10**4,facecolor='black',alpha=0.25)
-    ax1.set_title('$\psi_1$ Correlation')
-    #ax1.set_xlabel('Distance, Mpc/h')
-    ax1.set_ylabel('Correlation, $10^4 (km/s)^2$')
-    #ax1.axis(correlationScale)
-    
-    ax2.errorbar(xs, avg[1]/10**4, yerr=std[1]/10**4, fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5)
-    ax2.set_title('$\psi_2$ Correlation')
-    ax2.fill_between(xs,low68[1]/10**4,hi68[1]/10**4,facecolor='black',alpha=0.25)
-    ax2.fill_between(xs,low95[1]/10**4,hi95[1]/10**4,facecolor='black',alpha=0.25)
-    #plt.xlabel('Distance, Mpc/h')
-    #plt.ylabel('Correlation, $(km/s)^2$')
-    #plt.axis(correlationScale)
-    
-    ax3.errorbar(xs, avg[2], yerr=std[2], fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5)
-    ax3.set_title('Moment of the Selection Function, $\cal A$')
-    ax3.fill_between(xs,low68[2],hi68[2],facecolor='black',alpha=0.25)
-    ax3.fill_between(xs,low95[2],hi95[2],facecolor='black',alpha=0.25)
-    #plt.xlabel('Distance, Mpc/h')
-    ax3.set_ylabel('Value (unitless)')
-    #plt.axis(momentScale)
-    
-    ax4.errorbar(xs, avg[3], yerr=std[3], fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5)
-    ax4.set_title('Moment of the Selection Function, $\cal B$')
-    ax4.fill_between(xs,low68[3],hi68[3],facecolor='black',alpha=0.25)
-    ax4.fill_between(xs,low95[3],hi95[3],facecolor='black',alpha=0.25)
-    #plt.xlabel('Distance, Mpc/h')
-    #plt.ylabel('Value (unitless)')
-    #plt.axis(momentScale)
-
-    ax5.errorbar(xs, avg[4]/10**4, yerr=std[4]/10**4, fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5)
-    ax5.fill_between(xs,low68[4]/10**4,hi68[4]/10**4,facecolor='black',alpha=0.25)
-    ax5.fill_between(xs,low95[4]/10**4,hi95[4]/10**4,facecolor='black',alpha=0.25)
-    ax5.set_title('$\Psi_{{\parallel}}$ Correlation')
-    ax5.set_xlabel('Distance, {}'.format(units))
-    ax5.set_ylabel('Correlation, $10^4 (km/s)^2$')
-    #plt.axis(correlationScale)
-
-    ax6.errorbar(xs,avg[5]/10**4, yerr=std[5]/10**4, fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5)
-    ax6.fill_between(xs,low68[5]/10**4,hi68[5]/10**4,facecolor='black',alpha=0.25)
-    ax6.fill_between(xs,low95[5]/10**4,hi95[5]/10**4,facecolor='black',alpha=0.25)
-    ax6.set_title('$\Psi_{{\perp}}$ Correlation')
-    ax6.set_xlabel('Distance, {}'.format(units))
-    #plt.ylabel('Correlation, $(km/s)^2$')
-    #ax6.axis(correlationScale)
-
-    if units == 'km/s':
-        ax5.set_xbound(0,maxd*100)
-        ax6.set_xbound(0,maxd*100)
-    else:
-        ax5.set_xbound(0,maxd)
-        ax6.set_xbound(0,maxd)
-    
-    with pdfback.PdfPages(writeOut) as pdf:
-        pdf.savefig(f)
-    plt.close(f)
-    """
-    np.save(writeOut,np.array([xs,avg[0],std[0],low68[0],hi68[0],low95[0],hi95[0],
-                               avg[1],std[1],low68[1],hi68[1],low95[1],hi95[1],
-                               avg[2],std[2],low68[2],hi68[2],low95[2],hi95[2],
-                               avg[3],std[3],low68[3],hi68[3],low95[3],hi95[3],
-                               avg[4],std[4],low68[4],hi68[4],low95[4],hi95[4],
-                               avg[5],std[5],low68[5],hi68[5],low95[5],hi95[5]]))
-
-        
-
-        
-def standBackStats_perfectBackground_old(inFileList,name,units,writeOut,perfect_location,savenpy=False,maxd=100):
-    
-    theMap = map(np.load, inFileList)
-    theList = list(theMap)
-    allData = np.array(theList)
-    #allData = np.array(list(map(np.load, inFileList)))
-    #One inFile contains the following: [p1, p2, a, b, psiparallel, psiperpindicular]
-    xs = allData[0][6]
-    perfect = np.load(perfect_location.format(xs[1]-xs[0],units.replace('/','')))
-    std = np.std(allData,axis=0)
-    avg = np.mean(allData,axis=0)
-    low68 = perfect[range(3,37,6)] # I don't know why I saved them in this order, but at least it's not too hard
-    hi68  = perfect[range(4,37,6)] # to extract.
-    low95 = perfect[range(5,37,6)]
-    hi95  = perfect[range(6,37,6)]
-
-     
-
-    # if units == 'km/s':
-    #     correlationScale = (0,5000,-1000,5000)
-    # else:
-    #     correlationScale = (0,50,-1000,5000)
-
-    #momentScale = (0,30,0.25,1.1)
-    plotName = name
-
-    matplotlib.rc('font',size=10)
-    
-    fig1 = plt.figure()
-    
-    plt.title('$\psi_1$, {} Survey Mock'.format(plotName))
-    plt.errorbar(xs,
-                 avg[0],
-                 yerr=std[0],
-                 fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5
-    )
-    #print(xs)
-    #print(low68[0])
-    
-    plt.fill_between(xs,low68[0][0:50],hi68[0][0:50],facecolor='black',alpha=0.25)
-    plt.fill_between(xs,low95[0][0:50],hi95[0][0:50],facecolor='black',alpha=0.25)
-    
-    plt.xlabel('Distance, {}'.format(units))
-    plt.ylabel('Correlation, (km/s)^2$')
-    #plt.axis(correlationScale)
-    if units == 'km/s':
-        plt.xlim(0,5000)
-    else:
-        plt.xlim(0,50)
-    #ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
-
-    fig2 = plt.figure()
-    plt.errorbar(xs, avg[1], yerr=std[1], fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5)
-    plt.title('$\psi_2$, {} Survey Mock'.format(plotName))
-    plt.fill_between(xs,low68[1][0:50],hi68[1],facecolor='black',alpha=0.25)
-    plt.fill_between(xs,low95[1][0:50],hi95[1],facecolor='black',alpha=0.25)
-    plt.xlabel('Distance, Mpc/h')
-    plt.ylabel('Correlation, $(km/s)^2$')
-    #ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
-    #plt.axis(correlationScale)
-    if units == 'km/s':
-        plt.xlim(0,5000)
-    else:
-        plt.xlim(0,50)
-
-    with pdfback.PdfPages(writeOut+'-1.pdf') as pdf:
-        pdf.savefig(fig1)
-
-    with pdfback.PdfPages(writeOut+'-2.pdf') as pdf:
-        pdf.savefig(fig2)
-        
-    plt.close(fig1)
-    plt.close(fig2)
-    if savenpy:
-        np.save(writeOut,np.array([xs,avg[0],std[0],low68[0],hi68[0],low95[0],hi95[0],
-                                   avg[1],std[1],low68[1],hi68[1],low95[1],hi95[1],
-                                   avg[2],std[2],low68[2],hi68[2],low95[2],hi95[2],
-                                   avg[3],std[3],low68[3],hi68[3],low95[3],hi95[3],
-                                   avg[4],std[4],low68[4],hi68[4],low95[4],hi95[4],
-                                   avg[5],std[5],low68[5],hi68[5],low95[5],hi95[5]]))
-    
-def standBackStats_toomanyfiles(inFileList,name,units,writeOut,maxd=100,savenpy=False):
-    """Do statistics over many input files, for example the three groups of 100 surveys. Average them, plot w/errorbars."""
-    assert(len(inFileList) == 100) #Not true in all cases, but sufficient for debugging. REMOVE this line if problems
-    theMap = map(np.load, inFileList)
-    theList = list(theMap)
-    allData = np.array(theList)
+def saveOutput(allData,writeOut):
     #allData = np.array(list(map(np.load, inFileList)))
     #One inFile contains the following: [p1, p2, a, b, psiparallel, psiperpindicular]
     xs = allData[0][6]
     std = np.std(allData,axis=0)
     avg = np.mean(allData,axis=0)
-    low68 = np.percentile(allData,16,axis=0)
-    hi68  = np.percentile(allData,100-16,axis=0)
-    low95 = np.percentile(allData,2.5,axis=0)
-    hi95  = np.percentile(allData,100-2.5,axis=0)
-    
 
-    # if units == 'km/s':
-    #     correlationScale = (0,5000,-1000,5000)
-    # else:
-    #     correlationScale = (0,50,-1000,5000)
-
-    #momentScale = (0,30,0.25,1.1)
-    plotName = name
-
-    matplotlib.rc('font',size=10)
-    
-    fig1 = plt.figure()
-    
-    plt.title('$\psi_1$, {} Survey Mock'.format(plotName))
-    plt.errorbar(xs,
-                 avg[0]/10**4,
-                 yerr=std[0]/10**4,
-                 fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5
-    )
-    plt.fill_between(xs,low68[0]/10**4,hi68[0]/10**4,facecolor='black',alpha=0.25)
-    plt.fill_between(xs,low95[0]/10**4,hi95[0]/10**4,facecolor='black',alpha=0.25)
-    
-    plt.xlabel('Distance, {}'.format(units))
-    plt.ylabel('Correlation, $10^4 (km/s)^2$')
-    #plt.axis(correlationScale)
-    if units == 'km/s':
-        plt.xlim(0,5000)
-    else:
-        plt.xlim(0,50)
-
-    fig2 = plt.figure()
-    plt.errorbar(xs, avg[1]/10**4, yerr=std[1]/10**4, fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5)
-    plt.title('$\psi_2$, {} Survey Mock'.format(plotName))
-    plt.fill_between(xs,low68[1]/10**4,hi68[1]/10**4,facecolor='black',alpha=0.25)
-    plt.fill_between(xs,low95[1]/10**4,hi95[1]/10**4,facecolor='black',alpha=0.25)
-    plt.xlabel('Distance, Mpc/h')
-    plt.ylabel('Correlation, $(km/s)^2$')
-    #plt.axis(correlationScale)
-    if units == 'km/s':
-        plt.xlim(0,5000)
-    else:
-        plt.xlim(0,50)
-
-    
-    with pdfback.PdfPages(writeOut+'-1.pdf') as pdf:
-        pdf.savefig(fig1)
-
-    with pdfback.PdfPages(writeOut+'-2.pdf') as pdf:
-        pdf.savefig(fig2)
+    np.save(writeOut+'nice',np.array([xs,avg[0],std[0],
+                                      avg[1],std[1],
+                                      avg[2],std[2],
+                                      avg[3],std[3],
+                                      avg[4],std[4],
+                                      avg[5],std[5]]))
+    np.save(writeOut+'all',allData)
         
-    plt.close(fig1)
-    plt.close(fig2)
-    if savenpy:
-        np.save(writeOut,np.array([xs,avg[0],std[0],low68[0],hi68[0],low95[0],hi95[0],
-                                   avg[1],std[1],low68[1],hi68[1],low95[1],hi95[1],
-                                   avg[2],std[2],low68[2],hi68[2],low95[2],hi95[2],
-                                   avg[3],std[3],low68[3],hi68[3],low95[3],hi95[3],
-                                   avg[4],std[4],low68[4],hi68[4],low95[4],hi95[4],
-                                   avg[5],std[5],low68[5],hi68[5],low95[5],hi95[5]]))
-    
-def standBackStats_allonepage(allData,name,units,writeOut,maxd=100):
-    """Do statistics over many input files, for example the three groups of 100 surveys. Average them, plot w/errorbars."""
-    #assert(len(inFileList) == 100) #Not true in all cases, but sufficient for debugging. REMOVE this line if problems
-    #theMap = map(np.load, inFileList)
-    #theList = list(theMap)
-    #allData = np.array(theList)
-    #allData = np.array(list(map(np.load, inFileList)))
-    #One inFile contains the following: [p1, p2, a, b, psiparallel, psiperpindicular]
-    xs = allData[0][6]
-    std = np.std(allData,axis=0)
-    avg = np.mean(allData,axis=0)
-    low68 = np.percentile(allData,16,axis=0)
-    hi68  = np.percentile(allData,100-16,axis=0)
-    low95 = np.percentile(allData,2.5,axis=0)
-    hi95  = np.percentile(allData,100-2.5,axis=0)
-    
-    #correlationScale = (0,30,0,160000)
-    #momentScale = (0,30,0.25,1.1)
-    plotName = name
 
-    matplotlib.rc('font',size=10)
-    
-    f, ((ax1,ax2),(ax3,ax4),(ax5,ax6)) = plt.subplots(3,2,sharex='col',sharey='row',figsize=(8.5,11))
-    f.suptitle('Statistics of the {} Survey Mocks'.format(plotName))
-    ax1.errorbar(xs,
-                 avg[0]/10**4,
-                 yerr=std[0]/10**4,
-                 fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5
-    )
-    ax1.fill_between(xs,low68[0]/10**4,hi68[0]/10**4,facecolor='black',alpha=0.25)
-    ax1.fill_between(xs,low95[0]/10**4,hi95[0]/10**4,facecolor='black',alpha=0.25)
-    ax1.set_title('$\psi_1$ Correlation')
-    #ax1.set_xlabel('Distance, Mpc/h')
-    ax1.set_ylabel('Correlation, $10^4 (km/s)^2$')
-    #ax1.axis(correlationScale)
-    
-    ax2.errorbar(xs, avg[1]/10**4, yerr=std[1]/10**4, fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5)
-    ax2.set_title('$\psi_2$ Correlation')
-    ax2.fill_between(xs,low68[1]/10**4,hi68[1]/10**4,facecolor='black',alpha=0.25)
-    ax2.fill_between(xs,low95[1]/10**4,hi95[1]/10**4,facecolor='black',alpha=0.25)
-    #plt.xlabel('Distance, Mpc/h')
-    #plt.ylabel('Correlation, $(km/s)^2$')
-    #plt.axis(correlationScale)
-    
-    ax3.errorbar(xs, avg[2], yerr=std[2], fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5)
-    ax3.set_title('Moment of the Selection Function, $\cal A$')
-    ax3.fill_between(xs,low68[2],hi68[2],facecolor='black',alpha=0.25)
-    ax3.fill_between(xs,low95[2],hi95[2],facecolor='black',alpha=0.25)
-    #plt.xlabel('Distance, Mpc/h')
-    ax3.set_ylabel('Value (unitless)')
-    #plt.axis(momentScale)
-    
-    ax4.errorbar(xs, avg[3], yerr=std[3], fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5)
-    ax4.set_title('Moment of the Selection Function, $\cal B$')
-    ax4.fill_between(xs,low68[3],hi68[3],facecolor='black',alpha=0.25)
-    ax4.fill_between(xs,low95[3],hi95[3],facecolor='black',alpha=0.25)
-    #plt.xlabel('Distance, Mpc/h')
-    #plt.ylabel('Value (unitless)')
-    #plt.axis(momentScale)
-
-    ax5.errorbar(xs, avg[4]/10**4, yerr=std[4]/10**4, fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5)
-    ax5.fill_between(xs,low68[4]/10**4,hi68[4]/10**4,facecolor='black',alpha=0.25)
-    ax5.fill_between(xs,low95[4]/10**4,hi95[4]/10**4,facecolor='black',alpha=0.25)
-    ax5.set_title('$\Psi_{{\parallel}}$ Correlation')
-    ax5.set_xlabel('Distance, {}'.format(units))
-    ax5.set_ylabel('Correlation, $10^4 (km/s)^2$')
-    #plt.axis(correlationScale)
-
-    ax6.errorbar(xs,avg[5]/10**4, yerr=std[5]/10**4, fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5)
-    ax6.fill_between(xs,low68[5]/10**4,hi68[5]/10**4,facecolor='black',alpha=0.25)
-    ax6.fill_between(xs,low95[5]/10**4,hi95[5]/10**4,facecolor='black',alpha=0.25)
-    ax6.set_title('$\Psi_{{\perp}}$ Correlation')
-    ax6.set_xlabel('Distance, {}'.format(units))
-    #plt.ylabel('Correlation, $(km/s)^2$')
-    #ax6.axis(correlationScale)
-
-    if units == 'km/s':
-        ax5.set_xbound(0,maxd*100)
-        ax6.set_xbound(0,maxd*100)
-    else:
-        ax5.set_xbound(0,maxd)
-        ax6.set_xbound(0,maxd)
-    
-    with pdfback.PdfPages(writeOut) as pdf:
-        pdf.savefig(f)
-    plt.close(f)
-    np.save(writeOut,np.array([xs,avg[0],std[0],low68[0],hi68[0],low95[0],hi95[0],
-                               avg[1],std[1],low68[1],hi68[1],low95[1],hi95[1],
-                               avg[2],std[2],low68[2],hi68[2],low95[2],hi95[2],
-                               avg[3],std[3],low68[3],hi68[3],low95[3],hi95[3],
-                               avg[4],std[4],low68[4],hi68[4],low95[4],hi95[4],
-                               avg[5],std[5],low68[5],hi68[5],low95[5],hi95[5]]))
-
-
-
-def standBackStats_yuyu(inFileList,name,units,writeOut,min_r,numpoints,dr):
-    """Do statistics over many input files, for example the three groups of 100 surveys. Average them, plot w/errorbars."""
-    assert(len(inFileList) == 100) #Not true in all cases, but sufficient for debugging.
-    theMap = map(np.load, inFileList)
-    theList = list(theMap)
-    theList2 = []
-    
-    
-    #One inFile contains the following: [p1, p2, a, b]
-    xs,intervals = common.genBins(min_r,numpoints,dr,'lin')
-    
-    for array in theList:
-        p1 = array[:,0]
-        p2 = array[:,1]
-        a = array[:,2]
-        b = array[:,3]
-        aminusb = (a-b)
-        ppar = ((1-b)*p1-(1-a)*p2)/aminusb
-        pprp = (a*p2-b*p1)/aminusb
-    
-        thing = np.concatenate((np.atleast_2d(p1).T,
-                                np.atleast_2d(p2).T,
-                                np.atleast_2d(a).T,
-                                np.atleast_2d(b).T,
-                                np.atleast_2d(ppar).T,
-                                np.atleast_2d(pprp).T),axis=1).T
- 
-        theList2.append(thing)
-
-    allData = np.array(theList2)
-    print(allData[0])
- 
-    std = np.std(allData,axis=0)
-    avg = np.mean(allData,axis=0)
-    low68 = np.percentile(allData,16,axis=0)
-    hi68  = np.percentile(allData,100-16,axis=0)
-    low95 = np.percentile(allData,2.5,axis=0)
-    hi95  = np.percentile(allData,100-2.5,axis=0)
-    print(len(xs), avg[0].shape)   
-    #correlationScale = (0,30,0,160000)
-    #momentScale = (0,30,0.25,1.1)
-    plotName = name
-
-    matplotlib.rc('font',size=10)
-    
-    f, ((ax1,ax2),(ax3,ax4),(ax5,ax6)) = plt.subplots(3,2,sharex='col',sharey='row',figsize=(8.5,11))
-    f.suptitle('Statistics of the {} Survey Mocks'.format(plotName))
-    ax1.errorbar(xs,
-                 avg[0]/10**4,
-                 yerr=std[0]/10**4,
-                 fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5
-    )
-    ax1.fill_between(xs,low68[0]/10**4,hi68[0]/10**4,facecolor='black',alpha=0.25)
-    ax1.fill_between(xs,low95[0]/10**4,hi95[0]/10**4,facecolor='black',alpha=0.25)
-    ax1.set_title('$\psi_1$ Correlation')
-    #ax1.set_xlabel('Distance, Mpc/h')
-    ax1.set_ylabel('Correlation, $10^4 (km/s)^2$')
-    #ax1.axis(correlationScale)
-    
-    ax2.errorbar(xs, avg[1]/10**4, yerr=std[1]/10**4, fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5)
-    ax2.set_title('$\psi_2$ Correlation')
-    ax2.fill_between(xs,low68[1]/10**4,hi68[1]/10**4,facecolor='black',alpha=0.25)
-    ax2.fill_between(xs,low95[1]/10**4,hi95[1]/10**4,facecolor='black',alpha=0.25)
-    #plt.xlabel('Distance, Mpc/h')
-    #plt.ylabel('Correlation, $(km/s)^2$')
-    #plt.axis(correlationScale)
-    
-    ax3.errorbar(xs, avg[2], yerr=std[2], fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5)
-    ax3.set_title('Moment of the Selection Function, $\cal A$')
-    ax3.fill_between(xs,low68[2],hi68[2],facecolor='black',alpha=0.25)
-    ax3.fill_between(xs,low95[2],hi95[2],facecolor='black',alpha=0.25)
-    #plt.xlabel('Distance, Mpc/h')
-    ax3.set_ylabel('Value (unitless)')
-    #plt.axis(momentScale)
-    
-    ax4.errorbar(xs, avg[3], yerr=std[3], fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5)
-    ax4.set_title('Moment of the Selection Function, $\cal B$')
-    ax4.fill_between(xs,low68[3],hi68[3],facecolor='black',alpha=0.25)
-    ax4.fill_between(xs,low95[3],hi95[3],facecolor='black',alpha=0.25)
-    #plt.xlabel('Distance, Mpc/h')
-    #plt.ylabel('Value (unitless)')
-    #plt.axis(momentScale)
-
-    ax5.errorbar(xs, avg[4]/10**4, yerr=std[4]/10**4, fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5)
-    ax5.fill_between(xs,low68[4]/10**4,hi68[4]/10**4,facecolor='black',alpha=0.25)
-    ax5.fill_between(xs,low95[4]/10**4,hi95[4]/10**4,facecolor='black',alpha=0.25)
-    ax5.set_title('$\Psi_{{\parallel}}$ Correlation')
-    ax5.set_xlabel('Distance, {}'.format(units))
-    ax5.set_ylabel('Correlation, $10^4 (km/s)^2$')
-    #plt.axis(correlationScale)
-
-    ax6.errorbar(xs,avg[5]/10**4, yerr=std[5]/10**4, fmt = 'k-',
-                 elinewidth=0.5,
-                 capsize=2,
-                 capthick=0.5)
-    ax6.fill_between(xs,low68[5]/10**4,hi68[5]/10**4,facecolor='black',alpha=0.25)
-    ax6.fill_between(xs,low95[5]/10**4,hi95[5]/10**4,facecolor='black',alpha=0.25)
-    ax6.set_title('$\Psi_{{\perp}}$ Correlation')
-    ax6.set_xlabel('Distance, {}'.format(units))
-    #plt.ylabel('Correlation, $(km/s)^2$')
-    #ax6.axis(correlationScale)
-
-    if units == 'km/s':
-        ax5.set_xbound(0,100*100)
-        ax6.set_xbound(0,100*100)
-    else:
-        ax5.set_xbound(0,100)
-        ax6.set_xbound(0,100)
-    
-    with pdfback.PdfPages(writeOut) as pdf:
-        pdf.savefig(f)
-    plt.close(f)
-    np.save(writeOut,np.array([xs,avg[0],std[0],low68[0],hi68[0],low95[0],hi95[0],
-                               avg[1],std[1],low68[1],hi68[1],low95[1],hi95[1],
-                               avg[2],std[2],low68[2],hi68[2],low95[2],hi95[2],
-                               avg[3],std[3],low68[3],hi68[3],low95[3],hi95[3],
-                               avg[4],std[4],low68[4],hi68[4],low95[4],hi95[4],
-                               avg[5],std[5],low68[5],hi68[5],low95[5],hi95[5]]))
-
-def sendMessage(message):
-    server = smtplib.SMTP( "smtp.gmail.com", 587 )
-    login = common.getdict('mail.json')
-    server.starttls()
-    server.login(*(login[0]))
-    print(server.sendmail("",login[1],message))
-    server.quit()
 
 
                       
     
 if __name__ == "__main__":
     start = time.time()
-    arrrghs = common.parseCmdArgs([['settings'],
-                                   ['-c','--comp'],
-                                   ['-H','--hist'],
-                                   ['-p','--plots'],
-                                   ['-s','--stats'],
-                                   ['-n','--notify'],
-                                   ['-b','--statspb']
+    arrrghs = common.parseCmdArgs([['settings'],['-o','--override']
                                ],
-                                  ['Settings json file',
-                                   'Compute values for individual galaxies',
-                                   'Compute histograms (requires a prior or concurrent -c run)',
-                                   'Make a plot for every input survey (requires a prior or concurrent -H run)',
-                                   'Do the overview stats routine, one plot for all surveys (requires a prior or concurrent -H run)',
-                                   'Notify me via text message when the job is done running',
-                                   'Do the stats with perfect contours in the background'
+                                  ['Settings json file','array indices in the format a:b to extract from infile list'
                                   ],
-                                   [str,'bool','bool','bool','bool','bool','bool'])
-    try:
-        main(arrrghs)
-        print("That took {:.1f} s".format(time.time()-start))
-        if arrrghs.notify:
-            sendMessage("Job Finished in {:.1f} s".format(time.time()-start))
-    except:
-        if arrrghs.notify:
-            sendMessage("Job Failed")
-        raise
+                                   [str,str])
+
+    main(arrrghs)
+    print("That took {:.1f} s".format(time.time()-start))
+    #ADD a setting to settings to control whether we're dealing with npy
+    #or dat
         
 
 

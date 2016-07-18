@@ -2,12 +2,12 @@
 This file contains common functions used by my millenium programs. It contains mostly housekeeping functions
 like loading files and outputting 
 """
-import matplotlib
-matplotlib.use("TkAgg")
-import matplotlib.backends.backend_pdf as pdfback
+#import matplotlib
+#matplotlib.use("TkAgg")
+#import matplotlib.backends.backend_pdf as pdfback
 import numpy as np
 import json
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import os
 import math
 import scipy.spatial as space
@@ -85,50 +85,6 @@ def log_bins(min_r,numpoints,dr):
     intervals = [x-(.5*((10**(dr*i))*(1-10**(-dr)))) for i,x in enumerate(xs)]
     return(xs,intervals)
     
-def sphereVol(radius):
-    """Returns the volume of sphere"""
-    return (4/3)*(np.pi)*(radius**3)
-
-def shellVolCenter(r, thickness):
-    """Returns the volume of a shell centered on radius r, with specified thickness."""
-    dr = thickness/2
-    left = r-dr
-    right = r+dr
-    return shellVol(left,right)
-        
-def shellVol(r1,r2):
-    """Returns the volume of a shell with inner edge r1 and outer edge r2"""
-    return abs(sphereVol(r1)-sphereVol(r2))
-
-def gensettings(args):
-    """Makes a sample settings file called settings_<MODULENAME>.json
-    The sample settings file contains the settings information from that module contained in the
-    template_settings.json file.
-    """
-    module = args.module
-    filename = "settings_{}.json".format(module)
-    template = getdict("template_settings.json")
-    if(not os.path.exists(filename) or input("Are you sure you want to overwrite {}? (y/n) ".format(filename))=='y'):
-        #if the file doesn't exist, it goes ahead with out asking.
-        #if the file does exist, then it asks.
-        #Woo for boolean operator overloading!
-        with open(filename,'w') as settings:
-            settings.write(json.dumps(template[module],
-                                      sort_keys=True,
-                                      indent=4, separators=(',', ': ')))
-    exit()
-
-def writedict(filename, dictionary):
-    """Given a filename and a dictionary (or list...), writes the dictionary to file as json.
-    The dictionary can then be retrieved with the getdict function below.
-    Setting pretty to false can make the file considerably smaller, at the cost of being almost unintelligable.
-    """
-    with open(filename,'w') as jsonfile:
-        jsonfile.write(json.dumps(dictionary,
-                                  sort_keys=True,
-                                  indent=4, separators=(',', ': ')))
-        
-
 
 def getdict(filename):
     """Given the name of a json file, reads the file in and returns the object it contains
@@ -139,30 +95,6 @@ def getdict(filename):
         #reads the entire settings file with .read(), then loads it as a json dictionary, and stores it into jsondict
     return jsondict
 
-
-
-def makeplot(xs,ys,title,xl,yl):
-    """DEPRECATED. Avoid if possible."""
-    fig = plt.figure(figsize=(4,3),dpi=100)
-    ax = fig.add_subplot(111)
-    ax.loglog(xs,ys,'o')
-    ax.set_title(title)
-    plt.xlabel(xl)
-    plt.ylabel(yl)
-    plt.show()
-
-def makeplotWithErrors(data,title,xl,yl):
-    """DEPRECATED. Avoid if possible."""
-    fig = plt.figure(figsize=(4,3),dpi=100)
-    ax = fig.add_subplot(111)
-    ax.set_xscale("log", nonposx='clip')
-    ax.set_yscale("log", nonposx='clip')
-
-    plt.errorbar([x[0] for x in data],[x[2] for x in data],xerr=[x[1] for x in data],yerr=[x[3] for x in data]) 
-    ax.set_title(title)
-    plt.xlabel(xl)
-    plt.ylabel(yl)
-    plt.show()
 
 def getBoxName(name, xi, yi, zi):
     """
@@ -406,16 +338,6 @@ def _loadCF2Data(filename):
             galaxies.append(CF2(floats))
     return galaxies
 
-def writecsv(xslist,yslist):
-    """Deprecated. I remember that this function is mostly useless, but I don't remember exactly what it does."""
-    assert(len(xslist)==len(yslist))
-    with open("./out2.csv",'w') as csv:
-        for row in range(len(xslist[0])):
-            line = ""
-            for cell in range(len(xslist)):
-                line = line + str(xslist[cell][row]) + ',' + str(yslist[cell][row])+ ','
-            line = line + '\n'
-            csv.write(line)
 class CF2:
     """
     Data structure for holding a cf2 galaxy. The constructor takes a list of attributes,
@@ -444,19 +366,20 @@ class CF2:
         self.data = data
         self.theta = math.radians(self.lon-180)
         self.phi = math.radians(self.lat+90)
-        self.x = self.d*math.sin(self.phi)*math.cos(self.theta)
-        self.y = self.d*math.sin(self.phi)*math.sin(self.theta)
-        self.z = self.d*math.cos(self.phi)
+        self.normx = math.sin(self.phi)*math.cos(self.theta)
+        self.normy = math.sin(self.phi)*math.sin(self.theta)
+        self.normz = math.cos(self.phi)
+        self.x = self.d*self.normx
+        self.y = self.d*self.normy
+        self.z = self.d*self.normz
+        self.redx = self.cz*self.normx
+        self.redy = self.cz*self.normy
+        self.redz = self.cz*self.normz
     def __str__(self):
         outstr = "CF2 galaxy at redshift {} km/s, distance {} Mpc/h,\n".format(self.cz,self.d)
         outstr += "with peculiar velocity {} km/s.\n".format(self.v)
         outstr += "This galaxy is in the sky at galactic latitude {} and longitude {} (deg)".format(self.lat,self.lon)
         return outstr
-    def getRedshiftXYZ(self):
-        redx = self.cz*math.sin(self.phi)*math.cos(self.theta)
-        redy = self.cz*math.sin(self.phi)*math.sin(self.theta)
-        redz = self.cz*math.cos(self.phi)
-        return(redx,redy,redz)
     def toList(self):
         return self.data
         
