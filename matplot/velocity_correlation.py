@@ -119,8 +119,8 @@ def main(args):
                                 g.redz,
                                 g.dv,
                                 g.d,
-                                g.v) for g in galaxies])]) for galaxies in galaxiess]
-                i = 
+                                g.v) for g in galaxies]) for galaxies in galaxiess]
+                i = d
             elif not numpy:
                 galaxies = common.loadData(rawInFile,dataType='CF2')
                 d = [np.array([(g.normx,
