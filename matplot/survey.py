@@ -434,4 +434,4 @@ if __name__ == "__main__":
                                   ],
                                    [str,'bool'])
 
-    main(arrrghs)
+    selectrun(arrrghs)
