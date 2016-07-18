@@ -18,7 +18,7 @@ except:
     USE_GPU=False
 
 
-NUM_PROCESSORS = 8
+NUM_PROCESSORS = 12
 
 EDGES = [np.array((x,y,z)) for x in [-1,0,1] for y in [-1,0,1] for z in [-1,0,1]]
 
