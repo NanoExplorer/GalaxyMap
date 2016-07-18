@@ -84,8 +84,51 @@ def log_bins(min_r,numpoints,dr):
     xs = [(min_r + 10**(dr*x) - 1) for x in range(numpoints + 1)]
     intervals = [x-(.5*((10**(dr*i))*(1-10**(-dr)))) for i,x in enumerate(xs)]
     return(xs,intervals)
-    
+#Yes, I know these seem stupid, but it's way more work to remove them.
+#They ARE used by the surveystats routine, at least.
+def sphereVol(radius):
+    """Returns the volume of sphere"""
+    return (4/3)*(np.pi)*(radius**3)
 
+def shellVolCenter(r, thickness):
+    """Returns the volume of a shell centered on radius r, with specified thickness."""
+    dr = thickness/2
+    left = r-dr
+    right = r+dr
+    return shellVol(left,right)
+        
+def shellVol(r1,r2):
+    """Returns the volume of a shell with inner edge r1 and outer edge r2"""
+    return abs(sphereVol(r1)-sphereVol(r2))
+
+
+def gensettings(args):
+    """Makes a sample settings file called settings_<MODULENAME>.json
+    The sample settings file contains the settings information from that module contained in the
+    template_settings.json file.
+    """
+    module = args.module
+    filename = "settings_{}.json".format(module)
+    template = getdict("template_settings.json")
+    if(not os.path.exists(filename) or input("Are you sure you want to overwrite {}? (y/n) ".format(filename))=='y'):
+        #if the file doesn't exist, it goes ahead with out asking.
+        #if the file does exist, then it asks.
+        #Woo for boolean operator overloading!
+        with open(filename,'w') as settings:
+            settings.write(json.dumps(template[module],
+                                      sort_keys=True,
+                                      indent=4, separators=(',', ': ')))
+    exit()
+
+def writedict(filename, dictionary):
+    """Given a filename and a dictionary (or list...), writes the dictionary to file as json.
+    The dictionary can then be retrieved with the getdict function below.
+    Setting pretty to false can make the file considerably smaller, at the cost of being almost unintelligable.
+    """
+    with open(filename,'w') as jsonfile:
+        jsonfile.write(json.dumps(dictionary,
+                                  sort_keys=True,
+                                  indent=4, separators=(',', ': ')))
 def getdict(filename):
     """Given the name of a json file, reads the file in and returns the object it contains
     """

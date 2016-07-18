@@ -12,7 +12,7 @@ def statsrun(args):
 
     np.seterr(all='raise')
     all_settings = common.getdict(args.settings)
-    binsize = int(all_settings["binsize"])
+    binsize = all_settings["binsize"]
     outputFile = all_settings["output_filename"]
     filename = all_settings["survey_filename"]
     chop = float(all_settings["chop"])
@@ -89,7 +89,7 @@ def singlerun(filename,outputFile,binsize,chop,modelOverride=None):
     #Save figure
     with pdfback.PdfPages(outputFile+str(binsize)+'.pdf') as pdf:
         pdf.savefig(fig)
-        #pdf.savefig(fig2)
+        pdf.savefig(fig2)
     if modelOverride is None:
     #Write paramaters to a file for later use.
         common.writedict(outputFile+str(binsize)+'_params.json',{'constants':{'A':params[0],

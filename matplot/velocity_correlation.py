@@ -26,7 +26,7 @@ import os
 #import matplotlib.ticker as mtick
 
 TEMP_DIRECTORY = "/data/c156r133/tmp/"
-NUM_PROCESSES=12
+NUM_PROCESSES=4
 """
 Traceback (most recent call last):
   File "velocity_correlation.py", line 963, in <module>
@@ -49,10 +49,9 @@ ValueError: could not broadcast input array from shape (7,50) into shape (7)
 
 
 #PERFECT_LOCATION = "output/PERFECT_DONTTOUCH/COMPOSITE-MOCK-bin-{:.0f}-{}.npy"
-USE_TMP = True
+USE_TMP = False
 #This saves KD tree data. Turn it to True when doing redhsift surveys or when doing the same survey multiple times.
 
-print("Warning: Non-general perfect location")
 def main(args):
     np.seterr(divide='ignore',invalid='ignore')
     """ Compute the velocity correlations on one or many galaxy surveys. 
@@ -110,7 +109,8 @@ def main(args):
             if settings['many'] and not numpy:
                 #If there are lots of files, set them up accordingly.
                 inFileList = [rawInFile.format(x) for x in infileindices]
-                galaxiess = [common.loadData(f) for f in inFileList]                
+                galaxiess = [common.loadData(f,dataType='CF2') for f in inFileList]
+                print(galaxiess[1][2])
                 d = [np.array([(g.normx,
                                 g.normy,
                                 g.normz,
@@ -144,7 +144,7 @@ def main(args):
 
 
             with Pool(processes=NUM_PROCESSES) as pool:
-                histogramData = list(pool.starmap(turboRun,zip(d,i,np,
+                histogramData = list(pool.starmap(turboRun,zip(d,i,itertools.repeat(numpy),
                                                                itertools.repeat(maxd),
                                                                itertools.repeat(units),
                                                                itertools.repeat(xs),
@@ -173,7 +173,7 @@ def main(args):
 def formatHash(string,*args):
     return hashlib.md5(string.format(*args).encode('utf-8')).hexdigest()
 
-def turboRun(data,index,np,maxd,units,xs,intervals):
+def turboRun(data,index,use_npy,maxd,units,xs,intervals):
     """Returns a list of histograms, where a histogram is defined as a numpy array
     [[psi1 values] [psi2 values]
      [a values]    [b values]
@@ -188,7 +188,7 @@ def turboRun(data,index,np,maxd,units,xs,intervals):
      histogram(xs[n],intervals[n])
     ]
     """
-    if np:
+    if use_npy:
         d = np.concatenate((data[:,0:7],data[:,7+index:207:100]),axis=1)
         #mask = np.invert(np.isnan(d[:,0]))
     else:
