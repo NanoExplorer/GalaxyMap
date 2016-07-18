@@ -134,7 +134,7 @@ def selectrun(args):
     selectionParams = common.getdict(settings['selection_function_json'])
 
     #Grab the pre-computed distance files if they exist, or if not generate them.
-    distFileBase = "/media/christopher/2TB1/Christopher/code/Physics/GalaxyMap/tmp/" + hugeFile.rstrip('/') + "_distances_{:x}/".format(hash(tuple([tuple(x) for x in surveys]))) 
+    distFileBase = hugeFile.rstrip('/') + "_distances_{:x}/".format(hash(tuple([tuple(x) for x in surveys]))) 
     distanceFiles = [distFileBase + os.path.basename(os.path.splitext(milFile)[0]) for milFile in files]
     #Distance file format: outFile location + hash of survey centerpoints / xi.yi.zi.npy
     
