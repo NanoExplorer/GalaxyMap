@@ -4,13 +4,16 @@ import scipy.spatial as space
 import math
 
 def transpose(args):
+    print("Loading survey...")
     hubble_constant = 100
     fractional_error = 0.1
     use_dvs = False;
     survey_info = common.getdict(args.survey_file)
-    print(survey_info)
+    #print(survey_info)
+    print("Success!")
     for survey in survey_info:
-        outCF2String = "" 
+        outCF2String = ""
+        print("Processing survey {}.".format(survey['name']))
         with open(survey['name'],'r') as csvFile:
             for line in csvFile:
                 if line[0] == '#':
