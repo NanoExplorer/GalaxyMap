@@ -47,6 +47,8 @@ def transpose(args):
 
 
 if __name__ == "__main__":
-    print("RUN WItH GALAXY.PY STUPID")
-    print('note: if your name is not Christopher Rooney, I\'m not calling you stupid.')
-    print("That Christopher guy has made this mistake too many times, so I'm calling him names.")
+    arrrghs = common.parseCmdArgs([['survey_file']],
+                                  ['Survey .json file with surveys and their centers'],
+                                  [str])
+
+    transpose(arrrghs)
