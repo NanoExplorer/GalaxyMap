@@ -26,7 +26,7 @@ import os
 #import matplotlib.ticker as mtick
 
 TEMP_DIRECTORY = "/data/c156r133/tmp/"
-NUM_PROCESSES=4
+NUM_PROCESSES=12
 """
 Traceback (most recent call last):
   File "velocity_correlation.py", line 963, in <module>
