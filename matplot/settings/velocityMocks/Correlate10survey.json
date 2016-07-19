@@ -1,0 +1,16 @@
+{
+    "dr": [1,2,5],
+    "input_file": ["/data/c156r133/surveys/CF2_gal_10_{}.mil_cf2.txt"],
+    "min_r": [0.5,1,2.5],
+    "numpoints": [50,25,10],
+    "max_distance": 50,
+    "output_file_name":["output/Testingbin10_{}-bin-{}-{}"],
+    "step_type": "lin",
+    "many": true,
+    "num_files":100,
+    "offset":0,
+    "binunits":["km/s"],
+    "readable_name":["bin 10 survey gen test"],
+    "many_squared": true,
+    "use_npy": false
+}
