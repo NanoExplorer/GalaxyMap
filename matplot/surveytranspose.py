@@ -28,6 +28,8 @@ def transpose(args):
                 y = rotatedCoord.item(1)
                 z = rotatedCoord.item(2)
                 rho = space.distance.euclidean(ontoGalaxy,[0,0,0])
+                if rho == 0:
+                    continue
                 phi = math.degrees(math.acos(z/rho)) - 90
                 theta = math.degrees(math.atan2(y,x))+ 180
                 peculiarVel = np.dot(ontoGalaxy,[galaxy.velX,galaxy.velY,galaxy.velZ])/rho
