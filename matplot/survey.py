@@ -34,11 +34,8 @@ def compute_want_density(r,binsize, A, r_0, n_1, n_2):
     else:
         r_in = r
         r_gpu = r
-        
-    dr = binsize/2
-    ftpi = (4/3) * np.pi
-    
-    r_calc = (A*((r_gpu/r_0)**n_1)*(1+(r_gpu/r_0)**(n_1+n_2))**-1) / ((ftpi*(r_gpu+dr)**3)-(ftpi*(r_gpu-dr)**3))
+
+    r_calc = (A*((r_gpu/r_0)**n_1)*(1+(r_gpu/r_0)**(n_1+n_2))**-1)
     #(A*(r/r0)^n_1)*(1+(r/r0)^(n1+n2))^-1 is the selection function, i.e. number of galaxies in a binsize Mpc bin
     #centered on r distance from center
     #THAT IS THE IMPORTANT PART - the bin width is the same, but the center of the bin is at the position of
@@ -328,9 +325,11 @@ def surveyOneFile(hugeFile,surveys,selectionParams,histogram,boxMaxDistance):
         numSurveys = distances.shape[1]
     
         #Do calculations
-        wantDensity = compute_want_density(distances,binsize,**(selectionParams["constants"])) #!! 20 % !!
-        #wantDensity  =selection_values / common.shellVolCenter(distances,binsize)         #!! 22 % !!
         tdistBin =(np.digitize(distances.flatten(),bins)-1).reshape(distances.shape)
+        wantNum = compute_want_density( ((tdistBin+1)*binsize)-binsize/2  ,binsize,**(selectionParams["constants"])) #!! 20 % !!
+    
+
+        
         #!!!!IMPORTANT!!!!!
         #tdistBin and distBin are the indexes of the bin each galaxy goes into
         #Remember these are only the galaxies in the subbox we're looking at (surveyONEFILE)
@@ -344,26 +343,11 @@ def surveyOneFile(hugeFile,surveys,selectionParams,histogram,boxMaxDistance):
         something = [histogram[n][distBin[n]] for n in range(numSurveys)]
         #This is the number of galaxies in the same bin as the galaxy and in the same box as the galaxy
         originalCount = np.transpose(np.array(something)) # 2.2%
-        #volumes = calcVolumes(np.transpose(np.array(distBin))*binsize + (binsize/2),binsize)# !! 23 % !!
-        volumes = calcVolumes(tdistBin,binsize)# !! 23 % !!
-        originalDensity = originalCount / volumes
-        #I'm currently under the impression that this for loop is the main bottleneck in this function.
-        #It isn't a complicated task, so it might be worthwhile to consider alternate implementations.
-        #Let's see...
-        #This for loop uses information from distances, binsize, histogram
-    
-        # for i,galaxy in enumerate(distances):
-        #     for j,surveyDist in enumerate(galaxy):
-        #         distBin = int(distBinNotAnInt[i][j])
-        #         originalDensity[i][j] = histogram[j][distBin] / common.shellVolCenter(distBin*binsize + (binsize/2),binsize)
-        probability = wantDensity / originalDensity
+        
+        probability = wantNum / originalCount
         dice = rng.random_sample(probability.shape)
         toAdd = dice < probability
-        # for i,galaxy in enumerate(toAdd):
-        #     for j,addBool in enumerate(galaxy):
-        #         if addBool:
-        #             rawLine = galaxies[i][3]
-        #             surveyContent[j].append(rawLine)
+        
         arrGalaxies = np.array(galaxies,dtype="object")
         surveyContent = [arrGalaxies[toAdd[:,n]] for n in range(numSurveys)]
         print(".",end="",flush=True)
