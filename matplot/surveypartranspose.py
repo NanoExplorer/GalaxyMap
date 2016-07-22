@@ -52,7 +52,7 @@ def transpose(args):
     survey_info = common.getdict(args.survey_file)
 
     print("Success!")
-    with Pool(processes=8) as pool:
+    with Pool(processes=12) as pool:
         pool.map(proconesurvey,survey_info)
         
 
