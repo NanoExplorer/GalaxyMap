@@ -27,7 +27,7 @@ def genBins(binsize,chop):
     #generates bins for a certain bin size. Stops with the bin that slightly overshoots the chop value
     #Always starts at zero
     
-#@profile
+
 def compute_want_density(r,binsize, A, r_0, n_1, n_2):
     #Warning: Doesn't actually compute a density anymore. 
     if USE_GPU: #Use gpu just changes type of np arrays so that it runs on GPU if available.
@@ -271,6 +271,8 @@ def distsurvey(hugeFile,surveys,binsize,boxMaxDistance):
     #Notify the user that we're making progress
     print(".",end="",flush=True)
     return np.array(masterhist)
+
+
 
 #@profile
 def surveyOneFile(hugeFile,surveys,selectionParams,histogram,boxMaxDistance):
