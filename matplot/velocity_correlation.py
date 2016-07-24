@@ -49,7 +49,7 @@ ValueError: could not broadcast input array from shape (7,50) into shape (7)
 
 
 #PERFECT_LOCATION = "output/PERFECT_DONTTOUCH/COMPOSITE-MOCK-bin-{:.0f}-{}.npy"
-USE_TMP = False
+USE_TMP = True
 #This saves KD tree data. Turn it to True when doing redhsift surveys or when doing the same survey multiple times.
 
 def main(args):
