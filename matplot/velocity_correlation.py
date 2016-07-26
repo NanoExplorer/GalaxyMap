@@ -25,8 +25,8 @@ import os
 #import smtplib
 #import matplotlib.ticker as mtick
 
-TEMP_DIRECTORY = "/data/c156r133/tmp/"
-NUM_PROCESSES=4
+TEMP_DIRECTORY = "tmp/"
+NUM_PROCESSES=16
 """
 Traceback (most recent call last):
   File "velocity_correlation.py", line 963, in <module>
@@ -84,11 +84,12 @@ def main(args):
         xs_master = [xs_master]
         intervals_master = [intervals_master]
     if numpy:
-        print(args.override)
-        indices = args.override.split(':')
-        a = int(indices[0])
-        b = int(indices[1])
-        file_schemes = file_schemes[a:b]
+        if args.override:
+            print(args.override)
+            indices = args.override.split(':')
+            a = int(indices[0])
+            b = int(indices[1])
+            file_schemes = file_schemes[a:b]
         print(file_schemes)
     else:    
         infileindices = [x + settings['offset'] for x in range(settings['num_files'])]
@@ -140,17 +141,17 @@ def main(args):
                 print("Handling NaNs")
                 nansremoved = [ data[x][np.invert(np.isnan(data[x][:,0]))] for x in range(100)]
                 del data
-                for x in range(100):
-                    np.save('/tmp/c156r133-{}/vcorr-{}'.format(b,x),nansremoved[x])
-                del nansremoved
-                df = ['/tmp/c156r133-{}/vcorr-{}.npy'.format(b,x//100) for x in range(10000) ]
+                #for x in range(100):
+                #    np.save('/tmp/c156r133-{}/vcorr-{}'.format(b,x),nansremoved[x])
+                #df = ['/tmp/c156r133-{}/vcorr-{}.npy'.format(b,x//100) for x in range(10000) ]
+                d = [ nansremoved[x//100] for x in range(10000) ]
                 i = [ x%100  for x in range(10000) ]
                 #print(d[542].shape)
             print("Opening Pool...")
             gc.collect()
             with Pool(processes=NUM_PROCESSES) as pool:
                 print("Generating Histograms...")
-                histogramData = list(pool.starmap(turboRun,zip(df,i,itertools.repeat(numpy),
+                histogramData = list(pool.starmap(turboRun,zip(d,i,itertools.repeat(numpy),
                                                                itertools.repeat(maxd),
                                                                itertools.repeat(units),
                                                                itertools.repeat(xs),
@@ -196,7 +197,7 @@ def turboRun(data,index,use_npy,maxd,units,xs,intervals):
     """
     
     if use_npy:
-        loaded_data = np.load(data)
+        loaded_data = data#np.load(data)
         d = np.concatenate((loaded_data[:,0:7],loaded_data[:,7+index:207:100]),axis=1)
         #mask = np.invert(np.isnan(d[:,0]))
     else:
