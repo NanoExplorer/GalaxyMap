@@ -27,25 +27,6 @@ import os
 
 TEMP_DIRECTORY = "/data/c156r133/tmp/"
 NUM_PROCESSES=12
-"""
-Traceback (most recent call last):
-  File "velocity_correlation.py", line 963, in <module>
-    main(arrrghs)
-  File "velocity_correlation.py", line 99, in main
-    itertools.repeat(maxd_master))
-  File "velocity_correlation.py", line 411, in standBackStats_perfectBackground
-    std = np.std(allData,axis=0)
-  File "/home/christopher/.Envs/new-matplot/lib/python3.4/site-packages/numpy/core/fromnumeric.py", line 2985, in std
-    keepdims=keepdims)
-  File "/home/christopher/.Envs/new-matplot/lib/python3.4/site-packages/numpy/core/_methods.py", line 124, in _std
-    keepdims=keepdims)
-  File "/home/christopher/.Envs/new-matplot/lib/python3.4/site-packages/numpy/core/_methods.py", line 77, in _var
-    arr = asanyarray(a)
-  File "/home/christopher/.Envs/new-matplot/lib/python3.4/site-packages/numpy/core/numeric.py", line 525, in asanyarray
-    return array(a, dtype, copy=False, order=order, subok=True)
-ValueError: could not broadcast input array from shape (7,50) into shape (7)
-"""
-
 
 
 #PERFECT_LOCATION = "output/PERFECT_DONTTOUCH/COMPOSITE-MOCK-bin-{:.0f}-{}.npy"
@@ -428,12 +409,13 @@ def saveOutput(allData,writeOut):
     std = np.std(allData,axis=0)
     avg = np.mean(allData,axis=0)
 
-    np.save(writeOut+'nice',np.array([xs,avg[0],std[0],
-                                      avg[1],std[1],
-                                      avg[2],std[2],
-                                      avg[3],std[3],
-                                      avg[4],std[4],
-                                      avg[5],std[5]]))
+    np.save(writeOut+'nice',np.array([xs,
+                                      avg[0],std[0], #Psi_1
+                                      avg[1],std[1], #Psi_2
+                                      avg[2],std[2], #A
+                                      avg[3],std[3], #B
+                                      avg[4],std[4], #par
+                                      avg[5],std[5]])) #perp
     np.save(writeOut+'all',allData)
         
 
