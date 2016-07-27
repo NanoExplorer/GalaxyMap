@@ -25,13 +25,13 @@ import os
 #import smtplib
 #import matplotlib.ticker as mtick
 
-TEMP_DIRECTORY = "tmp/"
-NUM_PROCESSES=8
-
+#These are loaded in by every process. You can't modify them, or the processes will act weird.
+GLOBAL_SETTINGS = common.getdict('global_settings_vcorr.json')
+TEMP_DIRECTORY = GLOBAL_SETTINGS['tmp']#"tmp/"
+NUM_PROCESSES= GLOBAL_SETTINGS['num_processors']#8
+STAGGER_PROCESSES = GLOBAL_SETTINGS['stagger']
 
 #PERFECT_LOCATION = "output/PERFECT_DONTTOUCH/COMPOSITE-MOCK-bin-{:.0f}-{}.npy"
-USE_TMP = False
-#This saves KD tree data. Turn it to True when doing redhsift surveys or when doing the same survey multiple times.
 
 def main(args):
     np.seterr(divide='ignore',invalid='ignore')
@@ -51,6 +51,7 @@ def main(args):
     unitslist =    settings['binunits']
     maxd_master =  settings['max_distance']
     numpy =        settings['use_npy']
+    use_tmp =      settings['use_tmp']
     if settings['many_squared']:
         distance_args_master = list(zip(dr,min_r,numpoints))
         file_schemes  = list(zip(infile,orig_outfile,settings['readable_name']))
@@ -135,7 +136,8 @@ def main(args):
                                                                itertools.repeat(maxd),
                                                                itertools.repeat(units),
                                                                itertools.repeat(xs),
-                                                               itertools.repeat(intervals)
+                                                               itertools.repeat(intervals),
+                                                               itertools.repeat(use_tmp)
                                                            )))
                 """
                 Each turbo run returns a list of histograms [ 5-length histogram, 10-length histogram, 20-length etc]
@@ -160,7 +162,7 @@ def main(args):
 def formatHash(string,*args):
     return hashlib.md5(string.format(*args).encode('utf-8')).hexdigest()
 
-def turboRun(data,index,use_npy,maxd,units,xs,intervals):
+def turboRun(data,index,use_npy,maxd,units,xs,intervals,use_tmp):
     """Returns a list of histograms, where a histogram is defined as a numpy array
     [[psi1 values] [psi2 values]
      [a values]    [b values]
@@ -181,7 +183,7 @@ def turboRun(data,index,use_npy,maxd,units,xs,intervals):
         #mask = np.invert(np.isnan(d[:,0]))
     else:
         d = data
-    correlations=compute(d,maxd,units)
+    correlations=compute(d,maxd,units,use_tmp)
     del d
     return list(itertools.starmap(singleHistogram,zip(itertools.repeat(correlations),
                                                 xs,
@@ -190,7 +192,7 @@ def turboRun(data,index,use_npy,maxd,units,xs,intervals):
                                  )
                )
     
-def compute(data,maxd,units):
+def compute(data,maxd,units,use_tmp):
     """Formerly called 'singlePlot,' this function computes all pair-pair galaxy information,
     including figuring out the list of pairs.
     Input - cf2 file to read from.
@@ -220,12 +222,12 @@ def compute(data,maxd,units):
         print("I TOLD YOU, ONLY USE km/s or Mpc/h as your units!!!")
         print("And you should definitely, NEVER EVER, use '{}'!!".format(units))
 
-    data = correlation(galaxyXYZV,maxd,units)
+    data = correlation(galaxyXYZV,maxd,units,use_tmp)
 
     return data
 
 #@profile 
-def _kd_query(positions,maxd,units):
+def _kd_query(positions,maxd,units,use_tmp):
     
     """Returns a np array of pairs of galaxies."""
     #This is still the best function, despite all of my scheming.
@@ -234,7 +236,7 @@ def _kd_query(positions,maxd,units):
     #THERE WERE. Thanks for just leaving a warning instead of fixing it :P
     #The warning still stands, but it's a bit better now.
     
-    if units == "km/s" and os.path.exists(tmpfilename) and USE_TMP:
+    if units == "km/s" and os.path.exists(tmpfilename) and use_tmp:
         print("!",end="",flush=True)
         return np.load(tmpfilename)
     else:
@@ -248,21 +250,21 @@ def _kd_query(positions,maxd,units):
         pairarray = np.array(listOfPairs) #The np array creation takes a LOT of time. I am still wondering why.
         del pairs, removePairs, kd #This also takes forever.
         gc.collect()
-        if units == "km/s" and USE_TMP:
+        if units == "km/s" and use_tmp:
             np.save(tmpfilename,pairarray)
             #The caching scheme only helps if we have the same set of distance data over and over again.
             #That is the case with redshift-binned data, but not anything else.
         return pairarray
 
 
-def correlation(galaxies,maxd,units,usewt=False):
+def correlation(galaxies,maxd,units,use_tmp,usewt=False):
     """ Computes the raw galaxy-galaxy correlation information on a per-galaxy basis, and saves it to file"""
     #There are lots of dels in this function because otherwise it tends to gobble up memory.
     #I think there might be a better way to deal with the large amounts of memory usage, but I don't yet
     #know what it is.
                                                           
     # galaxies = [(galaxies[a],galaxies[b]) for a,b in interval_shell]
-    galaxyPairs = _kd_query(galaxies[:,0:3],maxd,units)
+    galaxyPairs = _kd_query(galaxies[:,0:3],maxd,units,use_tmp)
     #print("Done! (with the thing)")
     lGalaxies = galaxies[galaxyPairs[:,0]]
     rGalaxies = galaxies[galaxyPairs[:,1]]
