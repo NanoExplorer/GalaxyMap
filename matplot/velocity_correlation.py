@@ -25,12 +25,12 @@ import os
 #import smtplib
 #import matplotlib.ticker as mtick
 
-TEMP_DIRECTORY = "/data/c156r133/tmp/"
-NUM_PROCESSES=12
+TEMP_DIRECTORY = "tmp/"
+NUM_PROCESSES=8
 
 
 #PERFECT_LOCATION = "output/PERFECT_DONTTOUCH/COMPOSITE-MOCK-bin-{:.0f}-{}.npy"
-USE_TMP = True
+USE_TMP = False
 #This saves KD tree data. Turn it to True when doing redhsift surveys or when doing the same survey multiple times.
 
 def main(args):
@@ -40,7 +40,7 @@ def main(args):
     #Get setup information from the settings files
     settings =   common.getdict(args.settings)
     if settings['num_files'] != 10000 and settings['use_npy']:
-        print("Sorry! We can only handle 100x100 surveys. For other uses, use the turbospeed branch instead")
+        print("Sorry! We can only handle 100x100 surveys. Try turning off the use_npy flag.")
         exit()
     numpoints =    settings['numpoints']
     dr =           settings['dr']
@@ -65,11 +65,12 @@ def main(args):
         xs_master = [xs_master]
         intervals_master = [intervals_master]
     if numpy:
-        print(args.override)
-        indices = args.override.split(':')
-        a = int(indices[0])
-        b = int(indices[1])
-        file_schemes = file_schemes[a:b]
+        if args.override:
+            print(args.override)
+            indices = args.override.split(':')
+            a = int(indices[0])
+            b = int(indices[1])
+            file_schemes = file_schemes[a:b]
         print(file_schemes)
     else:    
         infileindices = [x + settings['offset'] for x in range(settings['num_files'])]
@@ -115,16 +116,21 @@ def main(args):
                                 g.v) for g in galaxies])]
                 i = ['nothing']
             else:
+                print("Loading numpy file...")
                 data = np.load(rawInFile)
-                #d = [ data[x/100][np.invert(np.isnan(data[x/100][:,0]))] for x in range(10000)] BAD. REALLY BAD.
+                print("Handling NaNs")
                 nansremoved = [ data[x][np.invert(np.isnan(data[x][:,0]))] for x in range(100)]
                 del data
-                d = [nansremoved[x//100] for x in range(10000)]
+                #for x in range(100):
+                #    np.save('/tmp/c156r133-{}/vcorr-{}'.format(b,x),nansremoved[x])
+                #df = ['/tmp/c156r133-{}/vcorr-{}.npy'.format(b,x//100) for x in range(10000) ]
+                d = [ nansremoved[x//100] for x in range(10000) ]
                 i = [ x%100  for x in range(10000) ]
-                print(d[542].shape)
-
-
+                #print(d[542].shape)
+            print("Opening Pool...")
+            gc.collect()
             with Pool(processes=NUM_PROCESSES) as pool:
+                print("Generating Histograms...")
                 histogramData = list(pool.starmap(turboRun,zip(d,i,itertools.repeat(numpy),
                                                                itertools.repeat(maxd),
                                                                itertools.repeat(units),
@@ -170,7 +176,8 @@ def turboRun(data,index,use_npy,maxd,units,xs,intervals):
     ]
     """
     if use_npy:
-        d = np.concatenate((data[:,0:7],data[:,7+index:207:100]),axis=1)
+        loaded_data = data#np.load(data)
+        d = np.concatenate((loaded_data[:,0:7],loaded_data[:,7+index:207:100]),axis=1)
         #mask = np.invert(np.isnan(d[:,0]))
     else:
         d = data
