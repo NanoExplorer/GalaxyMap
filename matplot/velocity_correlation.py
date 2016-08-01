@@ -8,6 +8,7 @@ import common
 from scipy.spatial import cKDTree
 import numpy as np
 from multiprocessing import Pool
+import multiprocessing
 import itertools
 #import matplotlib.pyplot as plt
 #import matplotlib.backends.backend_pdf as pdfback
@@ -32,7 +33,6 @@ NUM_PROCESSES= GLOBAL_SETTINGS['num_processors']#8
 STAGGER_PROCESSES = GLOBAL_SETTINGS['stagger']
 
 #PERFECT_LOCATION = "output/PERFECT_DONTTOUCH/COMPOSITE-MOCK-bin-{:.0f}-{}.npy"
-
 def main(args):
     np.seterr(divide='ignore',invalid='ignore')
     """ Compute the velocity correlations on one or many galaxy surveys. 
@@ -90,19 +90,7 @@ def main(args):
                 maxd = maxd_master
                 
             if settings['many'] and not numpy:
-                #If there are lots of files, set them up accordingly.
-                inFileList = [rawInFile.format(x) for x in infileindices]
-                galaxiess = [common.loadData(f,dataType='CF2') for f in inFileList]
-                print(galaxiess[1][2])
-                d = [np.array([(g.normx,
-                                g.normy,
-                                g.normz,
-                                g.redx,
-                                g.redy,
-                                g.redz,
-                                g.dv,
-                                g.d,
-                                g.v) for g in galaxies]) for galaxies in galaxiess]
+                d = filemanagement(rawInFile,infileindices)
                 i = d
             elif not numpy:
                 galaxies = common.loadData(rawInFile,dataType='CF2')
@@ -177,6 +165,13 @@ def turboRun(data,index,use_npy,maxd,units,xs,intervals,use_tmp):
      histogram(xs[n],intervals[n])
     ]
     """
+    global STAGGER_PROCESSES
+    name=multiprocessing.current_process().name
+    wait = int(name[15:])*10
+    if STAGGER_PROCESSES:
+        time.sleep(wait)
+        STAGGER_PROCESSES = False
+        
     if use_npy:
         loaded_data = data#np.load(data)
         d = np.concatenate((loaded_data[:,0:7],loaded_data[:,7+index:207:100]),axis=1)
@@ -191,6 +186,29 @@ def turboRun(data,index,use_npy,maxd,units,xs,intervals,use_tmp):
                                             )
                                  )
                )
+
+def filemanagement(rawInFile,infileindices):
+    #This is soooo stupid.
+    #If there are lots of files, set them up accordingly.
+    inFileList = [rawInFile.format(x) for x in infileindices]
+    d = []
+    for f in inFileList:
+        galaxies = common.loadData(f,dataType='CF2')
+        #print(galaxiess[1][2])
+        minid = np.array([(g.normx,
+                           g.normy,
+                           g.normz,
+                           g.redx,
+                           g.redy,
+                           g.redz,
+                           g.dv,
+                           g.d,
+                           g.v) for g in galaxies])
+        d.append(minid)
+    #[np.save("tmp/galaxydata{}".format(i),data) for i,data in enumerate(d)]
+    #d = ["tmp/galaxydata{}.npy".format(i) for i in range(100)]
+    
+    return d
     
 def compute(data,maxd,units,use_tmp):
     """Formerly called 'singlePlot,' this function computes all pair-pair galaxy information,
