@@ -355,7 +355,8 @@ def myNpHash(data):
 def getHash(filename,units):
     """Loads up CF2 files and uses them to rebuild the hash database.
     Returns a list of strings. The strings should be hashed with hashlib.md5(string.encode('utf-8')).hexdigest()
-    I'm not sure what I meant when I put that second line there..."""
+    I'm not sure what I meant when I put that second line there... It means that this just returns strings,
+    then you hash them yourself."""
     galaxies = common.loadData(filename, dataType = 'CF2')
     if units == 'Mpc/h':
         return myNpHash(np.array([(a.x,a.y,a.z,a.v,a.dv) for a in galaxies]))
