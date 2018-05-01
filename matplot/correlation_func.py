@@ -51,11 +51,9 @@ def correlate_box(boxinfo, intervals):
     #make kd trees        
     actual_kd = space.cKDTree(actual_galaxies,3)
     random_kd = space.cKDTree(random_list,3)
-    DDs = actual_kd.count_neighbors(actual_kd,intervals)
-    print("This is WRONG - each pair is duplicated, and pairs are created between a galaxy and itself. So, to get the actual number of pairs, take the count_neighbors, subtract len(actual_galaxies), and divide by two.")
-    exit()
-    DRs = actual_kd.count_neighbors(random_kd,intervals)
-    RRs = random_kd.count_neighbors(random_kd,intervals)
+    DDs = actual_kd.count_neighbors(actual_kd,[0]+intervals,cumulative=False)[1:]/2
+    DRs = actual_kd.count_neighbors(random_kd,[0]+intervals,cumulative=False)[1:]/2
+    RRs = random_kd.count_neighbors(random_kd,[0]+intervals,cumulative=False)[1:]/2
     #RDs = random_kd.count_neighbors(actual_kd,intervals)
     #Turns out that RDs == DRs always
     #Just think about it.
@@ -205,28 +203,18 @@ def checkSampleSize(Dd,Dr,Rr,name):
 def hamest(DDs,DRs,RRs):
     results = []
     for index in range(0,len(DDs),2):
-        DDr = DDs[index+1]-DDs[index]
-        #DDr, DRr, and RRr are all "number of objects in a shell" not "number of
-        #objects closer than". This function converts from "closer than" to "in a shell"
-        DRr = DRs[index+1]-DRs[index]
-        RRr = RRs[index+1]-RRs[index]
-        if checkSampleSize(DDr,DRr,RRr,"hamilton"):
+        if checkSampleSize(DDs,DRs,RRs,"hamilton"):
             return None
-        results.append((DDr*RRr)/(DRr**2)-1)
+        results.append((DDs*RRs)/(DRs**2)-1)
         #This is the formula for a hamilton estimator from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
     return results
     
 def dpest(DDs,DRs,RRs):
     results = []
     for index in range(0,len(DDs),2):
-        DDr = DDs[index+1]-DDs[index]
-        #DDr, DRr, and RRr are all "number of objects in a shell" not "number of
-        #objects closer than". This function converts from "closer than" to "in a shell"
-        DRr = DRs[index+1]-DRs[index]
-        RRr = RRs[index+1]-RRs[index]
-        if checkSampleSize(DDr,DRr,RRr,"Davis Peebles"):
+        if checkSampleSize(DDs,DRs,RRs,"Davis Peebles"):
             return None
-        results.append((DDr/DRr)-1)
+        results.append((DDs/DRs)-1)
         #This is the formula for a Davis and Peebles estimator from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
         #Nrd = N
     return results
@@ -235,14 +223,9 @@ def dpest(DDs,DRs,RRs):
 def lsest(DDs,DRs,RRs):
     results = []
     for index in range(0,len(DDs),2):
-        DDr = DDs[index+1]-DDs[index]
-        #DDr, DRr, and RRr are all "number of objects in a shell" not "number of
-        #objects closer than". This function converts from "closer than" to "in a shell"
-        DRr = DRs[index+1]-DRs[index]
-        RRr = RRs[index+1]-RRs[index]
-        if checkSampleSize(DDr,DRr,RRr,"Landy Szalay"):
+        if checkSampleSize(DDs,DRs,RRs,"Landy Szalay"):
             return None
-        results.append(1+(DDr/RRr)-2*(DRr/RRr))
+        results.append(1+(DDs/RRs)-2*(DRs/RRs))
         #This is the formula for a Landy and Szalay estimator from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
         #Nrd = N
         #number of randomly uniform points = number of 'actual' points
@@ -251,15 +234,10 @@ def lsest(DDs,DRs,RRs):
 def randomPointCorrelation(DDs,DRs,RRs):
     results = []
     for index in range(0,len(DDs),2):
-        DDr = DDs[index+1]-DDs[index]
-        #DDr, DRr, and RRr are all "number of objects in a shell" not "number of
-        #objects closer than". This function converts from "closer than" to "in a shell"
-        DRr = DRs[index+1]-DRs[index]
-        RRr = RRs[index+1]-RRs[index]
-        if RRr == 0:
+        if RRs == 0:
             results.append(0)
         else:
-            results.append((DRr/RRr)-1)
+            results.append((DRs/RRs)-1)
         #This takes the number of galaxies in a shell around a random point
         #and compares it to the number of random points in a shell around the random point.
         #Nrd = N
