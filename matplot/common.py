@@ -27,41 +27,41 @@ def parseCmdArgs(argumentList,helpList,typeList):
     return parser.parse_args()
 
 
-def intervals(min_r,step_size,numpoints,dr,step_type):
-    """
-    returns xs, intervals where xs are the center points, intervals are the 'bin edges'
-    In theory, this lets me make lots of mistakes, and it is currently preferred that you use
-    the genBins function below instead.
-    """
-    if step_type == 'lin':
-        return lin_intervals(min_r,step_size,numpoints,dr)
-    elif step_type == 'log':
-        return log_intervals(min_r,step_size,numpoints,dr)
-    else:
-        raise RuntimeError("Interval type {} not recognized".format(step_type))
+# def intervals(min_r,step_size,numpoints,dr,step_type):
+#     """
+#     returns xs, intervals where xs are the center points, intervals are the 'bin edges'
+#     In theory, this lets me make lots of mistakes, and it is currently preferred that you use
+#     the genBins function below instead.
+#     """
+#     if step_type == 'lin':
+#         return lin_intervals(min_r,step_size,numpoints,dr)
+#     elif step_type == 'log':
+#         return log_intervals(min_r,step_size,numpoints,dr)
+#     else:
+#         raise RuntimeError("Interval type {} not recognized".format(step_type))
 
-def lin_intervals(min_r,step_size,numpoints,dr):
-    """Generates linearly-spaced intervals, and their center points."""
-    xs = [(min_r+step_size*x) for x in range(numpoints)]
-    intervals = []
-    for x in xs:
-        intervals.append(x-(dr/2.0))
-        intervals.append(x+(dr/2.0))
-    return (xs, intervals)
+# def lin_intervals(min_r,step_size,numpoints,dr):
+#     """Generates linearly-spaced intervals, and their center points."""
+#     xs = [(min_r+step_size*x) for x in range(numpoints)]
+#     intervals = []
+#     for x in xs:
+#         intervals.append(x-(dr/2.0))
+#         intervals.append(x+(dr/2.0))
+#     return (xs, intervals)
     
-def log_intervals(min_r,step_size,numpoints,dr):
-    """Generates logarithmically spaced intervals and their center points
-    dr is a measure of the size of each interval, as a percentage of the distance between the previous and
-    next interval edges. if dr is .5 then exactly all of the range will be covered with zero overlap.
-    """
-    #The minus one exists so that when x is zero xs is equal to min_r
-    xs = [(min_r + 10**(step_size*x) - 1) for x in range(numpoints)]
-    intervals = []
-    for i in range(numpoints):
-        x = xs[i]
-        intervals.append(x-(dr*((10**(step_size*i))*(1-10**(-step_size)))))
-        intervals.append(x+(dr*((10**(step_size*i))*(10**(step_size)-1))))
-    return (xs, intervals)
+# def log_intervals(min_r,step_size,numpoints,dr):
+#     """Generates logarithmically spaced intervals and their center points
+#     dr is a measure of the size of each interval, as a percentage of the distance between the previous and
+#     next interval edges. if dr is .5 then exactly all of the range will be covered with zero overlap.
+#     """
+#     #The minus one exists so that when x is zero xs is equal to min_r
+#     xs = [(min_r + 10**(step_size*x) - 1) for x in range(numpoints)]
+#     intervals = []
+#     for i in range(numpoints):
+#         x = xs[i]
+#         intervals.append(x-(dr*((10**(step_size*i))*(1-10**(-step_size)))))
+#         intervals.append(x+(dr*((10**(step_size*i))*(10**(step_size)-1))))
+#     return (xs, intervals)
 
 def genBins(min_r,numpoints,dr,step_type):
     """Generates bins that are compatible with sci- and num-py histogram functions.
@@ -75,14 +75,14 @@ def genBins(min_r,numpoints,dr,step_type):
 
 def lin_bins(min_r,numpoints,dr):
     """Generates linearly-spaced bins that can be used with histogram functions."""
-    xs = [min_r + dr*x for x in range(numpoints)]
-    intervals = [(min_r-dr/2)+(dr*x) for x in range(numpoints + 1)]
+    xs = np.arange(min_r,dr*numpoints+min_r,dr)#[min_r + dr*x for x in range(numpoints)]
+    intervals = np.arange(min_r-dr/2,dr*numpoints+min_r+dr/2,dr)#[(min_r-dr/2)+(dr*x) for x in range(numpoints + 1)]
     return (xs,intervals)
     
 def log_bins(min_r,numpoints,dr):
     """Generates logarithmically spaced bins that can be used with histogram functions."""
-    xs = [(min_r + 10**(dr*x) - 1) for x in range(numpoints + 1)]
-    intervals = [x-(.5*((10**(dr*i))*(1-10**(-dr)))) for i,x in enumerate(xs)]
+    xs = np.logspace(min_r,numpoints*dr+min_r-dr,numpoints)
+    intervals = np.logspace(min_r-dr/2,numpoints*dr+min_r-dr/2,numpoints+1)
     return(xs,intervals)
 #Yes, I know these seem stupid, but it's way more work to remove them.
 #They ARE used by the surveystats routine, at least.
@@ -114,6 +114,8 @@ def gensettings(args):
         #if the file doesn't exist, it goes ahead with out asking.
         #if the file does exist, then it asks.
         #Woo for boolean operator overloading!
+        #2018 Christopher says: wow. that's now how I would've done it today. but it's pretty clever.
+        #Also I don't know how I would've done it today.
         with open(filename,'w') as settings:
             settings.write(json.dumps(template[module],
                                       sort_keys=True,
@@ -321,7 +323,8 @@ def _loadBOXData(filename):
 def _loadCSVData(filename):
     """
     Loads galaxy data from a CSV file. Assumes that the data is in the same format that my csv box was in,
-    that is that X, Y, and Z are in rows 14,15, and 16 respectively.
+    that is that X, Y, and Z are in rows 14,15, and 16 respectively. unless the length of the line is 
+    exactly 3.
     """
 #    print("Loading Coordinates...")
 
@@ -331,12 +334,18 @@ def _loadCSVData(filename):
 
     with open(filename, "r") as boxfile:
         for line in boxfile:
-            if line[0]!="#":#comment lines need to be ignored
+            if line[0]!="#" and line[0]!="x":#comment lines and headers need to be ignored
                 try:
                     row = line.split(',')
-                    xs.append(float(row[14]))
-                    ys.append(float(row[15]))
-                    zs.append(float(row[16]))
+
+                    if len(row)==3:
+                        xs.append(float(row[0]))
+                        ys.append(float(row[1]))
+                        zs.append(float(row[2]))
+                    else:
+                        xs.append(float(row[14]))
+                        ys.append(float(row[15]))
+                        zs.append(float(row[16]))
                 except ValueError:
                     pass#sometimes the CSV file doesn't contain a number. In that case, just skip that row.
     return (xs,ys,zs)

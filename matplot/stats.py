@@ -59,7 +59,7 @@ def statistics(args):
     plt.xlabel("Correlation distance, Mpc/h")
     ax5.set_title("Correlation Function, average. Landy and Szalay estimator.")
     ax5.set_xscale('log', nonposx = 'clip')
-    ax5.set_yscale('log', nonposx = 'clip')
+    ax5.set_yscale('log', nonposy = 'clip')
 
     fig6 = plt.figure(6,figsize=(8,6),dpi=400)
     ax6 = fig6.add_subplot(111)
@@ -76,13 +76,13 @@ def statistics(args):
     ax2.set_xscale("log", nonposx='clip')
     ax3.set_xscale("log", nonposx='clip')
     ax4.set_xscale("log", nonposx='clip')
-    ax.set_yscale("log", nonposx='clip')
-    ax2.set_yscale("log", nonposx='clip')
-    ax3.set_yscale("log", nonposx='clip')
-    ax4.set_yscale("log", nonposx='clip')
+    ax.set_yscale("log", nonposy='clip')
+    ax2.set_yscale("log", nonposy='clip')
+    ax3.set_yscale("log", nonposy='clip')
+    ax4.set_yscale("log", nonposy='clip')
     ys = []
-    maxY =10**2
-    minY = 3*10**-1
+    maxY =10**1
+    minY = 10**-2
     maxRandom = 5*10**1
     minRandom = 10**-1
     numboxes = 0

@@ -51,9 +51,9 @@ def correlate_box(boxinfo, intervals):
     #make kd trees        
     actual_kd = space.cKDTree(actual_galaxies,3)
     random_kd = space.cKDTree(random_list,3)
-    DDs = actual_kd.count_neighbors(actual_kd,[0]+intervals,cumulative=False)[1:]/2
-    DRs = actual_kd.count_neighbors(random_kd,[0]+intervals,cumulative=False)[1:]/2
-    RRs = random_kd.count_neighbors(random_kd,[0]+intervals,cumulative=False)[1:]/2
+    DDs = actual_kd.count_neighbors(actual_kd,intervals,cumulative=False)[1:]/2
+    DRs = actual_kd.count_neighbors(random_kd,intervals,cumulative=False)[1:]/2
+    RRs = random_kd.count_neighbors(random_kd,intervals,cumulative=False)[1:]/2
     #RDs = random_kd.count_neighbors(actual_kd,intervals)
     #Turns out that RDs == DRs always
     #Just think about it.
@@ -62,17 +62,16 @@ def correlate_box(boxinfo, intervals):
     
 
 def makeSubDataPerBox(DDs, DRs, RRs, xs, ldrs, rdrs):
-    localxs = list(xs)
-    localLdrs = list(ldrs)
-    localRdrs = list(rdrs)
-    hamilton = hamest(DDs,DRs,RRs)
-    davis_peebles = dpest(DDs,DRs,RRs)
-    landy_szalay = lsest(DDs,DRs,RRs)
-    random_point = randomPointCorrelation(DDs,DRs,RRs)
-    if hamilton is None or davis_peebles is None or landy_szalay is None:
+    localxs = list(map(float,xs))
+    localLdrs = list(map(float,ldrs))
+    localRdrs = list(map(float,rdrs))
+    hamilton = list(map(float,hamest(DDs,DRs,RRs)))
+    davis_peebles = list(map(float,dpest(DDs,DRs,RRs)))
+    landy_szalay = list(map(float,lsest(DDs,DRs,RRs)))
+    random_point = list(map(float,randomPointCorrelation(DDs,DRs,RRs)))
+    if sum(DDs==0)!=0 or sum(DRs==0)!=0 or sum(RRs==0)!=0:
         #print("Zero correlation encountered!")
         return None
-    #checkForBadNums(hamilton, davis_peebles, landy_szalay, localxs, localLdrs,localRdrs,random_point)
     return {"rs":localxs,
             "dr_left":localLdrs,
             "dr_right":localRdrs,
@@ -84,19 +83,6 @@ def makeSubDataPerBox(DDs, DRs, RRs, xs, ldrs, rdrs):
             "DRs":[int(num) for num in DRs],
             "RRs":[int(num) for num in RRs]
     }
-#deprecated in favor of checkSampleSize()
-# def checkForBadNums(*args):
-#     #The lists always need to have the same length!
-#     for i in range(len(args[0])-1,-1,-1):
-#         #go through the lists from the back to the front.
-#         bad = False
-#         for arg in args:
-#             if not math.isfinite(arg[i]):
-#                 bad = True
-#                 break
-#         if bad:
-#             for arg in args:
-#                 del arg[i]
             
 def calculate_correlations(args):
     """
@@ -110,26 +96,19 @@ def calculate_correlations(args):
     """
 
     unique, boxinfo, numpoints, dr, step_size, min_r, step_type = args
-    
-    if step_type == "lin":
-        inter_fun = common.lin_intervals
-    elif step_type == "log":
-        inter_fun = common.log_intervals
-    else:
-        raise ValueError("step_type {} undefined".format(step_type))
-    xs,intervals = inter_fun(min_r, step_size, numpoints, dr)
+
+    xs,intervals = common.genBins(min_r, numpoints, dr,step_type)
     left_drs = getLeftdrs(xs,intervals)
     right_drs = getRightdrs(xs,intervals)
     #Left and right drs are used when plotting error bars
-    check_list = np.array(intervals)
+    check_list = intervals
     lower = min(check_list)
     #assert(lower >= 0)
 
-    DDs = [0 for x in range(len(check_list))]
-    DRs = [0 for x in range(len(check_list))]#These arrays should contain total numbers of pairs.
-    RRs = [0 for x in range(len(check_list))]
+    DDs = [0 for x in range(len(check_list)-1)]
+    DRs = [0 for x in range(len(check_list)-1)]#These arrays should contain total numbers of pairs.
+    RRs = [0 for x in range(len(check_list)-1)]
     
-
     #make a list of boxes:
     boxes = list(boxinfo['list_of_files'].items())
     pool = Pool(processes = NUM_PROCESSORS)
@@ -148,15 +127,14 @@ def calculate_correlations(args):
         #Make a local copy of these things for use in culling.
 
         miniDDs, miniDRs, miniRRs = item
-
+        print(len(DDs) , len(DRs) , len(RRs) , len(miniDDs), len(miniDRs) , len(miniRRs))
         assert(len(DDs) == len(DRs) == len(RRs) == len(miniDDs) == len(miniDRs) == len(miniRRs))
         #I think I'm just paranoid.
         
         #Make DDs, DRs, and RRs contain the *total* number of pairs found.
-        for i in range(len(miniDDs)):
-            DDs[i] = DDs[i] + miniDDs[i]
-            DRs[i] = DRs[i] + miniDRs[i]
-            RRs[i] = RRs[i] + miniRRs[i]
+        DDs = DDs + miniDDs
+        DRs = DRs + miniDRs
+        RRs = RRs + miniRRs
             
         
         data = makeSubDataPerBox(miniDDs, miniDRs, miniRRs, xs, left_drs, right_drs)
@@ -173,76 +151,35 @@ def calculate_correlations(args):
     return dataPerBox
 
 def getLeftdrs(xs,intervals):
-    return [xs[i] - intervals[i*2] for i in range(len(xs))]
+    return [xs[i] - intervals[i] for i in range(len(xs))]
 
 def getRightdrs(xs,intervals):
-    return [intervals[i*2+1] - xs[i] for i in range(len(xs))]
-
-def checkSampleSize(Dd,Dr,Rr,name):
-    """
-    if Dd < MINIMUM_SAMPLE:
-        print("Warning: Small sample size encountered in {} correlation calculation, {} value = {}.".format(name,
-                                                                                                            "DD",
-                                                                                                            Dd))
-        print("Consider increasing bin size.")
-    if Dr < MINIMUM_SAMPLE:
-        print("Warning: Small sample size encountered in {} correlation calculation, {} value = {}.".format(name,
-                                                                                                            "DR",
-                                                                                                            Dr))
-        print("Consider increasing bin size.")
-    if Rr < MINIMUM_SAMPLE:
-        print("Warning: Small sample size encountered in {} correlation calculation, {} value = {}.".format(name,
-                                                                                                            "RR",
-                                                                                                            Rr))
-        print("Consider increasing bin size.")"""
-    if Dd == 0 or Dr == 0 or Rr == 0:
-        return True
-    else:
-        return False
+    return [intervals[i+1] - xs[i] for i in range(len(xs))]
 
 def hamest(DDs,DRs,RRs):
-    results = []
-    for index in range(0,len(DDs),2):
-        if checkSampleSize(DDs,DRs,RRs,"hamilton"):
-            return None
-        results.append((DDs*RRs)/(DRs**2)-1)
-        #This is the formula for a hamilton estimator from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
+    results=(DDs*RRs)/(DRs**2)-1
+    #This is the formula for a hamilton estimator from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
     return results
     
 def dpest(DDs,DRs,RRs):
-    results = []
-    for index in range(0,len(DDs),2):
-        if checkSampleSize(DDs,DRs,RRs,"Davis Peebles"):
-            return None
-        results.append((DDs/DRs)-1)
+
         #This is the formula for a Davis and Peebles estimator from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
         #Nrd = N
-    return results
+    return (DDs/DRs)-1
 
 
 def lsest(DDs,DRs,RRs):
-    results = []
-    for index in range(0,len(DDs),2):
-        if checkSampleSize(DDs,DRs,RRs,"Landy Szalay"):
-            return None
-        results.append(1+(DDs/RRs)-2*(DRs/RRs))
         #This is the formula for a Landy and Szalay estimator from http://ned.ipac.caltech.edu/level5/March04/Jones/Jones5_2.html
         #Nrd = N
         #number of randomly uniform points = number of 'actual' points
-    return results
+    return 1+(DDs/RRs)-2*(DRs/RRs)
 
 def randomPointCorrelation(DDs,DRs,RRs):
-    results = []
-    for index in range(0,len(DDs),2):
-        if RRs == 0:
-            results.append(0)
-        else:
-            results.append((DRs/RRs)-1)
         #This takes the number of galaxies in a shell around a random point
         #and compares it to the number of random points in a shell around the random point.
         #Nrd = N
         #number of randomly uniform points = number of 'actual' points
-    return results
+    return (DRs/RRs)-1
 
 
     
@@ -320,11 +257,12 @@ def mainrun(args):
     dataFileName = dataFileName + args.settings.split('/')[-1].split('.')[0] + '---rawdata.json'
                             
                             
-                            
-    common.writedict(dataFileName,
-                     {'raw_runs':correlation_func_of_r,
+    dictionary={'raw_runs':correlation_func_of_r,
                       'settings':all_settings,
-                      'time':finish})
+                      'time':finish}
+    #return dictionary
+    #print(dictionary)
+    common.writedict(dataFileName,dictionary)
                      
 if __name__ == "__main__":
     print("This python file does not run as a script. Instead use:")
